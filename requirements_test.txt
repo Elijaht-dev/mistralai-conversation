@@ -3,4 +3,4 @@ mistralai==2.7.0
 mypy==2.3.0
 pytest-cov==7.1.0
 pytest-homeassistant-custom-component==0.13.347
-ruff==0.15.22
+ruff==0.16.0

@@ -68,33 +68,105 @@ $bubbleBrush = [System.Drawing.SolidBrush]::new(
 )
 $graphics.FillPath($bubbleBrush, $bubblePath)
 
-$markBrush = [System.Drawing.SolidBrush]::new(
-    [System.Drawing.ColorTranslator]::FromHtml('#171923')
+# Mistral's official gradient pixel-cat emblem:
+# https://mistral.ai/brand/
+$markX = 144
+$markY = 152
+$markUnit = 32
+$amberBrush = [System.Drawing.SolidBrush]::new(
+    [System.Drawing.ColorTranslator]::FromHtml('#FFAF01')
 )
-$markPath = [System.Drawing.Drawing2D.GraphicsPath]::new()
-$markPath.AddPolygon(
-    [System.Drawing.PointF[]] @(
-        [System.Drawing.PointF]::new(136, 312),
-        [System.Drawing.PointF]::new(136, 152),
-        [System.Drawing.PointF]::new(188, 152),
-        [System.Drawing.PointF]::new(256, 228),
-        [System.Drawing.PointF]::new(324, 152),
-        [System.Drawing.PointF]::new(376, 152),
-        [System.Drawing.PointF]::new(376, 312),
-        [System.Drawing.PointF]::new(320, 312),
-        [System.Drawing.PointF]::new(320, 232),
-        [System.Drawing.PointF]::new(256, 304),
-        [System.Drawing.PointF]::new(192, 232),
-        [System.Drawing.PointF]::new(192, 312)
-    )
+$orangeBrush = [System.Drawing.SolidBrush]::new(
+    [System.Drawing.ColorTranslator]::FromHtml('#FF8204')
 )
-$markPath.CloseFigure()
-$graphics.FillPath($markBrush, $markPath)
+$vermillionBrush = [System.Drawing.SolidBrush]::new(
+    [System.Drawing.ColorTranslator]::FromHtml('#FA500F')
+)
+$redBrush = [System.Drawing.SolidBrush]::new(
+    [System.Drawing.ColorTranslator]::FromHtml('#E61300')
+)
+$burgundyBrush = [System.Drawing.SolidBrush]::new(
+    [System.Drawing.ColorTranslator]::FromHtml('#C4001D')
+)
+
+$graphics.FillRectangle(
+    $amberBrush,
+    $markX + $markUnit,
+    $markY,
+    $markUnit,
+    $markUnit
+)
+$graphics.FillRectangle(
+    $amberBrush,
+    $markX + (5 * $markUnit),
+    $markY,
+    $markUnit,
+    $markUnit
+)
+$graphics.FillRectangle(
+    $orangeBrush,
+    $markX + $markUnit,
+    $markY + $markUnit,
+    2 * $markUnit,
+    $markUnit
+)
+$graphics.FillRectangle(
+    $orangeBrush,
+    $markX + (4 * $markUnit),
+    $markY + $markUnit,
+    2 * $markUnit,
+    $markUnit
+)
+$graphics.FillRectangle(
+    $vermillionBrush,
+    $markX + $markUnit,
+    $markY + (2 * $markUnit),
+    5 * $markUnit,
+    $markUnit
+)
+$graphics.FillRectangle(
+    $redBrush,
+    $markX + $markUnit,
+    $markY + (3 * $markUnit),
+    $markUnit,
+    $markUnit
+)
+$graphics.FillRectangle(
+    $redBrush,
+    $markX + (3 * $markUnit),
+    $markY + (3 * $markUnit),
+    $markUnit,
+    $markUnit
+)
+$graphics.FillRectangle(
+    $redBrush,
+    $markX + (5 * $markUnit),
+    $markY + (3 * $markUnit),
+    $markUnit,
+    $markUnit
+)
+$graphics.FillRectangle(
+    $burgundyBrush,
+    $markX,
+    $markY + (4 * $markUnit),
+    3 * $markUnit,
+    $markUnit
+)
+$graphics.FillRectangle(
+    $burgundyBrush,
+    $markX + (4 * $markUnit),
+    $markY + (4 * $markUnit),
+    3 * $markUnit,
+    $markUnit
+)
 
 $bitmap.Save($resolvedOutput, [System.Drawing.Imaging.ImageFormat]::Png)
 
-$markPath.Dispose()
-$markBrush.Dispose()
+$burgundyBrush.Dispose()
+$redBrush.Dispose()
+$vermillionBrush.Dispose()
+$orangeBrush.Dispose()
+$amberBrush.Dispose()
 $bubbleBrush.Dispose()
 $bubblePath.Dispose()
 $tileBrush.Dispose()

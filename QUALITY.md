@@ -49,7 +49,7 @@ validation and Dependabot help detect compatibility drift.
 - HACS cannot install a private repository. The private preview is manual-only.
 - Model-generated actions are not deterministic. Entity exposure and safeguards
   must be designed in Home Assistant.
-- Compatibility is declared from Home Assistant 2026.7.3 and is continuously
+- Compatibility is declared from Home Assistant 2026.7.4 and is continuously
   checked against the pinned development baseline.
 
 ## Release gate

@@ -1,0 +1,195 @@
+{
+  "title": "Conversation Mistral AI",
+  "config": {
+    "abort": {
+      "already_configured": "Ce compte Mistral AI est déjà configuré.",
+      "reauth_successful": "La réauthentification a réussi."
+    },
+    "error": {
+      "cannot_connect": "Impossible de se connecter à Mistral AI.",
+      "invalid_auth": "La clé API est incorrecte ou ne dispose pas des accès nécessaires.",
+      "timeout_connect": "Mistral AI n'a pas répondu avant l'expiration du délai de connexion.",
+      "unknown": "Erreur inattendue."
+    },
+    "step": {
+      "reauth_confirm": {
+        "data": {
+          "api_key": "Clé API"
+        },
+        "data_description": {
+          "api_key": "La nouvelle clé API Mistral AI."
+        },
+        "description": "Mistral AI a refusé les identifiants enregistrés. Saisissez une clé API valide pour vous reconnecter.",
+        "title": "Reconnecter Mistral AI"
+      },
+      "user": {
+        "data": {
+          "api_key": "Clé API"
+        },
+        "data_description": {
+          "api_key": "Votre clé API Mistral AI. Elle est conservée dans le stockage des entrées de configuration de Home Assistant."
+        },
+        "description": "Saisissez une clé API Mistral AI. Vous pouvez en créer une dans la [console Mistral]({api_key_url}).",
+        "title": "Connecter Mistral AI"
+      }
+    }
+  },
+  "config_subentries": {
+    "conversation": {
+      "abort": {
+        "entry_not_loaded": "Le compte Mistral AI n'est pas chargé. Rechargez-le avant de modifier les agents de conversation.",
+        "reconfigure_successful": "L'agent de conversation a été mis à jour.",
+        "unknown": "Erreur inattendue."
+      },
+      "entry_type": "Agent de conversation",
+      "error": {
+        "max_tokens_context": "Le nombre maximal de jetons de réponse ne peut pas dépasser la fenêtre de contexte de {max_context_length} jetons de ce modèle.",
+        "model_no_reasoning": "Le modèle sélectionné n'indique pas prendre en charge le raisonnement.",
+        "model_no_tools": "Le modèle sélectionné n'indique pas prendre en charge les appels de fonction. Désélectionnez les API Home Assistant ou choisissez un autre modèle."
+      },
+      "initiate_flow": {
+        "reconfigure": "Reconfigurer l'agent de conversation",
+        "user": "Ajouter un agent de conversation"
+      },
+      "step": {
+        "init": {
+          "data": {
+            "llm_hass_api": "API Home Assistant",
+            "max_tokens": "Nombre maximal de jetons de réponse",
+            "model": "Modèle",
+            "name": "Nom",
+            "prompt": "Instructions",
+            "reasoning_effort": "Effort de raisonnement",
+            "safe_prompt": "Activer le message de sécurité Mistral",
+            "temperature": "Température"
+          },
+          "data_description": {
+            "llm_hass_api": "Sélectionnez les API d'outils Home Assistant que le modèle peut utiliser. Laissez vide pour discuter uniquement.",
+            "max_tokens": "Nombre maximal de jetons que Mistral peut générer. L'entrée et la sortie doivent tenir ensemble dans la fenêtre de contexte du modèle.",
+            "model": "Sélectionnez un modèle proposé pour votre compte, ou saisissez l'identifiant d'un modèle personnalisé ou affiné.",
+            "name": "Nom affiché pour cet agent de conversation dans Home Assistant.",
+            "prompt": "Instructions données au modèle. Les modèles de texte Home Assistant sont pris en charge.",
+            "reasoning_effort": "Activez le raisonnement et choisissez son intensité. Utilisez Aucun pour les modèles qui ne le prennent pas en charge.",
+            "safe_prompt": "Demander à Mistral d'ajouter son message de sécurité avant la conversation.",
+            "temperature": "Une valeur faible donne des réponses plus prévisibles ; une valeur élevée les rend plus variées."
+          },
+          "description": "Configurez le modèle Mistral et les outils Home Assistant qu'il peut utiliser.",
+          "title": "Agent de conversation Mistral"
+        }
+      }
+    }
+  },
+  "entity": {
+    "conversation": {
+      "conversation": {
+        "name": "Conversation"
+      }
+    }
+  },
+  "exceptions": {
+    "api_authentication_error": {
+      "message": "Mistral AI a refusé les identifiants : {message}. Une réauthentification est nécessaire."
+    },
+    "api_connection_error": {
+      "message": "Impossible de se connecter à Mistral AI : {message}."
+    },
+    "api_error": {
+      "message": "Erreur de l'API Mistral AI : {message}."
+    },
+    "api_rate_limit": {
+      "message": "La limite de requêtes Mistral AI est atteinte ou le compte ne dispose plus de crédit : {message}."
+    },
+    "api_timeout": {
+      "message": "La requête Mistral AI a expiré : {message}."
+    },
+    "attachment_not_found": {
+      "message": "La pièce jointe {filename} est introuvable."
+    },
+    "attachment_too_large": {
+      "message": "La pièce jointe {filename} dépasse la taille maximale prise en charge de {maximum_mb} Mo."
+    },
+    "attachment_type_unsupported": {
+      "message": "La pièce jointe {filename} est de type {mime_type}, qui n'est pas pris en charge. Utilisez PNG, JPEG, GIF, WebP ou PDF."
+    },
+    "empty_response": {
+      "message": "Mistral AI a renvoyé une réponse vide."
+    },
+    "invalid_repair_data": {
+      "message": "La réparation du modèle ne contient pas d'entrée, d'agent de conversation et de remplacement valides."
+    },
+    "max_tokens_context": {
+      "message": "Le nombre maximal de jetons de réponse pour {model} ne peut pas dépasser sa fenêtre de contexte de {maximum} jetons."
+    },
+    "max_tool_iterations": {
+      "message": "Mistral AI demandait encore des outils après {maximum} cycles ; le traitement a donc été arrêté."
+    },
+    "model_no_documents": {
+      "message": "Le modèle {model} n'indique pas prendre en charge les documents PDF."
+    },
+    "model_no_reasoning": {
+      "message": "Le modèle {model} n'indique pas prendre en charge le raisonnement."
+    },
+    "model_no_tools": {
+      "message": "Le modèle {model} n'indique pas prendre en charge les appels de fonction."
+    },
+    "model_no_vision": {
+      "message": "Le modèle {model} n'indique pas prendre en charge les images en entrée."
+    },
+    "stream_error": {
+      "message": "Mistral AI a terminé le flux de réponse avec une erreur."
+    },
+    "subentry_not_found": {
+      "message": "L'agent de conversation visé par cette réparation n'existe plus."
+    },
+    "system_message_not_found": {
+      "message": "Le premier élément du journal de discussion doit être un message système."
+    },
+    "too_many_attachments": {
+      "message": "Une requête peut contenir au maximum {maximum} pièces jointes."
+    },
+    "too_many_tools": {
+      "message": "Mistral AI accepte au maximum {maximum} outils dans une requête."
+    },
+    "tool_call_invalid": {
+      "message": "Mistral AI a renvoyé un appel d'outil incorrect : {message}."
+    },
+    "unexpected_chat_log_content": {
+      "message": "Le journal de discussion contient un élément non pris en charge de type {type}."
+    },
+    "unknown_issue_id": {
+      "message": "Ce problème de réparation Mistral AI n'est pas reconnu."
+    },
+    "user_message_not_found": {
+      "message": "Les pièces jointes nécessitent un dernier message utilisateur."
+    }
+  },
+  "issues": {
+    "model_deprecated": {
+      "description": "L'agent de conversation **{subentry_name}** utilise **{model}**, dont le retrait est prévu le {retirement_date}. Sélectionnez **{replacement}** ou un autre modèle pris en charge.",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "data": {
+              "model": "Modèle de remplacement"
+            },
+            "description": "Remplacez **{model}** pour l'agent de conversation **{subentry_name}**.",
+            "title": "Remplacer le modèle Mistral obsolète"
+          }
+        }
+      },
+      "title": "Un modèle Mistral configuré est obsolète"
+    }
+  },
+  "selector": {
+    "reasoning_effort": {
+      "options": {
+        "high": "Élevé",
+        "low": "Faible",
+        "medium": "Moyen",
+        "minimal": "Minimal",
+        "none": "Aucun",
+        "xhigh": "Très élevé"
+      }
+    }
+  }
+}

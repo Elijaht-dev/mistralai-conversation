@@ -1,0 +1,60 @@
+name: Bug report
+description: Report reproducible integration behavior
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Remove API keys, prompt content, entity names, addresses, and other
+        private data. Report vulnerabilities privately as described in
+        SECURITY.md.
+  - type: input
+    id: home_assistant
+    attributes:
+      label: Home Assistant version
+      placeholder: 2026.7.2
+    validations:
+      required: true
+  - type: input
+    id: integration
+    attributes:
+      label: Integration version
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Mistral model ID
+      placeholder: mistral-small-latest
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs or diagnostics
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I removed secrets and private data.
+          required: true
+        - label: I searched existing issues.
+          required: true

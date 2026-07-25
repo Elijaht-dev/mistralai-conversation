@@ -1,0 +1,195 @@
+{
+  "title": "Mistral AI Conversation",
+  "config": {
+    "abort": {
+      "already_configured": "This Mistral AI account is already configured.",
+      "reauth_successful": "Reauthentication was successful."
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to Mistral AI.",
+      "invalid_auth": "The API key is invalid or does not have access.",
+      "timeout_connect": "Mistral AI did not respond before the connection timed out.",
+      "unknown": "Unexpected error."
+    },
+    "step": {
+      "reauth_confirm": {
+        "data": {
+          "api_key": "API key"
+        },
+        "data_description": {
+          "api_key": "The replacement Mistral AI API key."
+        },
+        "description": "Mistral AI rejected the saved credentials. Enter a valid API key to reconnect.",
+        "title": "Reconnect Mistral AI"
+      },
+      "user": {
+        "data": {
+          "api_key": "API key"
+        },
+        "data_description": {
+          "api_key": "Your Mistral AI API key. It is stored in Home Assistant's config-entry storage."
+        },
+        "description": "Enter a Mistral AI API key. You can create one in the [Mistral console]({api_key_url}).",
+        "title": "Connect to Mistral AI"
+      }
+    }
+  },
+  "config_subentries": {
+    "conversation": {
+      "abort": {
+        "entry_not_loaded": "The Mistral AI account is not loaded. Reload it before changing conversation agents.",
+        "reconfigure_successful": "The conversation agent was updated.",
+        "unknown": "Unexpected error."
+      },
+      "entry_type": "Conversation agent",
+      "error": {
+        "max_tokens_context": "Maximum response tokens cannot exceed this model's {max_context_length}-token context window.",
+        "model_no_reasoning": "The selected model does not advertise reasoning support.",
+        "model_no_tools": "The selected model does not advertise function-calling support. Clear Home Assistant APIs or choose another model."
+      },
+      "initiate_flow": {
+        "reconfigure": "Reconfigure conversation agent",
+        "user": "Add conversation agent"
+      },
+      "step": {
+        "init": {
+          "data": {
+            "llm_hass_api": "Home Assistant APIs",
+            "max_tokens": "Maximum response tokens",
+            "model": "Model",
+            "name": "Name",
+            "prompt": "Instructions",
+            "reasoning_effort": "Reasoning effort",
+            "safe_prompt": "Enable Mistral safety prompt",
+            "temperature": "Temperature"
+          },
+          "data_description": {
+            "llm_hass_api": "Select the Home Assistant tool APIs the model may use. Leave empty for chat only.",
+            "max_tokens": "Maximum tokens Mistral may generate. Input and output together must fit within the model's context window.",
+            "model": "Select a model returned by your account, or enter a custom or fine-tuned model ID.",
+            "name": "Name shown for this conversation agent in Home Assistant.",
+            "prompt": "Instructions for the model. Home Assistant templates are supported.",
+            "reasoning_effort": "Enable reasoning and choose its effort. Use None for models without reasoning support.",
+            "safe_prompt": "Ask Mistral to inject its safety prompt before the conversation.",
+            "temperature": "Lower values are more predictable; higher values are more varied."
+          },
+          "description": "Configure the Mistral model and the Home Assistant tools it can use.",
+          "title": "Mistral conversation agent"
+        }
+      }
+    }
+  },
+  "entity": {
+    "conversation": {
+      "conversation": {
+        "name": "Conversation"
+      }
+    }
+  },
+  "exceptions": {
+    "api_authentication_error": {
+      "message": "Mistral AI rejected the credentials: {message}. Reauthentication is required."
+    },
+    "api_connection_error": {
+      "message": "Unable to connect to Mistral AI: {message}."
+    },
+    "api_error": {
+      "message": "Mistral AI API error: {message}."
+    },
+    "api_rate_limit": {
+      "message": "Mistral AI's rate limit was reached or the account has no available credit: {message}."
+    },
+    "api_timeout": {
+      "message": "The Mistral AI request timed out: {message}."
+    },
+    "attachment_not_found": {
+      "message": "The attachment {filename} could not be found."
+    },
+    "attachment_too_large": {
+      "message": "The attachment {filename} is larger than the supported maximum of {maximum_mb} MB."
+    },
+    "attachment_type_unsupported": {
+      "message": "The attachment {filename} has unsupported type {mime_type}. Use PNG, JPEG, GIF, WebP, or PDF."
+    },
+    "empty_response": {
+      "message": "Mistral AI returned an empty response."
+    },
+    "invalid_repair_data": {
+      "message": "The model repair does not contain a valid entry, conversation agent, and replacement."
+    },
+    "max_tokens_context": {
+      "message": "Maximum response tokens for {model} cannot exceed its {maximum}-token context window."
+    },
+    "max_tool_iterations": {
+      "message": "Mistral AI still requested tools after {maximum} rounds, so processing was stopped."
+    },
+    "model_no_documents": {
+      "message": "The model {model} does not advertise PDF document support."
+    },
+    "model_no_reasoning": {
+      "message": "The model {model} does not advertise reasoning support."
+    },
+    "model_no_tools": {
+      "message": "The model {model} does not advertise function-calling support."
+    },
+    "model_no_vision": {
+      "message": "The model {model} does not advertise image input support."
+    },
+    "stream_error": {
+      "message": "Mistral AI ended the response stream with an error."
+    },
+    "subentry_not_found": {
+      "message": "The conversation agent targeted by this repair no longer exists."
+    },
+    "system_message_not_found": {
+      "message": "The first chat-log item must be a system message."
+    },
+    "too_many_attachments": {
+      "message": "At most {maximum} attachments can be sent in one request."
+    },
+    "too_many_tools": {
+      "message": "Mistral AI accepts at most {maximum} tools in one request."
+    },
+    "tool_call_invalid": {
+      "message": "Mistral AI returned an invalid tool call: {message}."
+    },
+    "unexpected_chat_log_content": {
+      "message": "The chat log contains unsupported content of type {type}."
+    },
+    "unknown_issue_id": {
+      "message": "This Mistral AI repair issue is not recognized."
+    },
+    "user_message_not_found": {
+      "message": "Attachments require a final user message."
+    }
+  },
+  "issues": {
+    "model_deprecated": {
+      "description": "The conversation agent **{subentry_name}** uses **{model}**, which is scheduled for retirement on {retirement_date}. Select **{replacement}** or another supported model.",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "data": {
+              "model": "Replacement model"
+            },
+            "description": "Replace **{model}** for the conversation agent **{subentry_name}**.",
+            "title": "Replace deprecated Mistral model"
+          }
+        }
+      },
+      "title": "A configured Mistral model is deprecated"
+    }
+  },
+  "selector": {
+    "reasoning_effort": {
+      "options": {
+        "high": "High",
+        "low": "Low",
+        "medium": "Medium",
+        "minimal": "Minimal",
+        "none": "None",
+        "xhigh": "Extra high"
+      }
+    }
+  }
+}

@@ -1,3 +1,5 @@
+hassil==3.8.0
+home-assistant-intents==2026.6.24
 homeassistant==2026.7.3
 mistralai==2.7.0
 mypy==2.3.0

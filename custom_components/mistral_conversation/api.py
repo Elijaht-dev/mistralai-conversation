@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from contextlib import suppress
 from datetime import datetime
+from types import TracebackType
+from typing import Protocol, cast
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.httpx_client import get_async_client
@@ -11,6 +13,28 @@ from mistralai.client import Mistral
 from mistralai.client.models import BaseModelCard, FTModelCard
 
 from .const import LOGGER, SETUP_TIMEOUT_MS, MistralModel
+
+
+class _ClosableMistralClient(Protocol):
+    """Typed context-manager surface missing from the generated SDK hints."""
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> object:
+        """Close synchronous SDK-owned resources."""
+        ...
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> object:
+        """Close asynchronous SDK-owned resources."""
+        ...
 
 
 def create_client(hass: HomeAssistant, api_key: str) -> Mistral:
@@ -27,10 +51,11 @@ async def async_close_client(client: Mistral) -> None:
     The asynchronous HTTP transport is supplied by Home Assistant. The SDK
     detaches from that transport without closing Home Assistant's shared client.
     """
+    closable_client = cast(_ClosableMistralClient, client)
     with suppress(Exception):
-        client.__exit__(None, None, None)
+        closable_client.__exit__(None, None, None)
     with suppress(Exception):
-        await client.__aexit__(None, None, None)
+        await closable_client.__aexit__(None, None, None)
 
 
 def _optional_string(value: object) -> str | None:

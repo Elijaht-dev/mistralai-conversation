@@ -4,7 +4,13 @@ from __future__ import annotations
 
 import base64
 import mimetypes
-from collections.abc import AsyncGenerator, AsyncIterable, Callable, Iterator
+from collections.abc import (
+    AsyncGenerator,
+    AsyncIterable,
+    Callable,
+    Iterator,
+    Sequence,
+)
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Never, cast
@@ -41,7 +47,7 @@ from mistralai.client.models import (
 )
 from mistralai.client.models.contentchunk import ContentChunk
 from mistralai.client.models.thinkchunk import Thinking
-from voluptuous_openapi import convert
+from voluptuous_openapi import convert  # type: ignore[import-untyped]
 
 from .const import (
     CONF_MAX_TOKENS,
@@ -49,6 +55,7 @@ from .const import (
     CONF_SAFE_PROMPT,
     CONF_TEMPERATURE,
     DEFAULT_CONVERSATION_OPTIONS,
+    DEFAULT_TEMPERATURE,
     DOMAIN,
     LOGGER,
     MAX_ATTACHMENT_BYTES,
@@ -397,7 +404,7 @@ async def async_prepare_attachments(
     return await hass.async_add_executor_job(prepare)
 
 
-def _has_meaningful_content(contents: list[conversation.Content]) -> bool:
+def _has_meaningful_content(contents: Sequence[conversation.Content]) -> bool:
     """Return whether a transformed stream produced text, reasoning, or tools."""
     return any(
         isinstance(content, conversation.AssistantContent)
@@ -510,7 +517,7 @@ class MistralBaseEntity(CoordinatorEntity[MistralCoordinator]):
 
         raw_reasoning_effort = options[CONF_REASONING_EFFORT]
         reasoning_effort: ReasoningEffort = (
-            cast(ReasoningEffort, raw_reasoning_effort)
+            raw_reasoning_effort
             if raw_reasoning_effort in REASONING_EFFORTS
             else REASONING_EFFORT_NONE
         )
@@ -545,7 +552,7 @@ class MistralBaseEntity(CoordinatorEntity[MistralCoordinator]):
                     translation_key="user_message_not_found",
                 )
             attachment_chunks = await async_prepare_attachments(self.hass, attachments)
-            last_message = cast(UserMessage, messages[-1])
+            last_message = messages[-1]
             content_chunks: list[ContentChunk] = []
             if isinstance(last_message.content, str) and last_message.content:
                 content_chunks.append(TextChunk(text=last_message.content))
@@ -570,12 +577,20 @@ class MistralBaseEntity(CoordinatorEntity[MistralCoordinator]):
             }
         )
 
+        raw_temperature = options[CONF_TEMPERATURE]
+        temperature = (
+            float(raw_temperature)
+            if not isinstance(raw_temperature, bool)
+            and isinstance(raw_temperature, int | float)
+            else DEFAULT_TEMPERATURE
+        )
+
         return MistralRequest(
             model=self.model,
             messages=messages,
             tools=tools,
             max_tokens=max_tokens,
-            temperature=float(options[CONF_TEMPERATURE]),
+            temperature=temperature,
             reasoning_effort=reasoning_effort,
             safe_prompt=bool(options[CONF_SAFE_PROMPT]),
             prompt_cache_key=chat_log.conversation_id,

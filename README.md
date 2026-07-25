@@ -151,8 +151,10 @@ with care.
 ## Quality and development
 
 The repository validates on Python 3.14 with Ruff, strict mypy, Home
-Assistant-native pytest fixtures, branch coverage, HACS validation, and Hassfest.
-Provider calls are mocked in tests; no live API key is required.
+Assistant-native pytest fixtures, branch coverage, HACS structural readiness, and
+Hassfest. The official HACS remote validator runs automatically once repository
+visibility is public, because HACS cannot read private repositories. Provider
+calls are mocked in tests; no live API key is required.
 
 ```bash
 python -m pip install --requirement requirements_test.txt

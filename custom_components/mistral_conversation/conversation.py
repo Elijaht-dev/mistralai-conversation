@@ -34,7 +34,6 @@ async def async_setup_entry(
 
 class MistralConversationEntity(
     conversation.ConversationEntity,
-    conversation.AbstractConversationAgent,
     MistralBaseEntity,
 ):
     """A Mistral AI conversation agent."""

@@ -33,10 +33,12 @@ Every push and pull request runs:
 - strict mypy over integration code
 - Home Assistant-native pytest tests with mocked provider streams
 - branch coverage with an 85% minimum
-- HACS repository validation
+- offline HACS repository-structure validation
 - Home Assistant Hassfest validation
 
-Weekly scheduled validation and Dependabot help detect compatibility drift.
+The official HACS remote validator additionally runs whenever the repository is
+public. HACS cannot fetch private repository manifests. Weekly scheduled
+validation and Dependabot help detect compatibility drift.
 
 ## Deliberate boundaries
 

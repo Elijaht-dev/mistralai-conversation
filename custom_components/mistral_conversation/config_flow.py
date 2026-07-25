@@ -164,7 +164,6 @@ class MistralConfigFlow(ConfigFlow, domain=DOMAIN):
             },
         )
 
-    @override
     async def async_step_reauth(self, entry_data: dict[str, Any]) -> ConfigFlowResult:
         """Start reauthentication."""
         return await self.async_step_reauth_confirm()

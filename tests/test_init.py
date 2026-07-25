@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from homeassistant.components import conversation
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import (
     CONF_API_KEY,
@@ -80,7 +81,9 @@ async def test_unload_closes_client(
     await hass.async_block_till_done()
 
     assert mock_config_entry.state is ConfigEntryState.NOT_LOADED
-    assert hass.states.get("conversation.mistral_conversation") is None
+    assert (
+        conversation.async_get_agent(hass, "conversation.mistral_conversation") is None
+    )
     mock_init_component.__exit__.assert_called_once_with(None, None, None)
     mock_init_component.__aexit__.assert_awaited_once_with(None, None, None)
 

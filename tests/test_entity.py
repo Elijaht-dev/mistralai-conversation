@@ -426,7 +426,6 @@ async def test_conversation_success_and_request_parameters(
     )
     with patch(
         "custom_components.mistral_conversation.entity.llm.AssistAPI._async_get_tools",
-        new_callable=AsyncMock,
         return_value=[],
     ):
         result = await conversation.async_converse(
@@ -494,7 +493,6 @@ async def test_conversation_function_call_round_trip(
 
     with patch(
         "custom_components.mistral_conversation.entity.llm.AssistAPI._async_get_tools",
-        new_callable=AsyncMock,
         return_value=[mock_tool],
     ):
         result = await conversation.async_converse(

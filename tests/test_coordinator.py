@@ -21,13 +21,13 @@ from custom_components.mistral_conversation.coordinator import (
 from .helpers import mistral_error
 
 
-async def test_first_refresh_creates_client_and_loads_models(
+async def test_refresh_creates_client_and_loads_models(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
     mock_mistral_client: MagicMock,
     model: MistralModel,
 ) -> None:
-    """The first coordinator refresh initializes the shared SDK client."""
+    """A coordinator refresh initializes the shared SDK client."""
     coordinator = MistralCoordinator(hass, mock_config_entry)
     with (
         patch(
@@ -40,7 +40,7 @@ async def test_first_refresh_creates_client_and_loads_models(
             return_value=[model],
         ) as get_models,
     ):
-        await coordinator.async_config_entry_first_refresh()
+        await coordinator.async_refresh()
 
     assert coordinator.client is mock_mistral_client
     assert coordinator.data == [model]

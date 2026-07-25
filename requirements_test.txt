@@ -2,5 +2,5 @@ homeassistant==2026.7.2
 mistralai==2.7.0
 mypy==2.3.0
 pytest-cov==7.1.0
-pytest-homeassistant-custom-component==0.13.347
+pytest-homeassistant-custom-component==0.13.348
 ruff==0.15.22

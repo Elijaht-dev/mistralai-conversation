@@ -37,8 +37,8 @@ Every push and pull request runs:
 - Home Assistant Hassfest validation
 
 The official HACS remote validator additionally runs whenever the repository is
-public. HACS cannot fetch private repository manifests. Weekly scheduled
-validation and Dependabot help detect compatibility drift.
+public. Weekly scheduled validation and Dependabot help detect compatibility
+drift.
 
 ## Deliberate boundaries
 
@@ -46,7 +46,6 @@ validation and Dependabot help detect compatibility drift.
   unavailable; Mistral remains the final capability authority.
 - Mistral API behavior is mocked in CI. Live-provider conformance is a separate,
   opt-in activity because it costs money and requires secrets.
-- HACS cannot install a private repository. The private preview is manual-only.
 - Model-generated actions are not deterministic. Entity exposure and safeguards
   must be designed in Home Assistant.
 - Compatibility is declared from Home Assistant 2026.7.4 and is continuously
@@ -54,7 +53,7 @@ validation and Dependabot help detect compatibility drift.
 
 ## Release gate
 
-A public release should not be made until validation is green, a real Home
-Assistant installation has completed chat and tool-call smoke tests, private
-review feedback is addressed, and repository visibility is intentionally changed
-by the owner.
+The public repository gate requires a clean secret and privacy review plus green
+quality, HACS, and Hassfest validation. A versioned release should additionally
+wait for a real Home Assistant installation to complete chat and tool-call smoke
+tests.

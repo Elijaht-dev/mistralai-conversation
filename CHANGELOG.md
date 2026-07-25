@@ -9,7 +9,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
-- Private production-validation baseline.
+- Public HACS custom-repository baseline.
 - Typed Mistral SDK request and streaming response boundary.
 - Streaming text, reasoning, token usage, and parallel tool calls.
 - Home Assistant conversation subentries and Assist tool support.

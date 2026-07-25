@@ -28,7 +28,7 @@ ignore = [
 known-first-party = ["custom_components"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["PLR0913"]
+"tests/**/*.py" = ["PLR0913", "PLR0917"]
 
 [tool.ruff.format]
 quote-style = "double"

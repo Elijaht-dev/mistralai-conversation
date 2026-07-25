@@ -66,10 +66,10 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Validate private-preview repository structure
+      - name: Validate HACS repository structure
         run: python scripts/validate_hacs.py
 
-      - name: HACS validation for a public repository
+      - name: HACS validation
         if: ${{ github.event.repository.private == false }}
         uses: hacs/action@main
         with:

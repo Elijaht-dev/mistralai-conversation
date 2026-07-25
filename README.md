@@ -5,6 +5,8 @@
 [![Mistral SDK 2.7.2](https://img.shields.io/badge/mistralai-2.7.2-FA520F.svg)](https://pypi.org/project/mistralai/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+[![Open your Home Assistant instance and add this repository to HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Elijaht-dev&repository=mistralai-conversation&category=integration)
+
 A custom Home Assistant conversation integration for Mistral AI, implemented
 against the official `mistralai` Python SDK. Its architecture follows Home
 Assistant's current `ConversationEntity`, `ChatLog`, config-subentry, coordinator,
@@ -12,15 +14,6 @@ repair, and diagnostics patterns.
 
 This is an independent custom integration. It is not developed, reviewed, or
 endorsed by Home Assistant or Mistral AI.
-
-## Private preview
-
-This repository is private during its first validation stage. HACS cannot install
-from private GitHub repositories, so private-preview installations must use the
-manual method below. Once the repository is intentionally made public, it can be
-added to HACS as a custom repository.
-
-No public release or repository visibility change is part of the private preview.
 
 ## Features
 
@@ -53,23 +46,30 @@ The integration pins `mistralai==2.7.2`.
 
 ## Installation
 
-### Private preview: manual installation
+### HACS
 
-1. Download or clone this repository using a GitHub account that has access.
+This integration is available as a HACS custom repository. It is not currently
+part of the default HACS catalog.
+
+Use the **Open your Home Assistant instance** button above, or add the repository
+manually:
+
+1. Open **HACS → Integrations**.
+2. Open the menu and choose **Custom repositories**.
+3. Add `https://github.com/Elijaht-dev/mistralai-conversation` with category
+   **Integration**.
+4. Select **Mistral AI Conversation**, choose **Download**, and restart Home
+   Assistant.
+
+### Manual installation
+
+1. Download or clone this repository.
 2. Copy `custom_components/mistral_conversation` into Home Assistant's
    `config/custom_components` directory.
 3. Confirm the resulting path is
    `config/custom_components/mistral_conversation/manifest.json`.
 4. Restart Home Assistant.
 5. Clear the browser cache if the integration does not appear immediately.
-
-### HACS after the repository is public
-
-1. Open **HACS → Integrations**.
-2. Open the menu and choose **Custom repositories**.
-3. Add `https://github.com/Elijaht-dev/mistralai-conversation` with category
-   **Integration**.
-4. Install **Mistral AI Conversation** and restart Home Assistant.
 
 ## Configuration
 
@@ -152,9 +152,8 @@ with care.
 
 The repository validates on Python 3.14 with Ruff, strict mypy, Home
 Assistant-native pytest fixtures, branch coverage, HACS structural readiness, and
-Hassfest. The official HACS remote validator runs automatically once repository
-visibility is public, because HACS cannot read private repositories. Provider
-calls are mocked in tests; no live API key is required.
+Hassfest. The official HACS remote validator also runs on every public push and
+pull request. Provider calls are mocked in tests; no live API key is required.
 
 ```bash
 python -m pip install --requirement requirements_test.txt

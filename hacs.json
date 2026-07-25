@@ -1,5 +1,4 @@
 {
   "name": "Mistral AI Conversation",
-  "homeassistant": "2026.7.2",
-  "render_readme": true
+  "homeassistant": "2026.7.3"
 }

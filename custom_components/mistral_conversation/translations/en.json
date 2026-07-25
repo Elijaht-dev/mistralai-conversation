@@ -165,7 +165,6 @@
   },
   "issues": {
     "model_deprecated": {
-      "description": "The conversation agent **{subentry_name}** uses **{model}**, which is scheduled for retirement on {retirement_date}. Select **{replacement}** or another supported model.",
       "fix_flow": {
         "step": {
           "init": {

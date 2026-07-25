@@ -1,6 +1,8 @@
 param(
     [string] $OutputPath = (
-        Join-Path $PSScriptRoot '..\brand\icon.png'
+        Join-Path $PSScriptRoot (
+            '..\custom_components\mistral_conversation\brand\icon.png'
+        )
     )
 )
 
@@ -99,5 +101,15 @@ $tileBrush.Dispose()
 $tilePath.Dispose()
 $graphics.Dispose()
 $bitmap.Dispose()
+
+$repositoryBrandPath = [System.IO.Path]::GetFullPath(
+    (Join-Path $PSScriptRoot '..\brand\icon.png')
+)
+if ($resolvedOutput -ne $repositoryBrandPath) {
+    [System.IO.Directory]::CreateDirectory(
+        [System.IO.Path]::GetDirectoryName($repositoryBrandPath)
+    ) | Out-Null
+    Copy-Item -LiteralPath $resolvedOutput -Destination $repositoryBrandPath -Force
+}
 
 Write-Output $resolvedOutput

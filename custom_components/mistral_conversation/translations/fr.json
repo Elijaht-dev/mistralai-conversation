@@ -165,7 +165,6 @@
   },
   "issues": {
     "model_deprecated": {
-      "description": "L'agent de conversation **{subentry_name}** utilise **{model}**, dont le retrait est prévu le {retirement_date}. Sélectionnez **{replacement}** ou un autre modèle pris en charge.",
       "fix_flow": {
         "step": {
           "init": {

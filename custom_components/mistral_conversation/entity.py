@@ -91,6 +91,19 @@ type MistralTool = ChatCompletionStreamRequestTool
 type MistralAttachmentChunk = ImageURLChunk | DocumentURLChunk
 
 
+def _adjust_structured_output_schema(value: object) -> None:
+    """Close every object in a JSON schema while preserving optional fields."""
+    if isinstance(value, dict):
+        schema = cast(dict[str, object], value)
+        if schema.get("type") == "object" or isinstance(schema.get("properties"), dict):
+            schema.setdefault("additionalProperties", False)
+        for nested_value in schema.values():
+            _adjust_structured_output_schema(nested_value)
+    elif isinstance(value, list):
+        for nested_value in cast(list[object], value):
+            _adjust_structured_output_schema(nested_value)
+
+
 @dataclass(slots=True)
 class MistralNativeContent:
     """Provider-native reasoning retained for replay on later turns."""
@@ -434,7 +447,7 @@ class MistralBaseEntity(CoordinatorEntity[MistralCoordinator]):
     """Base entity for Mistral-backed conversation features."""
 
     _attr_has_entity_name = True
-    _attr_name = None
+    _attr_name: str | None = None
 
     def __init__(self, entry: MistralConfigEntry, subentry: ConfigSubentry) -> None:
         """Initialize the entity."""
@@ -605,7 +618,7 @@ class MistralBaseEntity(CoordinatorEntity[MistralCoordinator]):
                     else llm.selector_serializer
                 ),
             )
-            schema["additionalProperties"] = False
+            _adjust_structured_output_schema(schema)
             response_format = ResponseFormat(
                 type="json_schema",
                 json_schema=JSONSchema(

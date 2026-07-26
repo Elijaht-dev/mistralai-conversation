@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 import binascii
 from collections.abc import Mapping, Sequence
-from typing import Any, ClassVar, cast, override
+from typing import Any, override
 
 import httpx
 from homeassistant.components.tts import (
@@ -77,7 +77,7 @@ def _audio_format(
     if preferred_format == "raw":
         return "pcm", "pcm"
     if preferred_format in SUPPORTED_FORMATS:
-        return str(preferred_format), cast(SpeechOutputFormat, preferred_format)
+        return str(preferred_format), preferred_format
     return "mp3", "mp3"
 
 
@@ -122,10 +122,6 @@ class MistralTTSEntity(TextToSpeechEntity, MistralBaseEntity):
     _attr_default_language = "en-US"
     _attr_has_entity_name = False
     _attr_supported_languages = SUPPORTED_LANGUAGES
-    _attr_supported_options: ClassVar[list[str]] = [
-        ATTR_VOICE,
-        ATTR_PREFERRED_FORMAT,
-    ]
 
     def __init__(
         self,
@@ -136,6 +132,7 @@ class MistralTTSEntity(TextToSpeechEntity, MistralBaseEntity):
         """Initialize the text-to-speech entity."""
         super().__init__(entry, subentry)
         self._attr_name = subentry.title
+        self._attr_supported_options = [ATTR_VOICE, ATTR_PREFERRED_FORMAT]
 
         configured_voice = subentry.data.get(CONF_VOICE_ID)
         available_voices = {voice.id: voice for voice in voices}
@@ -162,10 +159,11 @@ class MistralTTSEntity(TextToSpeechEntity, MistralBaseEntity):
     @override
     def default_options(self) -> Mapping[str, Any]:
         """Return the configured voice and preferred audio format."""
-        return {
-            ATTR_VOICE: self.subentry.data[CONF_VOICE_ID],
-            ATTR_PREFERRED_FORMAT: "mp3",
-        }
+        options: dict[str, Any] = {ATTR_PREFERRED_FORMAT: "mp3"}
+        configured_voice = self.subentry.data.get(CONF_VOICE_ID)
+        if isinstance(configured_voice, str) and configured_voice.strip():
+            options[ATTR_VOICE] = configured_voice.strip()
+        return options
 
     @override
     async def async_get_tts_audio(
@@ -188,6 +186,7 @@ class MistralTTSEntity(TextToSpeechEntity, MistralBaseEntity):
                 translation_domain=DOMAIN,
                 translation_key="tts_voice_required",
             )
+        voice_id = voice_id.strip()
 
         response_format, provider_format = _audio_format(
             options.get(ATTR_PREFERRED_FORMAT)

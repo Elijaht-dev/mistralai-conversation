@@ -64,12 +64,19 @@ async def test_generate_structured_data_uses_native_json_schema(
     mock_init_component.chat.stream_async.return_value = event_stream(
         [
             completion_event(
-                content='{"characters":["Mario","Luigi"]}',
+                content=(
+                    '{"characters":["Mario","Luigi"],"details":{"source":"game"}}'
+                ),
                 finish_reason="stop",
             )
         ]
     )
-    structure = vol.Schema({vol.Required("characters"): [str]})
+    structure = vol.Schema(
+        {
+            vol.Required("characters"): [str],
+            vol.Required("details"): {vol.Required("source"): str},
+        }
+    )
 
     result = await ai_task.async_generate_data(
         hass,
@@ -79,7 +86,10 @@ async def test_generate_structured_data_uses_native_json_schema(
         structure=structure,
     )
 
-    assert result.data == {"characters": ["Mario", "Luigi"]}
+    assert result.data == {
+        "characters": ["Mario", "Luigi"],
+        "details": {"source": "game"},
+    }
     response_format = mock_init_component.chat.stream_async.await_args.kwargs[
         "response_format"
     ]
@@ -92,6 +102,7 @@ async def test_generate_structured_data_uses_native_json_schema(
     assert schema["type"] == "object"
     assert schema["additionalProperties"] is False
     assert schema["properties"]["characters"]["type"] == "array"
+    assert schema["properties"]["details"]["additionalProperties"] is False
 
 
 async def test_generate_structured_data_rejects_invalid_json(

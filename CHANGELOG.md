@@ -7,6 +7,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-07-26
+
 ### Added
 
 - Public HACS custom-repository baseline.
@@ -23,4 +25,5 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - English and French translations.
 - Ruff, strict mypy, pytest coverage, HACS, Hassfest, and Dependabot automation.
 
-[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/commits/main
+[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/Elijaht-dev/mistralai-conversation/releases/tag/v0.1.0

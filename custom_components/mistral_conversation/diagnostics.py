@@ -10,9 +10,10 @@ from homeassistant.const import CONF_API_KEY, CONF_PROMPT
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
+from .const import CONF_VOICE_ID
 from .coordinator import MistralConfigEntry
 
-TO_REDACT = {CONF_API_KEY, CONF_PROMPT}
+TO_REDACT = {CONF_API_KEY, CONF_PROMPT, CONF_VOICE_ID}
 
 
 def _sdk_version() -> str:

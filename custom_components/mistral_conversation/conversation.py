@@ -10,7 +10,7 @@ from homeassistant.const import CONF_LLM_HASS_API, CONF_PROMPT, MATCH_ALL
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .const import DOMAIN
+from .const import DOMAIN, SUBENTRY_TYPE_CONVERSATION
 from .coordinator import MistralConfigEntry
 from .entity import MistralBaseEntity
 
@@ -24,7 +24,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up Mistral conversation entities."""
     for subentry in config_entry.subentries.values():
-        if subentry.subentry_type != "conversation":
+        if subentry.subentry_type != SUBENTRY_TYPE_CONVERSATION:
             continue
         async_add_entities(
             [MistralConversationEntity(config_entry, subentry)],

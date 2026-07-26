@@ -23,7 +23,7 @@ _DEPRECATION_ISSUE_PREFIX = "model_deprecated_"
 
 
 class DeprecatedModelRepairFlow(RepairsFlow):
-    """Replace a deprecated model on one conversation subentry."""
+    """Replace a deprecated model on one configured entity subentry."""
 
     def __init__(
         self,

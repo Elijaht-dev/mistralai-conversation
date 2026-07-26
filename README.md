@@ -92,6 +92,8 @@ manually:
 6. In **Settings → Voice assistants**, select the Mistral conversation,
    speech-to-text, and text-to-speech entities for the desired pipeline.
 
+### Conversation
+
 | Option | Purpose |
 | --- | --- |
 | Name | Label shown for this agent |

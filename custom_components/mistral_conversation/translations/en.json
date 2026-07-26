@@ -218,7 +218,7 @@
       "message": "Mistral AI returned an empty response."
     },
     "invalid_repair_data": {
-      "message": "The model repair does not contain a valid entry, conversation agent, and replacement."
+      "message": "The model repair does not contain a valid account, configured entity, and replacement."
     },
     "json_parse_error": {
       "message": "Mistral AI returned data that could not be parsed as the requested structure."
@@ -248,7 +248,7 @@
       "message": "Mistral AI ended the response stream with an error."
     },
     "subentry_not_found": {
-      "message": "The conversation agent targeted by this repair no longer exists."
+      "message": "The configured entity targeted by this repair no longer exists."
     },
     "system_message_not_found": {
       "message": "The first chat-log item must be a system message."
@@ -295,7 +295,7 @@
             "data": {
               "model": "Replacement model"
             },
-            "description": "Replace **{model}** for the conversation agent **{subentry_name}**.",
+            "description": "Replace **{model}** for the configured entity **{subentry_name}**.",
             "title": "Replace deprecated Mistral model"
           }
         }

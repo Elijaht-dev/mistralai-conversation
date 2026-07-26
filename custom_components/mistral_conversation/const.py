@@ -16,12 +16,23 @@ LOGGER = logging.getLogger(__package__)
 
 DEFAULT_TITLE: Final = "Mistral AI"
 DEFAULT_CONVERSATION_NAME: Final = "Mistral conversation"
+DEFAULT_AI_TASK_NAME: Final = "Mistral AI task"
+DEFAULT_STT_NAME: Final = "Mistral speech-to-text"
+DEFAULT_TTS_NAME: Final = "Mistral text-to-speech"
 DEFAULT_MODEL: Final = "mistral-small-latest"
+DEFAULT_STT_MODEL: Final = "voxtral-mini-latest"
+DEFAULT_TTS_MODEL: Final = "voxtral-mini-tts-2603"
+
+SUBENTRY_TYPE_CONVERSATION: Final = "conversation"
+SUBENTRY_TYPE_AI_TASK: Final = "ai_task_data"
+SUBENTRY_TYPE_STT: Final = "stt"
+SUBENTRY_TYPE_TTS: Final = "tts"
 
 CONF_MAX_TOKENS: Final = "max_tokens"
 CONF_REASONING_EFFORT: Final = "reasoning_effort"
 CONF_SAFE_PROMPT: Final = "safe_prompt"
 CONF_TEMPERATURE: Final = "temperature"
+CONF_VOICE_ID: Final = "voice_id"
 
 type ReasoningEffort = Literal[
     "none",
@@ -56,12 +67,33 @@ DEFAULT_CONVERSATION_OPTIONS = {
     CONF_TEMPERATURE: DEFAULT_TEMPERATURE,
 }
 
+DEFAULT_AI_TASK_OPTIONS = {
+    CONF_MAX_TOKENS: DEFAULT_MAX_TOKENS,
+    CONF_MODEL: DEFAULT_MODEL,
+    CONF_REASONING_EFFORT: REASONING_EFFORT_NONE,
+    CONF_SAFE_PROMPT: False,
+    CONF_TEMPERATURE: DEFAULT_TEMPERATURE,
+}
+
+DEFAULT_STT_OPTIONS = {
+    CONF_MODEL: DEFAULT_STT_MODEL,
+}
+
+DEFAULT_TTS_OPTIONS = {
+    CONF_MODEL: DEFAULT_TTS_MODEL,
+}
+
 MAX_ATTACHMENT_BYTES: Final = 20 * 1024 * 1024
 MAX_ATTACHMENTS: Final = 10
+MAX_STT_AUDIO_BYTES: Final = 25 * 1024 * 1024
+MAX_TTS_AUDIO_BYTES: Final = 25 * 1024 * 1024
+MAX_TTS_TEXT_LENGTH: Final = 5000
 MAX_TOOLS: Final = 128
 MAX_TOOL_ITERATIONS: Final = 10
+MAX_VOICES: Final = 1000
 REQUEST_TIMEOUT_MS: Final = 300_000
 SETUP_TIMEOUT_MS: Final = 10_000
+VOICE_LIST_PAGE_SIZE: Final = 100
 
 SUPPORTED_IMAGE_MIME_TYPES: Final[frozenset[str]] = frozenset(
     {
@@ -119,3 +151,12 @@ class MistralModel:
         return self.id.casefold() == folded_id or any(
             alias.casefold() == folded_id for alias in self.aliases
         )
+
+
+@dataclass(frozen=True, slots=True)
+class MistralVoice:
+    """Stable voice metadata exposed by the Mistral audio API."""
+
+    id: str
+    name: str
+    languages: tuple[str, ...] = ()

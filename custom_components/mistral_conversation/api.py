@@ -12,7 +12,14 @@ from homeassistant.helpers.httpx_client import get_async_client
 from mistralai.client import Mistral
 from mistralai.client.models import BaseModelCard, FTModelCard
 
-from .const import LOGGER, SETUP_TIMEOUT_MS, MistralModel
+from .const import (
+    LOGGER,
+    MAX_VOICES,
+    SETUP_TIMEOUT_MS,
+    VOICE_LIST_PAGE_SIZE,
+    MistralModel,
+    MistralVoice,
+)
 
 
 class _ClosableMistralClient(Protocol):
@@ -113,6 +120,38 @@ async def async_get_models(client: Mistral) -> list[MistralModel]:
             models.append(model)
 
     return sorted(models, key=lambda model: model.id.casefold())
+
+
+async def async_get_voices(client: Mistral) -> list[MistralVoice]:
+    """Return preset and custom TTS voices available to the account."""
+    voices: list[MistralVoice] = []
+    offset = 0
+
+    while offset < MAX_VOICES:
+        page_size = min(VOICE_LIST_PAGE_SIZE, MAX_VOICES - offset)
+        response = await client.audio.voices.list_async(
+            limit=page_size,
+            offset=offset,
+            type_="all",
+            timeout_ms=SETUP_TIMEOUT_MS,
+        )
+        if not response.items:
+            break
+
+        voices.extend(
+            MistralVoice(
+                id=voice.id,
+                name=voice.name,
+                languages=tuple(voice.languages or []),
+            )
+            for voice in response.items
+            if voice.id and voice.name
+        )
+        offset += len(response.items)
+        if offset >= response.total:
+            break
+
+    return sorted(voices, key=lambda voice: (voice.name.casefold(), voice.id))
 
 
 async def async_validate_api_key(

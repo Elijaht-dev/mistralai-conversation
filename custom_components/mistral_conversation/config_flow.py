@@ -36,29 +36,44 @@ from homeassistant.helpers.selector import (
     SelectSelectorMode,
     TemplateSelector,
 )
+from homeassistant.helpers.typing import VolDictType
 from mistralai.client.errors import MistralError, NoResponseError
 
-from .api import async_validate_api_key
+from .api import async_get_voices, async_validate_api_key
 from .const import (
     CONF_MAX_TOKENS,
     CONF_REASONING_EFFORT,
     CONF_SAFE_PROMPT,
     CONF_TEMPERATURE,
+    CONF_VOICE_ID,
+    DEFAULT_AI_TASK_NAME,
+    DEFAULT_AI_TASK_OPTIONS,
     DEFAULT_CONVERSATION_NAME,
     DEFAULT_CONVERSATION_OPTIONS,
     DEFAULT_MAX_TOKENS,
     DEFAULT_MODEL,
+    DEFAULT_STT_MODEL,
+    DEFAULT_STT_NAME,
+    DEFAULT_STT_OPTIONS,
     DEFAULT_TEMPERATURE,
     DEFAULT_TITLE,
+    DEFAULT_TTS_MODEL,
+    DEFAULT_TTS_NAME,
+    DEFAULT_TTS_OPTIONS,
     DOMAIN,
     MAX_CONFIGURED_TOKENS,
     REASONING_EFFORT_NONE,
     REASONING_EFFORTS,
+    SUBENTRY_TYPE_AI_TASK,
+    SUBENTRY_TYPE_CONVERSATION,
+    SUBENTRY_TYPE_STT,
+    SUBENTRY_TYPE_TTS,
     ApiErrorKind,
     MistralModel,
+    MistralVoice,
 )
 from .coordinator import MistralConfigEntry
-from .errors import classify_api_error
+from .errors import api_error_message, classify_api_error
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -108,7 +123,7 @@ class MistralConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Mistral AI Conversation."""
 
     VERSION = 1
-    MINOR_VERSION = 2
+    MINOR_VERSION = 3
 
     @classmethod
     @callback
@@ -117,7 +132,12 @@ class MistralConfigFlow(ConfigFlow, domain=DOMAIN):
         cls, config_entry: ConfigEntry
     ) -> dict[str, type[ConfigSubentryFlow]]:
         """Return the supported config subentry types."""
-        return {"conversation": ConversationSubentryFlowHandler}
+        return {
+            SUBENTRY_TYPE_CONVERSATION: ConversationSubentryFlowHandler,
+            SUBENTRY_TYPE_AI_TASK: ConversationSubentryFlowHandler,
+            SUBENTRY_TYPE_STT: STTSubentryFlowHandler,
+            SUBENTRY_TYPE_TTS: TTSSubentryFlowHandler,
+        }
 
     @override
     async def async_step_user(
@@ -147,11 +167,23 @@ class MistralConfigFlow(ConfigFlow, domain=DOMAIN):
                     data={CONF_API_KEY: api_key},
                     subentries=[
                         {
-                            "subentry_type": "conversation",
+                            "subentry_type": SUBENTRY_TYPE_CONVERSATION,
                             "data": DEFAULT_CONVERSATION_OPTIONS,
                             "title": DEFAULT_CONVERSATION_NAME,
                             "unique_id": None,
-                        }
+                        },
+                        {
+                            "subentry_type": SUBENTRY_TYPE_AI_TASK,
+                            "data": DEFAULT_AI_TASK_OPTIONS,
+                            "title": DEFAULT_AI_TASK_NAME,
+                            "unique_id": None,
+                        },
+                        {
+                            "subentry_type": SUBENTRY_TYPE_STT,
+                            "data": DEFAULT_STT_OPTIONS,
+                            "title": DEFAULT_STT_NAME,
+                            "unique_id": None,
+                        },
                     ],
                 )
 
@@ -202,7 +234,7 @@ class MistralConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class ConversationSubentryFlowHandler(ConfigSubentryFlow):
-    """Handle conversation-agent subentries."""
+    """Handle conversation and AI Task subentries."""
 
     options: dict[str, Any]
 
@@ -214,21 +246,25 @@ class ConversationSubentryFlowHandler(ConfigSubentryFlow):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
-        """Create a conversation agent."""
-        self.options = DEFAULT_CONVERSATION_OPTIONS.copy()
+        """Create a conversation or AI Task entity."""
+        self.options = (
+            DEFAULT_AI_TASK_OPTIONS.copy()
+            if self._subentry_type == SUBENTRY_TYPE_AI_TASK
+            else DEFAULT_CONVERSATION_OPTIONS.copy()
+        )
         return await self.async_step_init(user_input)
 
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
-        """Reconfigure a conversation agent."""
+        """Reconfigure a conversation or AI Task entity."""
         self.options = dict(self._get_reconfigure_subentry().data)
         return await self.async_step_init(user_input)
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
-        """Configure a conversation agent."""
+        """Configure a conversation or AI Task entity."""
         entry = self._get_entry()
         if entry.state is not ConfigEntryState.LOADED:
             return self.async_abort(reason="entry_not_loaded")
@@ -252,7 +288,9 @@ class ConversationSubentryFlowHandler(ConfigSubentryFlow):
             if not errors:
                 data = user_input.copy()
                 name = data.pop(CONF_NAME)
-                if not data.get(CONF_LLM_HASS_API):
+                if self._subentry_type == SUBENTRY_TYPE_CONVERSATION and not data.get(
+                    CONF_LLM_HASS_API
+                ):
                     data.pop(CONF_LLM_HASS_API, None)
 
                 if self._is_new:
@@ -276,18 +314,13 @@ class ConversationSubentryFlowHandler(ConfigSubentryFlow):
                 SelectOptionDict(value=configured_model, label=configured_model)
             )
 
-        hass_apis = [
-            SelectOptionDict(label=api.name, value=api.id)
-            for api in llm.async_get_apis(self.hass)
-        ]
-        known_api_ids = {api["value"] for api in hass_apis}
-        selected_apis = suggested.get(CONF_LLM_HASS_API, [])
-        if isinstance(selected_apis, str):
-            selected_apis = [selected_apis]
-        selected_apis = [api_id for api_id in selected_apis if api_id in known_api_ids]
-
+        default_name = (
+            DEFAULT_AI_TASK_NAME
+            if self._subentry_type == SUBENTRY_TYPE_AI_TASK
+            else DEFAULT_CONVERSATION_NAME
+        )
         subentry_name = (
-            suggested.get(CONF_NAME, DEFAULT_CONVERSATION_NAME)
+            suggested.get(CONF_NAME, default_name)
             if self._is_new
             else suggested.get(CONF_NAME, self._get_reconfigure_subentry().title)
         )
@@ -301,27 +334,45 @@ class ConversationSubentryFlowHandler(ConfigSubentryFlow):
                 MAX_CONFIGURED_TOKENS, selected_model.max_context_length
             )
 
-        schema = vol.Schema(
+        schema_fields: VolDictType = {
+            vol.Required(CONF_NAME, default=subentry_name): cv.string,
+            vol.Required(
+                CONF_MODEL,
+                default=configured_model,
+            ): SelectSelector(
+                SelectSelectorConfig(
+                    options=model_options,
+                    custom_value=True,
+                    mode=SelectSelectorMode.DROPDOWN,
+                    sort=True,
+                )
+            ),
+        }
+        if self._subentry_type == SUBENTRY_TYPE_CONVERSATION:
+            hass_apis = [
+                SelectOptionDict(label=api.name, value=api.id)
+                for api in llm.async_get_apis(self.hass)
+            ]
+            known_api_ids = {api["value"] for api in hass_apis}
+            selected_apis = suggested.get(CONF_LLM_HASS_API, [])
+            if isinstance(selected_apis, str):
+                selected_apis = [selected_apis]
+            selected_apis = [
+                api_id for api_id in selected_apis if api_id in known_api_ids
+            ]
+            schema_fields.update(
+                {
+                    vol.Optional(CONF_PROMPT): TemplateSelector(),
+                    vol.Optional(
+                        CONF_LLM_HASS_API,
+                        default=selected_apis,
+                    ): SelectSelector(
+                        SelectSelectorConfig(options=hass_apis, multiple=True)
+                    ),
+                }
+            )
+        schema_fields.update(
             {
-                vol.Required(CONF_NAME, default=subentry_name): cv.string,
-                vol.Required(
-                    CONF_MODEL,
-                    default=configured_model,
-                ): SelectSelector(
-                    SelectSelectorConfig(
-                        options=model_options,
-                        custom_value=True,
-                        mode=SelectSelectorMode.DROPDOWN,
-                        sort=True,
-                    )
-                ),
-                vol.Optional(CONF_PROMPT): TemplateSelector(),
-                vol.Optional(
-                    CONF_LLM_HASS_API,
-                    default=selected_apis,
-                ): SelectSelector(
-                    SelectSelectorConfig(options=hass_apis, multiple=True)
-                ),
                 vol.Required(
                     CONF_MAX_TOKENS,
                     default=suggested.get(CONF_MAX_TOKENS, DEFAULT_MAX_TOKENS),
@@ -362,11 +413,221 @@ class ConversationSubentryFlowHandler(ConfigSubentryFlow):
                 ): bool,
             }
         )
+        schema = vol.Schema(schema_fields)
 
         return self.async_show_form(
             step_id="init",
             data_schema=self.add_suggested_values_to_schema(schema, suggested),
             errors=errors or None,
             description_placeholders=description_placeholders or None,
+            last_step=True,
+        )
+
+
+class STTSubentryFlowHandler(ConfigSubentryFlow):
+    """Handle Mistral speech-to-text subentries."""
+
+    options: dict[str, Any]
+
+    @property
+    def _is_new(self) -> bool:
+        """Return whether a new subentry is being created."""
+        return self.source == SOURCE_USER
+
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """Create a speech-to-text entity."""
+        self.options = DEFAULT_STT_OPTIONS.copy()
+        return await self.async_step_init(user_input)
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """Reconfigure a speech-to-text entity."""
+        self.options = dict(self._get_reconfigure_subentry().data)
+        return await self.async_step_init(user_input)
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """Configure a speech-to-text entity."""
+        entry = self._get_entry()
+        if entry.state is not ConfigEntryState.LOADED:
+            return self.async_abort(reason="entry_not_loaded")
+
+        suggested = self.options
+        if user_input is not None:
+            data = user_input.copy()
+            name = data.pop(CONF_NAME)
+            if self._is_new:
+                return self.async_create_entry(title=name, data=data)
+            return self.async_update_and_abort(
+                entry,
+                self._get_reconfigure_subentry(),
+                title=name,
+                data=data,
+            )
+
+        configured_model = suggested.get(CONF_MODEL, DEFAULT_STT_MODEL)
+        subentry_name = (
+            suggested.get(CONF_NAME, DEFAULT_STT_NAME)
+            if self._is_new
+            else suggested.get(CONF_NAME, self._get_reconfigure_subentry().title)
+        )
+        model_options = list(dict.fromkeys((DEFAULT_STT_MODEL, configured_model)))
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_NAME, default=subentry_name): cv.string,
+                vol.Required(
+                    CONF_MODEL,
+                    default=configured_model,
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        options=model_options,
+                        custom_value=True,
+                        mode=SelectSelectorMode.DROPDOWN,
+                        sort=True,
+                    )
+                ),
+            }
+        )
+        return self.async_show_form(
+            step_id="init",
+            data_schema=self.add_suggested_values_to_schema(schema, suggested),
+            last_step=True,
+        )
+
+
+class TTSSubentryFlowHandler(ConfigSubentryFlow):
+    """Handle Mistral text-to-speech subentries."""
+
+    options: dict[str, Any]
+    voices: list[MistralVoice] | None
+
+    @property
+    def _is_new(self) -> bool:
+        """Return whether a new subentry is being created."""
+        return self.source == SOURCE_USER
+
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """Create a text-to-speech entity."""
+        self.options = DEFAULT_TTS_OPTIONS.copy()
+        self.voices = None
+        return await self.async_step_init(user_input)
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """Reconfigure a text-to-speech entity."""
+        self.options = dict(self._get_reconfigure_subentry().data)
+        self.voices = None
+        return await self.async_step_init(user_input)
+
+    async def _async_get_voices(self, entry: MistralConfigEntry) -> list[MistralVoice]:
+        """Fetch and cache voices for this flow without blocking custom IDs."""
+        if self.voices is not None:
+            return self.voices
+
+        try:
+            self.voices = await async_get_voices(entry.runtime_data.client)
+        except (
+            MistralError,
+            NoResponseError,
+            httpx.HTTPError,
+            TimeoutError,
+        ) as err:
+            _LOGGER.warning(
+                "Unable to load the Mistral TTS voice list: %s",
+                api_error_message(err),
+            )
+            self.voices = []
+        except Exception:
+            _LOGGER.exception("Unexpected exception loading Mistral TTS voices")
+            self.voices = []
+        return self.voices
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> SubentryFlowResult:
+        """Configure a text-to-speech entity."""
+        entry = self._get_entry()
+        if entry.state is not ConfigEntryState.LOADED:
+            return self.async_abort(reason="entry_not_loaded")
+
+        if user_input is not None:
+            data = user_input.copy()
+            name = data.pop(CONF_NAME)
+            if self._is_new:
+                return self.async_create_entry(title=name, data=data)
+            return self.async_update_and_abort(
+                entry,
+                self._get_reconfigure_subentry(),
+                title=name,
+                data=data,
+            )
+
+        config_entry = cast(MistralConfigEntry, entry)
+        voices = await self._async_get_voices(config_entry)
+        suggested = self.options
+        configured_model = suggested.get(CONF_MODEL, DEFAULT_TTS_MODEL)
+        configured_voice = suggested.get(CONF_VOICE_ID)
+        subentry_name = (
+            suggested.get(CONF_NAME, DEFAULT_TTS_NAME)
+            if self._is_new
+            else suggested.get(CONF_NAME, self._get_reconfigure_subentry().title)
+        )
+
+        voice_options = [
+            SelectOptionDict(
+                value=voice.id,
+                label=(
+                    f"{voice.name} ({', '.join(voice.languages)})"
+                    if voice.languages
+                    else voice.name
+                ),
+            )
+            for voice in voices
+        ]
+        known_voice_ids = {voice["value"] for voice in voice_options}
+        if (
+            isinstance(configured_voice, str)
+            and configured_voice
+            and configured_voice not in known_voice_ids
+        ):
+            voice_options.append(
+                SelectOptionDict(value=configured_voice, label=configured_voice)
+            )
+
+        model_options = list(dict.fromkeys((DEFAULT_TTS_MODEL, configured_model)))
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_NAME, default=subentry_name): cv.string,
+                vol.Required(
+                    CONF_MODEL,
+                    default=configured_model,
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        options=model_options,
+                        custom_value=True,
+                        mode=SelectSelectorMode.DROPDOWN,
+                        sort=True,
+                    )
+                ),
+                vol.Required(CONF_VOICE_ID): SelectSelector(
+                    SelectSelectorConfig(
+                        options=voice_options,
+                        custom_value=True,
+                        mode=SelectSelectorMode.DROPDOWN,
+                        sort=True,
+                    )
+                ),
+            }
+        )
+        return self.async_show_form(
+            step_id="init",
+            data_schema=self.add_suggested_values_to_schema(schema, suggested),
             last_step=True,
         )

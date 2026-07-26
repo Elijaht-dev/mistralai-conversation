@@ -7,10 +7,10 @@
 
 [![Open your Home Assistant instance and add this repository to HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Elijaht-dev&repository=mistralai-conversation&category=integration)
 
-A custom Home Assistant conversation integration for Mistral AI, implemented
-against the official `mistralai` Python SDK. Its architecture follows Home
-Assistant's current `ConversationEntity`, `ChatLog`, config-subentry, coordinator,
-repair, and diagnostics patterns.
+A custom Home Assistant AI integration for Mistral AI, implemented against the
+official `mistralai` Python SDK. It provides Conversation, AI Task,
+speech-to-text, and text-to-speech entities using Home Assistant's current
+entity, config-subentry, coordinator, repair, and diagnostics patterns.
 
 This is an independent custom integration. It is not developed, reviewed, or
 endorsed by Home Assistant or Mistral AI.
@@ -19,12 +19,17 @@ endorsed by Home Assistant or Mistral AI.
 
 - UI configuration, API-key validation, and reauthentication
 - Multiple independently configured conversation agents per Mistral account
+- Home Assistant AI Task data generation with native Mistral JSON-schema output
+- AI Task image and PDF attachments on compatible multimodal models
+- Voxtral speech-to-text for Home Assistant Assist voice pipelines
+- Streaming Voxtral text-to-speech with preset and saved custom Mistral voices
 - Live model discovery, aliases, capability metadata, and custom model IDs
 - Streamed text, reasoning, token usage, and parallel tool calls
 - Multi-turn history with provider-native signed reasoning replay
 - Home Assistant Assist tools for reading and controlling exposed entities
 - Bounded tool execution: 128 declared tools and 10 tool rounds per request
-- PNG, JPEG, GIF, WebP, and PDF attachments with local type, count, and size checks
+- PNG, JPEG, GIF, WebP, and PDF attachments with local type, count, and size
+  checks
 - Model-aware validation for tools, reasoning, vision, documents, and context size
 - Configurable instructions, model, output limit, temperature, reasoning effort,
   Mistral safety prompt, and exposed Home Assistant APIs
@@ -36,11 +41,14 @@ endorsed by Home Assistant or Mistral AI.
 
 - Home Assistant 2026.7.4 or newer
 - A Mistral AI API key and available API credit
-- A chat-capable Mistral model
+- A chat-capable Mistral model for Conversation and AI Task
+- Access to Mistral's audio endpoints for speech-to-text or text-to-speech
 
 Tool control, reasoning, image input, and PDF input also require the corresponding
 capability on the selected model. Unknown custom and fine-tuned model IDs remain
 configurable because their capabilities may not be present in model discovery.
+Text-to-speech additionally requires a preset or saved voice available to the
+Mistral account.
 
 The integration pins `mistralai==2.7.2`.
 
@@ -77,10 +85,12 @@ manually:
    [Mistral AI console](https://console.mistral.ai/api-keys/).
 2. Open **Settings → Devices & services → Add integration**.
 3. Search for **Mistral AI Conversation** and enter the API key.
-4. Reconfigure the default agent or add more conversation agents from the
-   integration page.
-5. In **Settings → Voice assistants**, choose the new conversation entity as the
-   assistant's conversation agent.
+4. Reconfigure the default Conversation, AI Task, or speech-to-text entity, or
+   add more entities from the integration page.
+5. Add a text-to-speech entity and explicitly select a preset or saved Mistral
+   voice.
+6. In **Settings → Voice assistants**, select the Mistral conversation,
+   speech-to-text, and text-to-speech entities for the desired pipeline.
 
 | Option | Purpose |
 | --- | --- |
@@ -95,12 +105,41 @@ manually:
 
 The default model is `mistral-small-latest`, with the built-in Assist API enabled.
 
+### AI Task
+
+The default AI Task entity uses the same chat-model controls as Conversation,
+without a conversation prompt or a fixed Home Assistant tool selection. It
+supports unstructured text and schema-constrained data through Mistral's native
+JSON-schema response format. Compatible models can also receive Home Assistant
+image and PDF attachments. Mistral image generation is not currently exposed.
+
+### Speech-to-text
+
+Speech-to-text defaults to `voxtral-mini-latest`. It accepts the conservative
+Assist format of mono, 16-bit, 16 kHz PCM audio, adds the WAV container expected
+by the batch transcription API, and forwards the pipeline language to Mistral.
+The input is bounded locally before upload.
+
+### Text-to-speech
+
+Text-to-speech defaults to `voxtral-mini-tts-2603` and supports MP3, Opus, FLAC,
+WAV, and raw PCM output. The setup flow reads preset and saved custom voices
+available to the account while still allowing a custom voice ID.
+
+Mistral requires an explicit `voice_id`, so the integration does not silently
+create, clone, or select a voice. Only use a cloned voice with the speaker's
+informed consent. Voice creation and retention are managed by Mistral, not by
+this integration.
+
 ## Data, control, and security
 
-Prompts, relevant conversation history, exposed tool definitions, tool results,
-and attachments are sent to Mistral AI. API use may incur charges. API keys are
-stored in Home Assistant's config-entry storage and are redacted from diagnostics.
-The integration does not log prompt or attachment content in its request trace.
+Prompts, AI Task instructions, relevant conversation history, exposed tool
+definitions, tool results, attachments, speech recordings, and text submitted
+for speech generation are sent to Mistral AI. Generated speech may enter Home
+Assistant's TTS cache. API use may incur charges. API keys are stored in Home
+Assistant's config-entry storage and are redacted from diagnostics. The
+integration does not log prompt, attachment, recording, transcript, or generated
+audio content in its request trace.
 
 When a Home Assistant API is selected, the model can call its exposed tools.
 Review the entities exposed to the voice assistant before enabling control,
@@ -109,6 +148,10 @@ devices. Home Assistant remains responsible for tool validation and execution.
 
 Attachments are encoded as data URLs. Each file is limited to 20 MB and each
 request to 10 files. The configured model must support the input type.
+
+Speech-to-text input and decoded text-to-speech output are each limited to 25 MB
+per request. Text-to-speech input is limited to 5,000 characters. These local
+bounds protect Home Assistant memory independently of provider-side limits.
 
 See [SECURITY.md](SECURITY.md) for vulnerability reporting and deployment
 guidance.
@@ -122,7 +165,8 @@ guidance.
   succeeds again; request validation and rate-limit errors do not.
 - Invalid or incomplete streamed tool calls are rejected before execution.
 - Empty responses, explicit stream errors, excessive tools, oversized
-  attachments, and runaway tool loops fail closed.
+  attachments, oversized audio, malformed speech data, and runaway tool loops
+  fail closed.
 - Model deprecation metadata creates a Home Assistant repair issue when Mistral
   provides a replacement.
 
@@ -134,6 +178,12 @@ guidance.
 - **Model rejects reasoning:** set **Reasoning effort** to **None**.
 - **Attachment rejected:** select a vision/document-capable model and use a
   supported image or PDF.
+- **Speech-to-text unavailable:** confirm the account can use Voxtral
+  transcription and that the Assist pipeline uses the advertised PCM format.
+- **No text-to-speech entity:** add one from the integration page and select a
+  preset or saved voice.
+- **Voice missing from the list:** enter its saved Mistral voice ID manually, or
+  confirm that the API key can list voices.
 - **No entities can be controlled:** confirm that the voice assistant exposes
   them and that an appropriate Home Assistant API is selected.
 

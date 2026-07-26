@@ -23,10 +23,21 @@ from custom_components.mistral_conversation.const import (
     CONF_REASONING_EFFORT,
     CONF_SAFE_PROMPT,
     CONF_TEMPERATURE,
+    CONF_VOICE_ID,
+    DEFAULT_AI_TASK_NAME,
+    DEFAULT_AI_TASK_OPTIONS,
     DEFAULT_CONVERSATION_NAME,
     DEFAULT_CONVERSATION_OPTIONS,
+    DEFAULT_STT_NAME,
+    DEFAULT_STT_OPTIONS,
+    DEFAULT_TTS_MODEL,
     DOMAIN,
+    SUBENTRY_TYPE_AI_TASK,
+    SUBENTRY_TYPE_CONVERSATION,
+    SUBENTRY_TYPE_STT,
+    SUBENTRY_TYPE_TTS,
     MistralModel,
+    MistralVoice,
 )
 
 from .helpers import mistral_error
@@ -60,11 +71,23 @@ async def test_user_form_and_create_entry(
     assert result["data"] == {CONF_API_KEY: "new-key"}
     assert result["subentries"] == [
         {
-            "subentry_type": "conversation",
+            "subentry_type": SUBENTRY_TYPE_CONVERSATION,
             "data": DEFAULT_CONVERSATION_OPTIONS,
             "title": DEFAULT_CONVERSATION_NAME,
             "unique_id": None,
-        }
+        },
+        {
+            "subentry_type": SUBENTRY_TYPE_AI_TASK,
+            "data": DEFAULT_AI_TASK_OPTIONS,
+            "title": DEFAULT_AI_TASK_NAME,
+            "unique_id": None,
+        },
+        {
+            "subentry_type": SUBENTRY_TYPE_STT,
+            "data": DEFAULT_STT_OPTIONS,
+            "title": DEFAULT_STT_NAME,
+            "unique_id": None,
+        },
     ]
     validate.assert_awaited_once_with(hass, "new-key")
     mock_setup_entry.assert_awaited_once()
@@ -350,3 +373,125 @@ async def test_subentry_flow_aborts_when_entry_not_loaded(
 
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "entry_not_loaded"
+
+
+async def test_create_ai_task_subentry(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_init_component: MagicMock,
+) -> None:
+    """AI Task subentries expose chat-model controls without agent prompts."""
+    result = await hass.config_entries.subentries.async_init(
+        (mock_config_entry.entry_id, SUBENTRY_TYPE_AI_TASK),
+        context={"source": config_entries.SOURCE_USER},
+    )
+    assert result["type"] is FlowResultType.FORM
+    schema_keys = {
+        marker.schema
+        for marker in result["data_schema"].schema
+        if hasattr(marker, "schema")
+    }
+    assert CONF_PROMPT not in schema_keys
+    assert CONF_LLM_HASS_API not in schema_keys
+
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        {
+            CONF_NAME: "Event summary",
+            **DEFAULT_AI_TASK_OPTIONS,
+        },
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["title"] == "Event summary"
+    assert result["data"] == DEFAULT_AI_TASK_OPTIONS
+
+
+async def test_create_stt_subentry(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_init_component: MagicMock,
+) -> None:
+    """Speech-to-text subentries support the recommended or a custom model."""
+    result = await hass.config_entries.subentries.async_init(
+        (mock_config_entry.entry_id, SUBENTRY_TYPE_STT),
+        context={"source": config_entries.SOURCE_USER},
+    )
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        {
+            CONF_NAME: "Hall microphone",
+            **DEFAULT_STT_OPTIONS,
+        },
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["title"] == "Hall microphone"
+    assert result["data"] == DEFAULT_STT_OPTIONS
+
+
+async def test_create_and_reconfigure_tts_subentry(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_init_component: MagicMock,
+) -> None:
+    """TTS requires an explicit listed or custom saved voice ID."""
+    with patch(
+        "custom_components.mistral_conversation.config_flow.async_get_voices",
+        new_callable=AsyncMock,
+        return_value=[
+            MistralVoice(
+                id="voice-1",
+                name="Living room",
+                languages=("en", "fr"),
+            )
+        ],
+    ) as get_voices:
+        result = await hass.config_entries.subentries.async_init(
+            (mock_config_entry.entry_id, SUBENTRY_TYPE_TTS),
+            context={"source": config_entries.SOURCE_USER},
+        )
+
+    get_voices.assert_awaited_once_with(mock_config_entry.runtime_data.client)
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        {
+            CONF_NAME: "Mistral speaker",
+            CONF_MODEL: DEFAULT_TTS_MODEL,
+            CONF_VOICE_ID: "voice-1",
+        },
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["title"] == "Mistral speaker"
+    assert result["data"] == {
+        CONF_MODEL: DEFAULT_TTS_MODEL,
+        CONF_VOICE_ID: "voice-1",
+    }
+
+    tts_subentry = next(
+        subentry
+        for subentry in mock_config_entry.subentries.values()
+        if subentry.subentry_type == SUBENTRY_TYPE_TTS
+    )
+    with patch(
+        "custom_components.mistral_conversation.config_flow.async_get_voices",
+        new_callable=AsyncMock,
+        return_value=[],
+    ):
+        result = await mock_config_entry.start_subentry_reconfigure_flow(
+            hass, tts_subentry.subentry_id
+        )
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        {
+            CONF_NAME: "Updated speaker",
+            CONF_MODEL: DEFAULT_TTS_MODEL,
+            CONF_VOICE_ID: "custom-voice-id",
+        },
+    )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert tts_subentry.title == "Updated speaker"
+    assert tts_subentry.data[CONF_VOICE_ID] == "custom-voice-id"

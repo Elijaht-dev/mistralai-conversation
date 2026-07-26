@@ -3,8 +3,8 @@
 ## Objective
 
 Mistral AI Conversation aims for the engineering shape and operational behavior
-of Home Assistant's first-party cloud conversation integrations while remaining
-an independent custom integration. “Comparable” here describes architecture,
+of Home Assistant's first-party cloud AI integrations while remaining an
+independent custom integration. “Comparable” here describes architecture,
 defensive behavior, and automated assurance; it does not claim first-party
 status, Home Assistant review, or a Quality Scale certification.
 
@@ -12,13 +12,16 @@ status, Home Assistant review, or a Quality Scale certification.
 
 | Concern | Implementation |
 | --- | --- |
-| Home Assistant API | `ConversationEntity` and `ChatLog` streaming |
-| Configuration | Config entry plus multiple conversation subentries |
-| Provider boundary | Official `mistralai` SDK with generated message models |
+| Home Assistant API | Conversation, AI Task, STT, and TTS entities |
+| Configuration | One account entry with typed feature subentries |
+| Provider boundary | Official `mistralai` SDK and generated request models |
 | Lifecycle | Shared HA HTTP client, coordinator refresh, deterministic close |
 | Credentials | Validation, duplicate prevention, and reauthentication |
 | Tools | HA LLM APIs, typed schemas, parallel calls, bounded rounds |
-| Multimodal | Bounded image and PDF data-URL attachments |
+| Structured data | Native strict Mistral JSON-schema response format |
+| Multimodal | Bounded AI Task and conversation image/PDF attachments |
+| Voice | Bounded Voxtral transcription and streamed speech generation |
+| Voice identity | Explicit preset/saved voice selection; no silent cloning |
 | Reasoning | Streamed display plus provider-native signed replay |
 | Model lifecycle | Discovery, aliases, capabilities, deprecation repairs |
 | Failures | Classified, translated errors and availability updates |
@@ -48,6 +51,10 @@ drift.
   opt-in activity because it costs money and requires secrets.
 - Model-generated actions are not deterministic. Entity exposure and safeguards
   must be designed in Home Assistant.
+- Speech recordings and text-to-speech input leave Home Assistant for Mistral;
+  custom voice creation, consent, and retention remain outside this integration.
+- TTS is not auto-created during migration because the provider requires an
+  explicit preset or saved voice choice.
 - Compatibility is declared from Home Assistant 2026.7.4 and is continuously
   checked against the pinned development baseline.
 
@@ -55,5 +62,5 @@ drift.
 
 The public repository gate requires a clean secret and privacy review plus green
 quality, HACS, and Hassfest validation. A versioned release should additionally
-wait for a real Home Assistant installation to complete chat and tool-call smoke
-tests.
+wait for a real Home Assistant installation to complete Conversation, tool-call,
+AI Task, speech-to-text, and text-to-speech smoke tests.

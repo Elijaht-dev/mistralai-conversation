@@ -13,10 +13,14 @@ from mistralai.client.models import BaseModelCard, FTModelCard, ModelCapabilitie
 from custom_components.mistral_conversation.api import (
     async_close_client,
     async_get_models,
+    async_get_voices,
     async_validate_api_key,
     create_client,
 )
-from custom_components.mistral_conversation.const import SETUP_TIMEOUT_MS
+from custom_components.mistral_conversation.const import (
+    SETUP_TIMEOUT_MS,
+    VOICE_LIST_PAGE_SIZE,
+)
 
 
 def _model_card(
@@ -118,6 +122,55 @@ async def test_get_models_filters_archived_fine_tunes() -> None:
     models = await async_get_models(client)
 
     assert [model.id for model in models] == ["active"]
+
+
+async def test_get_voices_pages_filters_and_sorts() -> None:
+    """Preset and custom voices are returned as stable account metadata."""
+    client = MagicMock()
+    client.audio.voices.list_async = AsyncMock(
+        side_effect=[
+            SimpleNamespace(
+                items=[
+                    SimpleNamespace(id="voice-z", name="Zulu", languages=["en"]),
+                    SimpleNamespace(id="", name="Ignored", languages=[]),
+                ],
+                total=3,
+            ),
+            SimpleNamespace(
+                items=[
+                    SimpleNamespace(
+                        id="voice-a",
+                        name="Alpha",
+                        languages=["fr", "en"],
+                    )
+                ],
+                total=3,
+            ),
+        ]
+    )
+
+    voices = await async_get_voices(client)
+
+    assert [voice.id for voice in voices] == ["voice-a", "voice-z"]
+    assert voices[0].languages == ("fr", "en")
+    assert client.audio.voices.list_async.await_args_list[0].kwargs == {
+        "limit": VOICE_LIST_PAGE_SIZE,
+        "offset": 0,
+        "type_": "all",
+        "timeout_ms": SETUP_TIMEOUT_MS,
+    }
+    assert client.audio.voices.list_async.await_args_list[1].kwargs["offset"] == 2
+
+
+async def test_get_voices_stops_on_empty_page() -> None:
+    """An empty provider page terminates pagination without retries."""
+    client = MagicMock()
+    client.audio.voices.list_async = AsyncMock(
+        return_value=SimpleNamespace(items=[], total=20)
+    )
+
+    assert await async_get_voices(client) == []
+    client.audio.voices.list_async.assert_awaited_once()
 
 
 def test_create_client_uses_home_assistant_http_client(

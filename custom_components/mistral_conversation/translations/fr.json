@@ -35,6 +35,45 @@
     }
   },
   "config_subentries": {
+    "ai_task_data": {
+      "abort": {
+        "entry_not_loaded": "Le compte Mistral AI n'est pas chargé. Rechargez-le avant de modifier les entités de tâche IA.",
+        "reconfigure_successful": "L'entité de tâche IA a été mise à jour.",
+        "unknown": "Erreur inattendue."
+      },
+      "entry_type": "Tâche IA",
+      "error": {
+        "max_tokens_context": "Le nombre maximal de jetons de réponse ne peut pas dépasser la fenêtre de contexte de {max_context_length} jetons de ce modèle.",
+        "model_no_reasoning": "Le modèle sélectionné n'indique pas prendre en charge le raisonnement.",
+        "model_no_tools": "Le modèle sélectionné n'indique pas prendre en charge les appels de fonction."
+      },
+      "initiate_flow": {
+        "reconfigure": "Reconfigurer la tâche IA",
+        "user": "Ajouter une tâche IA"
+      },
+      "step": {
+        "init": {
+          "data": {
+            "max_tokens": "Nombre maximal de jetons de réponse",
+            "model": "Modèle",
+            "name": "Nom",
+            "reasoning_effort": "Effort de raisonnement",
+            "safe_prompt": "Activer le message de sécurité Mistral",
+            "temperature": "Température"
+          },
+          "data_description": {
+            "max_tokens": "Nombre maximal de jetons que Mistral peut générer. L'entrée et la sortie doivent tenir ensemble dans la fenêtre de contexte du modèle.",
+            "model": "Sélectionnez un modèle proposé pour votre compte, ou saisissez l'identifiant d'un modèle personnalisé ou affiné.",
+            "name": "Nom affiché pour cette entité de tâche IA dans Home Assistant.",
+            "reasoning_effort": "Activez le raisonnement et choisissez son intensité. Utilisez Aucun pour les modèles qui ne le prennent pas en charge.",
+            "safe_prompt": "Demander à Mistral d'ajouter son message de sécurité avant la tâche.",
+            "temperature": "Une valeur faible donne des réponses plus prévisibles ; une valeur élevée les rend plus variées."
+          },
+          "description": "Configurez Mistral pour la génération de données avec les tâches IA de Home Assistant. Des images et des documents PDF peuvent être joints aux modèles compatibles.",
+          "title": "Tâche IA Mistral"
+        }
+      }
+    },
     "conversation": {
       "abort": {
         "entry_not_loaded": "Le compte Mistral AI n'est pas chargé. Rechargez-le avant de modifier les agents de conversation.",
@@ -77,12 +116,76 @@
           "title": "Agent de conversation Mistral"
         }
       }
+    },
+    "stt": {
+      "abort": {
+        "entry_not_loaded": "Le compte Mistral AI n'est pas chargé. Rechargez-le avant de modifier les entités de reconnaissance vocale.",
+        "reconfigure_successful": "L'entité de reconnaissance vocale a été mise à jour.",
+        "unknown": "Erreur inattendue."
+      },
+      "entry_type": "Reconnaissance vocale",
+      "initiate_flow": {
+        "reconfigure": "Reconfigurer la reconnaissance vocale",
+        "user": "Ajouter la reconnaissance vocale"
+      },
+      "step": {
+        "init": {
+          "data": {
+            "model": "Modèle de transcription",
+            "name": "Nom"
+          },
+          "data_description": {
+            "model": "Identifiant du modèle de transcription audio Mistral. Le modèle recommandé est Voxtral Mini Transcribe 2.",
+            "name": "Nom affiché pour cette entité de reconnaissance vocale dans Home Assistant."
+          },
+          "description": "Configurez la transcription par lot de Mistral pour Assist. L'audio vocal est envoyé à Mistral AI pour être traité.",
+          "title": "Reconnaissance vocale Mistral"
+        }
+      }
+    },
+    "tts": {
+      "abort": {
+        "entry_not_loaded": "Le compte Mistral AI n'est pas chargé. Rechargez-le avant de modifier les entités de synthèse vocale.",
+        "reconfigure_successful": "L'entité de synthèse vocale a été mise à jour.",
+        "unknown": "Erreur inattendue."
+      },
+      "entry_type": "Synthèse vocale",
+      "initiate_flow": {
+        "reconfigure": "Reconfigurer la synthèse vocale",
+        "user": "Ajouter la synthèse vocale"
+      },
+      "step": {
+        "init": {
+          "data": {
+            "model": "Modèle vocal",
+            "name": "Nom",
+            "voice_id": "Voix"
+          },
+          "data_description": {
+            "model": "Identifiant du modèle de synthèse vocale Mistral.",
+            "name": "Nom affiché pour cette entité de synthèse vocale dans Home Assistant.",
+            "voice_id": "Sélectionnez une voix Mistral prédéfinie ou personnalisée enregistrée, ou saisissez son identifiant. N'utilisez une voix clonée qu'avec le consentement de la personne concernée."
+          },
+          "description": "Configurez la génération vocale de Mistral. Le texte envoyé à cette entité est traité par Mistral AI avec la voix enregistrée sélectionnée.",
+          "title": "Synthèse vocale Mistral"
+        }
+      }
     }
   },
   "entity": {
+    "ai_task": {
+      "ai_task_data": {
+        "name": "Tâche IA"
+      }
+    },
     "conversation": {
       "conversation": {
         "name": "Conversation"
+      }
+    },
+    "stt": {
+      "stt": {
+        "name": "Reconnaissance vocale"
       }
     }
   },
@@ -117,6 +220,9 @@
     "invalid_repair_data": {
       "message": "La réparation du modèle ne contient pas d'entrée, d'agent de conversation et de remplacement valides."
     },
+    "json_parse_error": {
+      "message": "Mistral AI a renvoyé des données qui ne correspondent pas à la structure demandée."
+    },
     "max_tokens_context": {
       "message": "Le nombre maximal de jetons de réponse pour {model} ne peut pas dépasser sa fenêtre de contexte de {maximum} jetons."
     },
@@ -135,6 +241,9 @@
     "model_no_vision": {
       "message": "Le modèle {model} n'indique pas prendre en charge les images en entrée."
     },
+    "response_not_found": {
+      "message": "Mistral AI n'a renvoyé aucune réponse d'assistant pour cette tâche."
+    },
     "stream_error": {
       "message": "Mistral AI a terminé le flux de réponse avec une erreur."
     },
@@ -152,6 +261,21 @@
     },
     "tool_call_invalid": {
       "message": "Mistral AI a renvoyé un appel d'outil incorrect : {message}."
+    },
+    "tts_audio_too_large": {
+      "message": "Mistral AI a renvoyé plus que la taille maximale prise en charge de {maximum_mb} Mo d'audio vocal."
+    },
+    "tts_response_empty": {
+      "message": "Mistral AI n'a renvoyé aucun audio vocal."
+    },
+    "tts_response_invalid": {
+      "message": "Mistral AI a renvoyé un audio vocal non valide."
+    },
+    "tts_text_too_long": {
+      "message": "Le texte destiné à la synthèse vocale ne peut pas dépasser {maximum} caractères."
+    },
+    "tts_voice_required": {
+      "message": "Une voix Mistral prédéfinie ou enregistrée doit être sélectionnée."
     },
     "unexpected_chat_log_content": {
       "message": "Le journal de discussion contient un élément non pris en charge de type {type}."

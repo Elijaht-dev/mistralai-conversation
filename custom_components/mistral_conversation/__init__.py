@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from functools import partial
+from types import MappingProxyType
 from typing import Any
 
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigSubentry
 from homeassistant.const import CONF_LLM_HASS_API, CONF_MODEL, Platform
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import config_validation as cv
@@ -17,14 +18,21 @@ from .const import (
     CONF_REASONING_EFFORT,
     CONF_SAFE_PROMPT,
     CONF_TEMPERATURE,
+    DEFAULT_AI_TASK_NAME,
+    DEFAULT_AI_TASK_OPTIONS,
     DEFAULT_CONVERSATION_OPTIONS,
+    DEFAULT_STT_NAME,
+    DEFAULT_STT_OPTIONS,
     DOMAIN,
     LOGGER,
     REASONING_EFFORTS,
+    SUBENTRY_TYPE_AI_TASK,
+    SUBENTRY_TYPE_CONVERSATION,
+    SUBENTRY_TYPE_STT,
 )
 from .coordinator import MistralConfigEntry, MistralCoordinator
 
-PLATFORMS = (Platform.CONVERSATION,)
+PLATFORMS = (Platform.AI_TASK, Platform.CONVERSATION, Platform.STT, Platform.TTS)
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 _DEPRECATION_ISSUE_PREFIX = "model_deprecated_"
@@ -185,12 +193,40 @@ async def async_migrate_entry(
 
     if entry.minor_version < 2:
         for subentry in entry.subentries.values():
+            if subentry.subentry_type != SUBENTRY_TYPE_CONVERSATION:
+                continue
             hass.config_entries.async_update_subentry(
                 entry,
                 subentry,
                 data=_migrate_subentry_data(dict(subentry.data)),
             )
         hass.config_entries.async_update_entry(entry, minor_version=2)
+
+    if entry.minor_version < 3:
+        subentry_types = {
+            subentry.subentry_type for subentry in entry.subentries.values()
+        }
+        if SUBENTRY_TYPE_AI_TASK not in subentry_types:
+            hass.config_entries.async_add_subentry(
+                entry,
+                ConfigSubentry(
+                    data=MappingProxyType(DEFAULT_AI_TASK_OPTIONS),
+                    subentry_type=SUBENTRY_TYPE_AI_TASK,
+                    title=DEFAULT_AI_TASK_NAME,
+                    unique_id=None,
+                ),
+            )
+        if SUBENTRY_TYPE_STT not in subentry_types:
+            hass.config_entries.async_add_subentry(
+                entry,
+                ConfigSubentry(
+                    data=MappingProxyType(DEFAULT_STT_OPTIONS),
+                    subentry_type=SUBENTRY_TYPE_STT,
+                    title=DEFAULT_STT_NAME,
+                    unique_id=None,
+                ),
+            )
+        hass.config_entries.async_update_entry(entry, minor_version=3)
 
     return True
 

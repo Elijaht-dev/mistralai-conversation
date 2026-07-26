@@ -35,6 +35,45 @@
     }
   },
   "config_subentries": {
+    "ai_task_data": {
+      "abort": {
+        "entry_not_loaded": "The Mistral AI account is not loaded. Reload it before changing AI Task entities.",
+        "reconfigure_successful": "The AI Task entity was updated.",
+        "unknown": "Unexpected error."
+      },
+      "entry_type": "AI Task",
+      "error": {
+        "max_tokens_context": "Maximum response tokens cannot exceed this model's {max_context_length}-token context window.",
+        "model_no_reasoning": "The selected model does not advertise reasoning support.",
+        "model_no_tools": "The selected model does not advertise function-calling support."
+      },
+      "initiate_flow": {
+        "reconfigure": "Reconfigure AI Task",
+        "user": "Add AI Task"
+      },
+      "step": {
+        "init": {
+          "data": {
+            "max_tokens": "Maximum response tokens",
+            "model": "Model",
+            "name": "Name",
+            "reasoning_effort": "Reasoning effort",
+            "safe_prompt": "Enable Mistral safety prompt",
+            "temperature": "Temperature"
+          },
+          "data_description": {
+            "max_tokens": "Maximum tokens Mistral may generate. Input and output together must fit within the model's context window.",
+            "model": "Select a model returned by your account, or enter a custom or fine-tuned model ID.",
+            "name": "Name shown for this AI Task entity in Home Assistant.",
+            "reasoning_effort": "Enable reasoning and choose its effort. Use None for models without reasoning support.",
+            "safe_prompt": "Ask Mistral to inject its safety prompt before the task.",
+            "temperature": "Lower values are more predictable; higher values are more varied."
+          },
+          "description": "Configure Mistral for Home Assistant AI Task data generation. Images and PDF documents can be attached to supported models.",
+          "title": "Mistral AI Task"
+        }
+      }
+    },
     "conversation": {
       "abort": {
         "entry_not_loaded": "The Mistral AI account is not loaded. Reload it before changing conversation agents.",
@@ -77,12 +116,76 @@
           "title": "Mistral conversation agent"
         }
       }
+    },
+    "stt": {
+      "abort": {
+        "entry_not_loaded": "The Mistral AI account is not loaded. Reload it before changing speech-to-text entities.",
+        "reconfigure_successful": "The speech-to-text entity was updated.",
+        "unknown": "Unexpected error."
+      },
+      "entry_type": "Speech-to-text",
+      "initiate_flow": {
+        "reconfigure": "Reconfigure speech-to-text",
+        "user": "Add speech-to-text"
+      },
+      "step": {
+        "init": {
+          "data": {
+            "model": "Transcription model",
+            "name": "Name"
+          },
+          "data_description": {
+            "model": "Mistral audio transcription model ID. The recommended model is Voxtral Mini Transcribe 2.",
+            "name": "Name shown for this speech-to-text entity in Home Assistant."
+          },
+          "description": "Configure Mistral batch transcription for Assist. Voice audio is sent to Mistral AI for processing.",
+          "title": "Mistral speech-to-text"
+        }
+      }
+    },
+    "tts": {
+      "abort": {
+        "entry_not_loaded": "The Mistral AI account is not loaded. Reload it before changing text-to-speech entities.",
+        "reconfigure_successful": "The text-to-speech entity was updated.",
+        "unknown": "Unexpected error."
+      },
+      "entry_type": "Text-to-speech",
+      "initiate_flow": {
+        "reconfigure": "Reconfigure text-to-speech",
+        "user": "Add text-to-speech"
+      },
+      "step": {
+        "init": {
+          "data": {
+            "model": "Speech model",
+            "name": "Name",
+            "voice_id": "Voice"
+          },
+          "data_description": {
+            "model": "Mistral text-to-speech model ID.",
+            "name": "Name shown for this text-to-speech entity in Home Assistant.",
+            "voice_id": "Select a preset or saved custom Mistral voice, or enter its voice ID. Only use a cloned voice when you have the speaker's consent."
+          },
+          "description": "Configure Mistral speech generation. Text sent to this entity is processed by Mistral AI using the selected saved voice.",
+          "title": "Mistral text-to-speech"
+        }
+      }
     }
   },
   "entity": {
+    "ai_task": {
+      "ai_task_data": {
+        "name": "AI Task"
+      }
+    },
     "conversation": {
       "conversation": {
         "name": "Conversation"
+      }
+    },
+    "stt": {
+      "stt": {
+        "name": "Speech-to-text"
       }
     }
   },
@@ -115,7 +218,10 @@
       "message": "Mistral AI returned an empty response."
     },
     "invalid_repair_data": {
-      "message": "The model repair does not contain a valid entry, conversation agent, and replacement."
+      "message": "The model repair does not contain a valid account, configured entity, and replacement."
+    },
+    "json_parse_error": {
+      "message": "Mistral AI returned data that could not be parsed as the requested structure."
     },
     "max_tokens_context": {
       "message": "Maximum response tokens for {model} cannot exceed its {maximum}-token context window."
@@ -135,11 +241,14 @@
     "model_no_vision": {
       "message": "The model {model} does not advertise image input support."
     },
+    "response_not_found": {
+      "message": "Mistral AI did not return an assistant response for this task."
+    },
     "stream_error": {
       "message": "Mistral AI ended the response stream with an error."
     },
     "subentry_not_found": {
-      "message": "The conversation agent targeted by this repair no longer exists."
+      "message": "The configured entity targeted by this repair no longer exists."
     },
     "system_message_not_found": {
       "message": "The first chat-log item must be a system message."
@@ -152,6 +261,21 @@
     },
     "tool_call_invalid": {
       "message": "Mistral AI returned an invalid tool call: {message}."
+    },
+    "tts_audio_too_large": {
+      "message": "Mistral AI returned more than the supported maximum of {maximum_mb} MB of speech audio."
+    },
+    "tts_response_empty": {
+      "message": "Mistral AI returned no speech audio."
+    },
+    "tts_response_invalid": {
+      "message": "Mistral AI returned invalid speech audio."
+    },
+    "tts_text_too_long": {
+      "message": "Text-to-speech input cannot exceed {maximum} characters."
+    },
+    "tts_voice_required": {
+      "message": "A Mistral preset or saved voice must be selected."
     },
     "unexpected_chat_log_content": {
       "message": "The chat log contains unsupported content of type {type}."
@@ -171,7 +295,7 @@
             "data": {
               "model": "Replacement model"
             },
-            "description": "Replace **{model}** for the conversation agent **{subentry_name}**.",
+            "description": "Replace **{model}** for the configured entity **{subentry_name}**.",
             "title": "Replace deprecated Mistral model"
           }
         }

@@ -12,9 +12,16 @@ from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.mistral_conversation.const import (
+    DEFAULT_AI_TASK_NAME,
+    DEFAULT_AI_TASK_OPTIONS,
     DEFAULT_CONVERSATION_NAME,
     DEFAULT_CONVERSATION_OPTIONS,
+    DEFAULT_STT_NAME,
+    DEFAULT_STT_OPTIONS,
     DOMAIN,
+    SUBENTRY_TYPE_AI_TASK,
+    SUBENTRY_TYPE_CONVERSATION,
+    SUBENTRY_TYPE_STT,
     MistralModel,
 )
 
@@ -56,14 +63,26 @@ def mock_config_entry(
         domain=DOMAIN,
         data={CONF_API_KEY: "test-api-key"},
         version=1,
-        minor_version=2,
+        minor_version=3,
         subentries_data=[
             {
                 "data": DEFAULT_CONVERSATION_OPTIONS.copy(),
-                "subentry_type": "conversation",
+                "subentry_type": SUBENTRY_TYPE_CONVERSATION,
                 "title": DEFAULT_CONVERSATION_NAME,
                 "unique_id": None,
-            }
+            },
+            {
+                "data": DEFAULT_AI_TASK_OPTIONS.copy(),
+                "subentry_type": SUBENTRY_TYPE_AI_TASK,
+                "title": DEFAULT_AI_TASK_NAME,
+                "unique_id": None,
+            },
+            {
+                "data": DEFAULT_STT_OPTIONS.copy(),
+                "subentry_type": SUBENTRY_TYPE_STT,
+                "title": DEFAULT_STT_NAME,
+                "unique_id": None,
+            },
         ],
     )
     entry.add_to_hass(hass)
@@ -78,6 +97,13 @@ def mock_mistral_client() -> MagicMock:
     client.chat.stream_async = AsyncMock()
     client.models = MagicMock()
     client.models.list_async = AsyncMock()
+    client.audio = MagicMock()
+    client.audio.speech = MagicMock()
+    client.audio.speech.complete_async = AsyncMock()
+    client.audio.transcriptions = MagicMock()
+    client.audio.transcriptions.complete_async = AsyncMock()
+    client.audio.voices = MagicMock()
+    client.audio.voices.list_async = AsyncMock()
     client.__aexit__ = AsyncMock(return_value=None)
     return client
 

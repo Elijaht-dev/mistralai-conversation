@@ -35,8 +35,13 @@ from custom_components.mistral_conversation.const import (
     CONF_REASONING_EFFORT,
     CONF_SAFE_PROMPT,
     CONF_TEMPERATURE,
+    DEFAULT_AI_TASK_OPTIONS,
     DEFAULT_CONVERSATION_OPTIONS,
+    DEFAULT_STT_OPTIONS,
     DOMAIN,
+    SUBENTRY_TYPE_AI_TASK,
+    SUBENTRY_TYPE_CONVERSATION,
+    SUBENTRY_TYPE_STT,
     MistralModel,
 )
 
@@ -204,7 +209,7 @@ async def test_migration_normalizes_preview_data(
                     CONF_REASONING_EFFORT: "unsupported",
                     CONF_SAFE_PROMPT: "yes",
                 },
-                "subentry_type": "conversation",
+                "subentry_type": SUBENTRY_TYPE_CONVERSATION,
                 "title": "Chat only",
                 "unique_id": None,
             },
@@ -213,7 +218,7 @@ async def test_migration_normalizes_preview_data(
                     **DEFAULT_CONVERSATION_OPTIONS,
                     CONF_LLM_HASS_API: "assist",
                 },
-                "subentry_type": "conversation",
+                "subentry_type": SUBENTRY_TYPE_CONVERSATION,
                 "title": "Legacy API",
                 "unique_id": None,
             },
@@ -223,8 +228,12 @@ async def test_migration_normalizes_preview_data(
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.minor_version == 2
-    chat_only, legacy = entry.subentries.values()
+    assert entry.minor_version == 3
+    chat_only, legacy = [
+        subentry
+        for subentry in entry.subentries.values()
+        if subentry.subentry_type == SUBENTRY_TYPE_CONVERSATION
+    ]
     assert CONF_LLM_HASS_API not in chat_only.data
     assert chat_only.data[CONF_MODEL] == "custom"
     assert chat_only.data[CONF_PROMPT] == "Custom prompt"
@@ -233,6 +242,62 @@ async def test_migration_normalizes_preview_data(
     assert chat_only.data[CONF_REASONING_EFFORT] == "none"
     assert chat_only.data[CONF_SAFE_PROMPT] is False
     assert legacy.data[CONF_LLM_HASS_API] == ["assist"]
+    ai_task_entry = next(
+        subentry
+        for subentry in entry.subentries.values()
+        if subentry.subentry_type == SUBENTRY_TYPE_AI_TASK
+    )
+    stt_entry = next(
+        subentry
+        for subentry in entry.subentries.values()
+        if subentry.subentry_type == SUBENTRY_TYPE_STT
+    )
+    assert ai_task_entry.data == DEFAULT_AI_TASK_OPTIONS
+    assert stt_entry.data == DEFAULT_STT_OPTIONS
+
+
+async def test_migration_does_not_duplicate_voice_platform_subentries(
+    hass: HomeAssistant,
+) -> None:
+    """Version 1.2 accounts keep existing AI Task and STT subentries."""
+    entry = MockConfigEntry(
+        title="Mistral AI",
+        domain=DOMAIN,
+        data={CONF_API_KEY: "test-api-key"},
+        version=1,
+        minor_version=2,
+        subentries_data=[
+            {
+                "data": DEFAULT_CONVERSATION_OPTIONS,
+                "subentry_type": SUBENTRY_TYPE_CONVERSATION,
+                "title": "Conversation",
+                "unique_id": None,
+            },
+            {
+                "data": DEFAULT_AI_TASK_OPTIONS,
+                "subentry_type": SUBENTRY_TYPE_AI_TASK,
+                "title": "AI Task",
+                "unique_id": None,
+            },
+            {
+                "data": DEFAULT_STT_OPTIONS,
+                "subentry_type": SUBENTRY_TYPE_STT,
+                "title": "STT",
+                "unique_id": None,
+            },
+        ],
+    )
+    entry.add_to_hass(hass)
+
+    assert await async_migrate_entry(hass, entry)
+
+    assert entry.minor_version == 3
+    assert [subentry.subentry_type for subentry in entry.subentries.values()].count(
+        SUBENTRY_TYPE_AI_TASK
+    ) == 1
+    assert [subentry.subentry_type for subentry in entry.subentries.values()].count(
+        SUBENTRY_TYPE_STT
+    ) == 1
 
 
 async def test_migration_rejects_unknown_major_version(

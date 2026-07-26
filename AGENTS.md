@@ -5,9 +5,10 @@ These instructions apply to the entire repository.
 ## Mission
 
 Maintain a production-quality HACS custom integration that gives Home Assistant
-a Mistral AI conversation agent through the official `mistralai` Python SDK.
-Preserve Home Assistant conventions and defensive behavior; do not imply that
-this project is first-party, Home Assistant-certified, or endorsed by Mistral AI.
+Mistral-backed Conversation, AI Task, speech-to-text, and text-to-speech entities
+through the official `mistralai` Python SDK. Preserve Home Assistant conventions
+and defensive behavior; do not imply that this project is first-party, Home
+Assistant-certified, or endorsed by Mistral AI.
 
 ## Read before editing
 
@@ -20,12 +21,15 @@ this project is first-party, Home Assistant-certified, or endorsed by Mistral AI
 ## Repository map
 
 - `custom_components/mistral_conversation/` is the only runtime integration.
-- `api.py` owns SDK client creation, credential validation, and model discovery.
+- `api.py` owns SDK client creation, credential validation, and model/voice
+  discovery.
 - `coordinator.py` owns the shared client, model metadata, availability, and
   refresh lifecycle.
 - `conversation.py` is the thin Home Assistant `ConversationEntity` adapter.
+- `ai_task.py`, `stt.py`, and `tts.py` are the thin Home Assistant adapters for
+  structured tasks and voice pipelines.
 - `entity.py` owns message conversion, streaming, capability checks,
-  attachments, and the tool-execution loop.
+  attachments, structured chat output, and the tool-execution loop.
 - `tool_calls.py` reconstructs fragmented and parallel streamed tool calls.
 - `config_flow.py`, `diagnostics.py`, and `repairs.py` implement their matching
   Home Assistant surfaces.
@@ -38,8 +42,8 @@ this project is first-party, Home Assistant-certified, or endorsed by Mistral AI
 
 ### Home Assistant lifecycle
 
-- Keep configuration UI-only: one account config entry with one or more
-  conversation config subentries.
+- Keep configuration UI-only: one account config entry with typed Conversation,
+  AI Task, STT, and TTS config subentries.
 - Store shared runtime state in typed `ConfigEntry.runtime_data`.
 - Use Home Assistant's shared HTTP client when constructing the Mistral client,
   and close provider resources deterministically during unload or failed setup.
@@ -65,6 +69,10 @@ this project is first-party, Home Assistant-certified, or endorsed by Mistral AI
   timeout, connection, rate-limit, and generic provider failures have different
   Home Assistant behavior and must remain distinguishable.
 - Do not add a live Mistral request to normal tests or CI.
+- Use `client.audio.transcriptions`, `client.audio.speech`, and
+  `client.audio.voices` through their generated asynchronous SDK surfaces.
+- Keep AI Task structured responses on native JSON-schema output instead of
+  relying on prompt-only JSON formatting.
 
 ### Tools and attachments
 
@@ -73,8 +81,9 @@ this project is first-party, Home Assistant-certified, or endorsed by Mistral AI
 - Reject incomplete, malformed, or ambiguous streamed tool calls before
   execution.
 - Preserve the bounds in `const.py`: declared tools, tool rounds, attachment
-  count, attachment size, supported MIME types, output tokens, and timeouts.
-  Changing a bound requires a clear user-facing reason and boundary tests.
+  count, attachment size, audio input/output size, TTS input length, supported
+  MIME types, output tokens, and timeouts. Changing a bound requires a clear
+  user-facing reason and boundary tests.
 - Validate model capabilities before sending tools, reasoning, images, or PDFs.
 - Fail closed on empty streams, explicit stream errors, unsupported chat-log
   content, oversized input, and runaway tool loops.
@@ -82,11 +91,14 @@ this project is first-party, Home Assistant-certified, or endorsed by Mistral AI
 ### Security and privacy
 
 - Never commit or print API keys, access tokens, real prompts, entity inventories,
-  addresses, attachments, recordings, diagnostics, or user data.
+  addresses, attachments, recordings, transcripts, generated audio,
+  diagnostics, or user data.
 - Use obviously fake credentials such as `test-api-key` in tests.
 - Keep diagnostics redacted and request logging free of prompt and attachment
-  content. Bound and normalize provider error text before displaying or logging
-  it.
+  content, recordings, transcripts, and speech output. Bound and normalize
+  provider error text before displaying or logging it.
+- Do not silently create, clone, or select a TTS voice. Persist an explicit
+  preset or saved voice ID, and keep consent/retention warnings user-facing.
 - Do not broaden entity control, remove capability checks, or weaken limits as a
   convenience fix.
 - Report suspected vulnerabilities through `SECURITY.md`, not a public issue.

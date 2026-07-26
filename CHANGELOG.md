@@ -13,6 +13,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Typed Mistral SDK request and streaming response boundary.
 - Streaming text, reasoning, token usage, and parallel tool calls.
 - Home Assistant conversation subentries and Assist tool support.
+- Home Assistant AI Task entities with native JSON-schema structured output.
+- Voxtral speech-to-text entities for Assist voice pipelines.
+- Streaming Voxtral text-to-speech with explicit preset or saved voice
+  selection.
 - Images and PDF attachments with bounded local validation.
 - Model capability validation, aliases, coordinator availability, diagnostics,
   reauthentication, migrations, and deprecated-model repairs.

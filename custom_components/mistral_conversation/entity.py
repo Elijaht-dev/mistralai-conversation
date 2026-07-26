@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Never, cast
 
 import httpx
+import voluptuous as vol
 from homeassistant.components import conversation
 from homeassistant.config_entries import ConfigSubentry
 from homeassistant.const import CONF_MODEL
@@ -25,6 +26,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import llm
 from homeassistant.helpers.json import json_dumps
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import slugify
 from mistralai.client.errors import MistralError, NoResponseError
 from mistralai.client.models import (
     AssistantMessage,
@@ -35,7 +37,9 @@ from mistralai.client.models import (
     Function,
     FunctionCall,
     ImageURLChunk,
+    JSONSchema,
     ReferenceChunk,
+    ResponseFormat,
     SystemMessage,
     TextChunk,
     ThinkChunk,
@@ -54,8 +58,12 @@ from .const import (
     CONF_REASONING_EFFORT,
     CONF_SAFE_PROMPT,
     CONF_TEMPERATURE,
+    DEFAULT_AI_TASK_OPTIONS,
     DEFAULT_CONVERSATION_OPTIONS,
+    DEFAULT_MODEL,
+    DEFAULT_STT_MODEL,
     DEFAULT_TEMPERATURE,
+    DEFAULT_TTS_MODEL,
     DOMAIN,
     LOGGER,
     MAX_ATTACHMENT_BYTES,
@@ -65,6 +73,9 @@ from .const import (
     REASONING_EFFORT_NONE,
     REASONING_EFFORTS,
     REQUEST_TIMEOUT_MS,
+    SUBENTRY_TYPE_AI_TASK,
+    SUBENTRY_TYPE_STT,
+    SUBENTRY_TYPE_TTS,
     SUPPORTED_DOCUMENT_MIME_TYPES,
     SUPPORTED_IMAGE_MIME_TYPES,
     ApiErrorKind,
@@ -78,6 +89,19 @@ from .tool_calls import ToolCallAccumulator, ToolCallDecodeError
 type MistralMessage = ChatCompletionStreamRequestMessage
 type MistralTool = ChatCompletionStreamRequestTool
 type MistralAttachmentChunk = ImageURLChunk | DocumentURLChunk
+
+
+def _adjust_structured_output_schema(value: object) -> None:
+    """Close every object in a JSON schema while preserving optional fields."""
+    if isinstance(value, dict):
+        schema = cast(dict[str, object], value)
+        if schema.get("type") == "object" or isinstance(schema.get("properties"), dict):
+            schema.setdefault("additionalProperties", False)
+        for nested_value in schema.values():
+            _adjust_structured_output_schema(nested_value)
+    elif isinstance(value, list):
+        for nested_value in cast(list[object], value):
+            _adjust_structured_output_schema(nested_value)
 
 
 @dataclass(slots=True)
@@ -121,6 +145,7 @@ class MistralRequest:
     reasoning_effort: ReasoningEffort
     safe_prompt: bool
     prompt_cache_key: str | None
+    response_format: ResponseFormat | None
 
 
 @dataclass(slots=True)
@@ -422,14 +447,23 @@ class MistralBaseEntity(CoordinatorEntity[MistralCoordinator]):
     """Base entity for Mistral-backed conversation features."""
 
     _attr_has_entity_name = True
-    _attr_name = None
+    _attr_name: str | None = None
 
     def __init__(self, entry: MistralConfigEntry, subentry: ConfigSubentry) -> None:
         """Initialize the entity."""
         super().__init__(entry.runtime_data)
         self.entry = entry
         self.subentry = subentry
-        self.model = cast(str, subentry.data[CONF_MODEL])
+        default_model = {
+            SUBENTRY_TYPE_STT: DEFAULT_STT_MODEL,
+            SUBENTRY_TYPE_TTS: DEFAULT_TTS_MODEL,
+        }.get(subentry.subentry_type, DEFAULT_MODEL)
+        configured_model = subentry.data.get(CONF_MODEL, default_model)
+        self.model = (
+            configured_model
+            if isinstance(configured_model, str) and configured_model
+            else default_model
+        )
         model_info, _ = self.coordinator.get_model_info(self.model)
         self._attr_unique_id = subentry.subentry_id
         self._attr_device_info = dr.DeviceInfo(
@@ -489,7 +523,10 @@ class MistralBaseEntity(CoordinatorEntity[MistralCoordinator]):
                 )
 
     async def _async_build_request(
-        self, chat_log: conversation.ChatLog
+        self,
+        chat_log: conversation.ChatLog,
+        structure_name: str | None = None,
+        structure: vol.Schema | None = None,
     ) -> MistralRequest:
         """Build and validate the first provider request."""
         if not chat_log.content or not isinstance(
@@ -500,7 +537,12 @@ class MistralBaseEntity(CoordinatorEntity[MistralCoordinator]):
                 translation_key="system_message_not_found",
             )
 
-        options = DEFAULT_CONVERSATION_OPTIONS | dict(self.subentry.data)
+        default_options = (
+            DEFAULT_AI_TASK_OPTIONS
+            if self.subentry.subentry_type == SUBENTRY_TYPE_AI_TASK
+            else DEFAULT_CONVERSATION_OPTIONS
+        )
+        options = default_options | dict(self.subentry.data)
         messages = [
             message
             for content in chat_log.content
@@ -566,12 +608,33 @@ class MistralBaseEntity(CoordinatorEntity[MistralCoordinator]):
                 for tool in chat_log.llm_api.tools
             ]
 
+        response_format: ResponseFormat | None = None
+        if structure is not None:
+            schema = convert(
+                structure,
+                custom_serializer=(
+                    chat_log.llm_api.custom_serializer
+                    if chat_log.llm_api
+                    else llm.selector_serializer
+                ),
+            )
+            _adjust_structured_output_schema(schema)
+            response_format = ResponseFormat(
+                type="json_schema",
+                json_schema=JSONSchema(
+                    name=slugify(structure_name or "") or "home_assistant_task",
+                    schema_definition=schema,
+                    strict=True,
+                ),
+            )
+
         chat_log.async_trace(
             {
                 "mistral": {
                     "model": self.model,
                     "reasoning_effort": reasoning_effort,
                     "safe_prompt": bool(options[CONF_SAFE_PROMPT]),
+                    "structured_output": response_format is not None,
                     "tool_count": len(tools),
                 }
             }
@@ -594,21 +657,18 @@ class MistralBaseEntity(CoordinatorEntity[MistralCoordinator]):
             reasoning_effort=reasoning_effort,
             safe_prompt=bool(options[CONF_SAFE_PROMPT]),
             prompt_cache_key=chat_log.conversation_id,
+            response_format=response_format,
         )
 
-    async def _async_handle_api_error(self, err: BaseException) -> Never:
-        """Update coordinator state and raise a translated runtime error."""
+    async def _async_process_api_error(self, err: BaseException) -> tuple[str, str]:
+        """Update coordinator state and return a translated runtime error."""
         coordinator = self.coordinator
         error_kind = classify_api_error(err)
         message = api_error_message(err)
 
         if error_kind is ApiErrorKind.AUTHENTICATION:
             await coordinator.async_request_refresh()
-            raise HomeAssistantError(
-                translation_domain=DOMAIN,
-                translation_key="api_authentication_error",
-                translation_placeholders={"message": message},
-            ) from err
+            return "api_authentication_error", message
 
         if error_kind in (ApiErrorKind.CONNECTION, ApiErrorKind.TIMEOUT):
             coordinator.mark_connection_error()
@@ -620,6 +680,11 @@ class MistralBaseEntity(CoordinatorEntity[MistralCoordinator]):
             ApiErrorKind.TIMEOUT: "api_timeout",
             ApiErrorKind.RATE_LIMIT: "api_rate_limit",
         }.get(error_kind, "api_error")
+        return translation_key, message
+
+    async def _async_handle_api_error(self, err: BaseException) -> Never:
+        """Update coordinator state and raise a translated runtime error."""
+        translation_key, message = await self._async_process_api_error(err)
         raise HomeAssistantError(
             translation_domain=DOMAIN,
             translation_key=translation_key,
@@ -629,10 +694,16 @@ class MistralBaseEntity(CoordinatorEntity[MistralCoordinator]):
     async def _async_handle_chat_log(
         self,
         chat_log: conversation.ChatLog,
+        structure_name: str | None = None,
+        structure: vol.Schema | None = None,
         max_iterations: int = MAX_TOOL_ITERATIONS,
     ) -> None:
         """Generate an answer and execute requested Home Assistant tools."""
-        request = await self._async_build_request(chat_log)
+        request = await self._async_build_request(
+            chat_log,
+            structure_name=structure_name,
+            structure=structure,
+        )
 
         for _iteration in range(max_iterations):
             stream_state = MistralStreamState()
@@ -645,6 +716,7 @@ class MistralBaseEntity(CoordinatorEntity[MistralCoordinator]):
                     safe_prompt=request.safe_prompt,
                     prompt_cache_key=request.prompt_cache_key,
                     reasoning_effort=request.reasoning_effort,
+                    response_format=request.response_format,
                     tools=request.tools or None,
                     tool_choice="auto" if request.tools else None,
                     parallel_tool_calls=bool(request.tools),

@@ -78,7 +78,7 @@ async def test_invalid_repair_metadata(
 async def test_repair_target_was_removed(
     hass: HomeAssistant,
 ) -> None:
-    """A stale repair reports that its conversation agent no longer exists."""
+    """A stale repair reports that its configured entity no longer exists."""
     flow = await async_create_fix_flow(
         hass,
         "model_deprecated_removed",

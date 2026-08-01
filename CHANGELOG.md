@@ -13,6 +13,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 - Updated the official `mistralai` SDK baseline from 2.7.2 to 2.8.0.
 
+### Fixed
+
+- Corrected the Home Assistant and HACS icon and logo assets.
+
 ## [0.1.0] - 2026-07-26
 
 ### Added

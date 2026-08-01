@@ -7,6 +7,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- Updated the official `mistralai` SDK baseline from 2.7.2 to 2.8.0.
+
 ## [0.1.0] - 2026-07-26
 
 ### Added

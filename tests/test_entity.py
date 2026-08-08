@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 import voluptuous as vol
 from homeassistant.components import conversation
+from homeassistant.components.llm import LLMTools
 from homeassistant.core import Context, HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import intent, llm
@@ -425,8 +426,9 @@ async def test_conversation_success_and_request_parameters(
         ]
     )
     with patch(
-        "custom_components.mistral_conversation.entity.llm.AssistAPI._async_get_tools",
-        return_value=[],
+        "homeassistant.components.llm.async_get_tools",
+        new_callable=AsyncMock,
+        return_value=LLMTools(tools=[]),
     ):
         result = await conversation.async_converse(
             hass,
@@ -492,8 +494,9 @@ async def test_conversation_function_call_round_trip(
     ]
 
     with patch(
-        "custom_components.mistral_conversation.entity.llm.AssistAPI._async_get_tools",
-        return_value=[mock_tool],
+        "homeassistant.components.llm.async_get_tools",
+        new_callable=AsyncMock,
+        return_value=LLMTools(tools=[mock_tool]),
     ):
         result = await conversation.async_converse(
             hass,

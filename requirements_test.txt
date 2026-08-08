@@ -2,7 +2,7 @@ hassil==3.11.0
 ha-ffmpeg==3.2.2
 home-assistant-intents==2026.7.30
 homeassistant==2026.7.4
-mistralai==2.8.0
+mistralai==2.9.1
 mypy==2.3.0
 mutagen==1.47.0
 pytest-cov==7.1.0

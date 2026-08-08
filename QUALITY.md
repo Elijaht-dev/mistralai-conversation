@@ -55,7 +55,7 @@ drift.
   custom voice creation, consent, and retention remain outside this integration.
 - TTS is not auto-created during migration because the provider requires an
   explicit preset or saved voice choice.
-- Compatibility is declared from Home Assistant 2026.7.4 and is continuously
+- Compatibility is declared from Home Assistant 2026.8.1 and is continuously
   checked against the pinned development baseline.
 
 ## Release gate

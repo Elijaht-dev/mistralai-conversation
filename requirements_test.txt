@@ -1,11 +1,11 @@
 hassil==3.11.0
 ha-ffmpeg==3.2.2
 home-assistant-intents==2026.7.30
-homeassistant==2026.7.4
+homeassistant==2026.8.1
 mistralai==2.9.1
 mypy==2.3.0
 mutagen==1.47.0
 pytest-cov==7.1.0
-pytest-homeassistant-custom-component==0.13.348
+pytest-homeassistant-custom-component==0.13.355
 PyTurboJPEG==1.8.3
 ruff==0.16.1

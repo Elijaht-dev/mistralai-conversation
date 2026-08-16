@@ -7,6 +7,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- Updated the HACS installation instructions now that the integration is
+  included in the default HACS catalog.
+
 ## [0.1.4] - 2026-08-15
 
 ### Changed

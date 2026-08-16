@@ -56,18 +56,14 @@ The integration pins `mistralai==2.9.2`.
 
 ### HACS
 
-This integration is available as a HACS custom repository. It is not currently
-part of the default HACS catalog.
+This integration is included in the default HACS catalog.
 
-Use the **Open your Home Assistant instance** button above, or add the repository
-manually:
+Use the **Open your Home Assistant instance** button above, or install it from
+the HACS dashboard:
 
-1. Open **HACS → Integrations**.
-2. Open the menu and choose **Custom repositories**.
-3. Add `https://github.com/Elijaht-dev/mistralai-conversation` with category
-   **Integration**.
-4. Select **Mistral AI Conversation**, choose **Download**, and restart Home
-   Assistant.
+1. Open **HACS** in Home Assistant.
+2. Search for **Mistral AI Conversation**.
+3. Select it, choose **Download**, and restart Home Assistant.
 
 ### Manual installation
 

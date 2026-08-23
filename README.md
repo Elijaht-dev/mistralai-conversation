@@ -1,8 +1,8 @@
 # Mistral AI Conversation for Home Assistant
 
 [![Validate](https://github.com/Elijaht-dev/mistralai-conversation/actions/workflows/validate.yml/badge.svg)](https://github.com/Elijaht-dev/mistralai-conversation/actions/workflows/validate.yml)
-[![Home Assistant 2026.8.1+](https://img.shields.io/badge/Home%20Assistant-2026.8.1%2B-41BDF5.svg)](https://www.home-assistant.io/)
-[![Mistral SDK 2.9.2](https://img.shields.io/badge/mistralai-2.9.2-FA520F.svg)](https://pypi.org/project/mistralai/)
+[![Home Assistant 2026.8.2+](https://img.shields.io/badge/Home%20Assistant-2026.8.2%2B-41BDF5.svg)](https://www.home-assistant.io/)
+[![Mistral SDK 2.9.3](https://img.shields.io/badge/mistralai-2.9.3-FA520F.svg)](https://pypi.org/project/mistralai/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 [![Open your Home Assistant instance and add this repository to HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Elijaht-dev&repository=mistralai-conversation&category=integration)
@@ -39,7 +39,7 @@ endorsed by Home Assistant or Mistral AI.
 
 ## Requirements
 
-- Home Assistant 2026.8.1 or newer
+- Home Assistant 2026.8.2 or newer
 - A Mistral AI API key and available API credit
 - A chat-capable Mistral model for Conversation and AI Task
 - Access to Mistral's audio endpoints for speech-to-text or text-to-speech
@@ -50,7 +50,7 @@ configurable because their capabilities may not be present in model discovery.
 Text-to-speech additionally requires a preset or saved voice available to the
 Mistral account.
 
-The integration pins `mistralai==2.9.2`.
+The integration pins `mistralai==2.9.3`.
 
 ## Installation
 

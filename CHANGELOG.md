@@ -7,8 +7,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-08-23
+
 ### Changed
 
+- Raised the minimum Home Assistant version from 2026.8.1 to 2026.8.2 and
+  synchronized the Home Assistant-native test fixture.
+- Updated the official `mistralai` SDK baseline from 2.9.2 to 2.9.3.
+- Updated the Ruff and mypy development baselines.
 - Updated the HACS installation instructions now that the integration is
   included in the default HACS catalog.
 
@@ -59,7 +65,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - English and French translations.
 - Ruff, strict mypy, pytest coverage, HACS, Hassfest, and Dependabot automation.
 
-[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.1.5...HEAD
+[0.1.5]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.1.1...v0.1.2

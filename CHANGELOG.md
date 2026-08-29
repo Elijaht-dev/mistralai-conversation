@@ -7,6 +7,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-08-29
+
+### Fixed
+
+- Restored the minimum Home Assistant version to 2026.7.4. The declared
+  compatibility floor is no longer raised with the newer development test
+  baseline.
+
 ## [0.1.6] - 2026-08-29
 
 ### Changed
@@ -73,7 +81,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - English and French translations.
 - Ruff, strict mypy, pytest coverage, HACS, Hassfest, and Dependabot automation.
 
-[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.1.6...HEAD
+[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.1.7...HEAD
+[0.1.7]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.1.3...v0.1.4

@@ -7,6 +7,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.1.8b1] - 2026-09-04
+
+### Fixed
+
+- Restored setup on Home Assistant 2026.9 by using Probatio's OpenAPI schema
+  converter while retaining the previous converter on older supported Home
+  Assistant releases.
+
+### Changed
+
+- Advanced the automated test baseline to Home Assistant 2026.9.0 and its
+  matching Home Assistant-native test fixture.
+
 ## [0.1.7] - 2026-08-29
 
 ### Fixed
@@ -81,7 +94,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - English and French translations.
 - Ruff, strict mypy, pytest coverage, HACS, Hassfest, and Dependabot automation.
 
-[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.1.7...HEAD
+[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.1.8b1...HEAD
+[0.1.8b1]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.1.7...v0.1.8b1
 [0.1.7]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.1.4...v0.1.5

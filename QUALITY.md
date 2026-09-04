@@ -56,7 +56,8 @@ drift.
 - TTS is not auto-created during migration because the provider requires an
   explicit preset or saved voice choice.
 - Compatibility is declared from Home Assistant 2026.7.4. Automated tests use
-  the newer pinned development baseline without raising the user-facing minimum.
+  the newer Home Assistant 2026.9.0 development baseline without raising the
+  user-facing minimum.
 
 ## Release gate
 

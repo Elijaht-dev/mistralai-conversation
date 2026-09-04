@@ -51,7 +51,6 @@ from mistralai.client.models import (
 )
 from mistralai.client.models.contentchunk import ContentChunk
 from mistralai.client.models.thinkchunk import Thinking
-from voluptuous_openapi import convert  # type: ignore[import-untyped]
 
 from .const import (
     CONF_MAX_TOKENS,
@@ -89,6 +88,26 @@ from .tool_calls import ToolCallAccumulator, ToolCallDecodeError
 type MistralMessage = ChatCompletionStreamRequestMessage
 type MistralTool = ChatCompletionStreamRequestTool
 type MistralAttachmentChunk = ImageURLChunk | DocumentURLChunk
+
+
+def _to_openapi(
+    schema: Any,
+    custom_serializer: Callable[[Any], Any] | None,
+) -> dict[str, Any]:
+    """Convert a schema with the engine provided by this Home Assistant version."""
+    try:
+        from probatio import to_openapi  # noqa: PLC0415
+    except ModuleNotFoundError:  # Home Assistant 2026.7 and 2026.8
+        from voluptuous_openapi import (  # type: ignore[import-not-found]  # noqa: PLC0415
+            convert as legacy_to_openapi,
+        )
+
+        return cast(
+            dict[str, Any],
+            legacy_to_openapi(schema, custom_serializer=custom_serializer),
+        )
+
+    return to_openapi(schema, custom_serializer=custom_serializer)
 
 
 def _adjust_structured_output_schema(value: object) -> None:
@@ -164,7 +183,7 @@ def _format_tool(
         function=Function(
             name=tool.name,
             description=tool.description or None,
-            parameters=convert(
+            parameters=_to_openapi(
                 tool.parameters,
                 custom_serializer=custom_serializer,
             ),
@@ -610,7 +629,7 @@ class MistralBaseEntity(CoordinatorEntity[MistralCoordinator]):
 
         response_format: ResponseFormat | None = None
         if structure is not None:
-            schema = convert(
+            schema = _to_openapi(
                 structure,
                 custom_serializer=(
                     chat_log.llm_api.custom_serializer

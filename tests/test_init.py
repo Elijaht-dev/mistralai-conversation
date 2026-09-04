@@ -67,7 +67,9 @@ async def test_setup_creates_entity_and_service_device(
     assert entity.config_subentry_id == subentry.subentry_id
     assert entity.translation_key == "conversation"
 
-    device = device_registry.async_get_device({(DOMAIN, subentry.subentry_id)})
+    device = device_registry.async_get_device_by_identifier(
+        (DOMAIN, subentry.subentry_id), mock_config_entry.entry_id
+    )
     assert device is not None
     assert device.name == "Mistral conversation"
     assert device.manufacturer == "Mistral AI"

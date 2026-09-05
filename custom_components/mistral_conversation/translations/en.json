@@ -45,6 +45,7 @@
       "error": {
         "max_tokens_context": "Maximum response tokens cannot exceed this model's {max_context_length}-token context window.",
         "model_no_reasoning": "The selected model does not advertise reasoning support.",
+        "model_reasoning_effort": "This model does not support this setting. Review the Reasoning field before saving.",
         "model_no_tools": "The selected model does not advertise function-calling support."
       },
       "initiate_flow": {
@@ -57,7 +58,7 @@
             "max_tokens": "Maximum response tokens",
             "model": "Model",
             "name": "Name",
-            "reasoning_effort": "Reasoning effort",
+            "reasoning_effort": "Reasoning",
             "safe_prompt": "Enable Mistral safety prompt",
             "temperature": "Temperature"
           },
@@ -65,7 +66,7 @@
             "max_tokens": "Maximum tokens Mistral may generate. Input and output together must fit within the model's context window.",
             "model": "Select a model returned by your account, or enter a custom or fine-tuned model ID.",
             "name": "Name shown for this AI Task entity in Home Assistant.",
-            "reasoning_effort": "Enable reasoning and choose its effort. Use None for models without reasoning support.",
+            "reasoning_effort": "Automatic uses the provider's default. Available controls depend on the model.",
             "safe_prompt": "Ask Mistral to inject its safety prompt before the task.",
             "temperature": "Lower values are more predictable; higher values are more varied."
           },
@@ -84,6 +85,7 @@
       "error": {
         "max_tokens_context": "Maximum response tokens cannot exceed this model's {max_context_length}-token context window.",
         "model_no_reasoning": "The selected model does not advertise reasoning support.",
+        "model_reasoning_effort": "This model does not support this setting. Review the Reasoning field before saving.",
         "model_no_tools": "The selected model does not advertise function-calling support. Clear Home Assistant APIs or choose another model."
       },
       "initiate_flow": {
@@ -98,7 +100,7 @@
             "model": "Model",
             "name": "Name",
             "prompt": "Instructions",
-            "reasoning_effort": "Reasoning effort",
+            "reasoning_effort": "Reasoning",
             "safe_prompt": "Enable Mistral safety prompt",
             "temperature": "Temperature"
           },
@@ -108,7 +110,7 @@
             "model": "Select a model returned by your account, or enter a custom or fine-tuned model ID.",
             "name": "Name shown for this conversation agent in Home Assistant.",
             "prompt": "Instructions for the model. Home Assistant templates are supported.",
-            "reasoning_effort": "Enable reasoning and choose its effort. Use None for models without reasoning support.",
+            "reasoning_effort": "Automatic uses the provider's default. Available controls depend on the model.",
             "safe_prompt": "Ask Mistral to inject its safety prompt before the conversation.",
             "temperature": "Lower values are more predictable; higher values are more varied."
           },
@@ -232,6 +234,9 @@
     "model_no_documents": {
       "message": "The model {model} does not advertise PDF document support."
     },
+    "model_reasoning_effort": {
+      "message": "The model {model} does not accept reasoning effort {effort}. Reconfigure the entity and review the Reasoning field."
+    },
     "model_no_reasoning": {
       "message": "The model {model} does not advertise reasoning support."
     },
@@ -306,13 +311,20 @@
   "selector": {
     "reasoning_effort": {
       "options": {
-        "high": "High",
+        "auto": "Automatic",
+        "high": "Enabled",
         "low": "Low",
         "medium": "Medium",
         "minimal": "Minimal",
-        "none": "None",
+        "none": "Disabled",
         "xhigh": "Extra high"
       }
+    },
+    "reasoning_unavailable": {
+      "value": "Reasoning unavailable"
+    },
+    "reasoning_always_on": {
+      "value": "Reasoning always active"
     }
   }
 }

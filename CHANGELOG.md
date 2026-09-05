@@ -7,6 +7,27 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.2.0b1] - 2026-09-05
+
+### Fixed
+
+- Fixed Conversation and AI Task requests failing with HTTP 400 on non-reasoning
+  models such as Ministral when reasoning effort is set to None. The unsupported
+  parameter is now omitted for these models and unknown custom model IDs, while
+  retaining explicit reasoning controls for compatible models.
+- Limited the reasoning choices for Mistral Small 4 and Medium 3.5 to their
+  documented `none` / `high` controls, and added Automatic for provider-managed
+  behavior, including Magistral's native reasoning. Incompatible saved efforts
+  now fail locally with a translated reconfiguration message instead of being
+  sent to Mistral. Undocumented custom-model efforts remain available.
+
+### Changed
+
+- Simplified the Reasoning control to Automatic / Disabled / Enabled, with
+  fixed text for unavailable or always-active reasoning. Changing models across
+  these states presents the updated controls before saving. Existing custom
+  efforts remain editable without changing their stored meaning.
+
 ## [0.1.8b1] - 2026-09-04
 
 ### Fixed

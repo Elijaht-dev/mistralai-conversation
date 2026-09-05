@@ -47,6 +47,19 @@ drift.
 
 - Unknown custom model IDs are allowed because model-card capabilities may be
   unavailable; Mistral remains the final capability authority.
+- Conversation and AI Task share model-specific reasoning validation in setup
+  and runtime. Discovery's boolean capability is authoritative for non-reasoning
+  models; exact documented IDs and discovered aliases constrain Small 4 / Medium
+  3.5 to None / High and Magistral to provider-default native reasoning. The SDK
+  does not expose per-model effort lists, so other models remain permissive.
+- The UI labels auto / none / high as Automatic / Disabled / Enabled and shows
+  fixed translated states for non-reasoning and native-reasoning models. Model
+  changes that alter the control require a form review before saving. Custom
+  efforts remain manually configurable and retain their stored meaning.
+- Automatic omits the reasoning parameter. Disabled also omits it for
+  non-reasoning and unknown models. Existing incompatible settings are preserved
+  until explicitly reconfigured; confirming a fixed state saves its applicable
+  setting. No stored value is migrated solely to change its UI label.
 - Mistral API behavior is mocked in CI. Live-provider conformance is a separate,
   opt-in activity because it costs money and requires secrets.
 - Model-generated actions are not deterministic. Entity exposure and safeguards

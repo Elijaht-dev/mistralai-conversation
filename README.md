@@ -98,10 +98,36 @@ the HACS dashboard:
 | Home Assistant APIs | Tool APIs exposed to Mistral; clear for chat-only use |
 | Maximum response tokens | Upper bound for generated output |
 | Temperature | Predictability-to-variation control from 0 to 1 |
-| Reasoning effort | None, minimal, low, medium, high, or extra high |
+| Reasoning | Automatic, Disabled, Enabled, or a fixed model state; see below |
 | Mistral safety prompt | Requests Mistral's provider-side safety prompt |
 
 The default model is `mistral-small-latest`, with the built-in Assist API enabled.
+
+**Reasoning** adapts to the model:
+
+| Model | Reasoning choices |
+| --- | --- |
+| Mistral Small 4 and Medium 3.5 | Automatic, Disabled, Enabled |
+| Magistral Small and Medium | Fixed text: Reasoning always active |
+| Discovered models without reasoning, including Ministral | Fixed text: Reasoning unavailable |
+| Other or unknown custom models | Automatic, Disabled, Enabled; other SDK efforts can be entered manually if supported |
+
+**Automatic** omits the reasoning parameter and lets Mistral choose its behavior.
+**Disabled** corresponds to `none` and **Enabled** to `high`. Disabled omits the
+parameter for non-reasoning and unknown models; for compatible adjustable models
+it explicitly sends `none`. Magistral's fixed state uses provider-default native
+reasoning, which cannot be disabled this way.
+
+The controls reflect the currently configured model. When changing a model
+switches between an editable control and a fixed state, or between fixed states,
+the form shows the updated controls for review before saving. Existing settings
+remain unchanged until you explicitly save; a fixed state replaces an
+incompatible saved effort only on that confirmation. Other incompatible efforts
+require a compatible selection and fail locally at runtime until reconfigured.
+Custom efforts remain visible when already saved and can still be entered
+manually; they are not silently mapped to High. See Mistral's
+[reasoning guide](https://docs.mistral.ai/studio/conversations/reasoning)
+and [native reasoning guide](https://docs.mistral.ai/resources/deprecated/native-reasoning).
 
 ### AI Task
 
@@ -173,7 +199,10 @@ guidance.
 - **Invalid API key:** complete the reauthentication notification.
 - **Model rejects tools:** select a function-calling model or clear **Home
   Assistant APIs**.
-- **Model rejects reasoning:** set **Reasoning effort** to **None**.
+- **Model rejects reasoning:** review **Reasoning** in the entity configuration.
+  On Small 4 and Medium 3.5, choose **Automatic**, **Disabled**, or **Enabled**.
+  For a fixed state, review and save the form. Replace older custom efforts such
+  as Low or Medium if the model does not support them.
 - **Attachment rejected:** select a vision/document-capable model and use a
   supported image or PDF.
 - **Speech-to-text unavailable:** confirm the account can use Voxtral

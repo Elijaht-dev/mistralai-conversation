@@ -53,6 +53,14 @@ REASONING_EFFORTS: Final[tuple[ReasoningEffort, ...]] = (
     "xhigh",
 )
 
+type ReasoningSetting = ReasoningEffort | Literal["auto"]
+
+REASONING_MODEL_DEFAULT: Final = "auto"
+REASONING_SETTINGS: Final[tuple[ReasoningSetting, ...]] = (
+    REASONING_MODEL_DEFAULT,
+    *REASONING_EFFORTS,
+)
+
 DEFAULT_MAX_TOKENS: Final = 2048
 DEFAULT_TEMPERATURE: Final = 0.2
 MAX_CONFIGURED_TOKENS: Final = 32768

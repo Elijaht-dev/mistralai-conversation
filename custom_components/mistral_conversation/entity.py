@@ -51,6 +51,8 @@ from mistralai.client.models import (
 )
 from mistralai.client.models.contentchunk import ContentChunk
 from mistralai.client.models.thinkchunk import Thinking
+from mistralai.client.types import UNSET
+from mistralai.client.types.basemodel import Unset
 
 from .const import (
     CONF_MAX_TOKENS,
@@ -70,7 +72,8 @@ from .const import (
     MAX_TOOL_ITERATIONS,
     MAX_TOOLS,
     REASONING_EFFORT_NONE,
-    REASONING_EFFORTS,
+    REASONING_MODEL_DEFAULT,
+    REASONING_SETTINGS,
     REQUEST_TIMEOUT_MS,
     SUBENTRY_TYPE_AI_TASK,
     SUBENTRY_TYPE_STT,
@@ -80,9 +83,11 @@ from .const import (
     ApiErrorKind,
     MistralModel,
     ReasoningEffort,
+    ReasoningSetting,
 )
 from .coordinator import MistralConfigEntry, MistralCoordinator
 from .errors import api_error_message, classify_api_error
+from .reasoning import reasoning_error
 from .tool_calls import ToolCallAccumulator, ToolCallDecodeError
 
 type MistralMessage = ChatCompletionStreamRequestMessage
@@ -161,7 +166,7 @@ class MistralRequest:
     tools: list[MistralTool]
     max_tokens: int
     temperature: float
-    reasoning_effort: ReasoningEffort
+    reasoning_effort: ReasoningEffort | Unset
     safe_prompt: bool
     prompt_cache_key: str | None
     response_format: ResponseFormat | None
@@ -499,7 +504,7 @@ class MistralBaseEntity(CoordinatorEntity[MistralCoordinator]):
         model: MistralModel,
         known: bool,
         chat_log: conversation.ChatLog,
-        reasoning_effort: ReasoningEffort,
+        reasoning_effort: ReasoningSetting,
         attachments: list[tuple[Path, str | None]],
     ) -> None:
         """Reject requests that contradict known provider capabilities."""
@@ -519,11 +524,14 @@ class MistralBaseEntity(CoordinatorEntity[MistralCoordinator]):
                 translation_key="model_no_tools",
                 translation_placeholders={"model": self.model},
             )
-        if reasoning_effort != REASONING_EFFORT_NONE and not model.reasoning:
+        if error := reasoning_error(model, known, reasoning_effort):
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
-                translation_key="model_no_reasoning",
-                translation_placeholders={"model": self.model},
+                translation_key=error,
+                translation_placeholders={
+                    "model": self.model,
+                    "effort": reasoning_effort,
+                },
             )
 
         for path, mime_type in attachments:
@@ -577,9 +585,9 @@ class MistralBaseEntity(CoordinatorEntity[MistralCoordinator]):
             ]
 
         raw_reasoning_effort = options[CONF_REASONING_EFFORT]
-        reasoning_effort: ReasoningEffort = (
+        reasoning_effort: ReasoningSetting = (
             raw_reasoning_effort
-            if raw_reasoning_effort in REASONING_EFFORTS
+            if raw_reasoning_effort in REASONING_SETTINGS
             else REASONING_EFFORT_NONE
         )
         model_info, model_known = self.coordinator.get_model_info(self.model)
@@ -673,7 +681,17 @@ class MistralBaseEntity(CoordinatorEntity[MistralCoordinator]):
             tools=tools,
             max_tokens=max_tokens,
             temperature=temperature,
-            reasoning_effort=reasoning_effort,
+            # Non-reasoning models reject even "none". Keep an explicit "none"
+            # only when discovery confirms reasoning support; otherwise omit it.
+            reasoning_effort=(
+                UNSET
+                if reasoning_effort == REASONING_MODEL_DEFAULT
+                or (
+                    reasoning_effort == REASONING_EFFORT_NONE
+                    and not (model_known and model_info.reasoning)
+                )
+                else reasoning_effort
+            ),
             safe_prompt=bool(options[CONF_SAFE_PROMPT]),
             prompt_cache_key=chat_log.conversation_id,
             response_format=response_format,

@@ -130,7 +130,12 @@ def _reasoning_selector(
             default = fixed_default
         return (
             ConstantSelector(
-                ConstantSelectorConfig(value=default, translation_key=translation_key)
+                ConstantSelectorConfig(
+                    value=default,
+                    # Constant selectors append ".value" to this path. Nest
+                    # the label under options, supported by Hassfest's schema.
+                    translation_key=f"{translation_key}.options",
+                )
             ),
             default,
         )

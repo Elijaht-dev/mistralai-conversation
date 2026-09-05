@@ -321,10 +321,14 @@
       }
     },
     "reasoning_unavailable": {
-      "value": "Reasoning unavailable"
+      "options": {
+        "value": "Reasoning unavailable"
+      }
     },
     "reasoning_always_on": {
-      "value": "Reasoning always active"
+      "options": {
+        "value": "Reasoning always active"
+      }
     }
   }
 }

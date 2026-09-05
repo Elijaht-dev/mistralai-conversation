@@ -321,10 +321,14 @@
       }
     },
     "reasoning_unavailable": {
-      "value": "Raisonnement non disponible"
+      "options": {
+        "value": "Raisonnement non disponible"
+      }
     },
     "reasoning_always_on": {
-      "value": "Raisonnement toujours actif"
+      "options": {
+        "value": "Raisonnement toujours actif"
+      }
     }
   }
 }

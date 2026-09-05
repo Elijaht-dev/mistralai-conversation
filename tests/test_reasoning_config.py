@@ -7,6 +7,7 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_MODEL, CONF_NAME
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.helpers.translation import async_get_translations
 from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -47,13 +48,13 @@ from custom_components.mistral_conversation.const import (
                 id="magistral-small-2509", reasoning=True, function_calling=True
             ),
             "none",
-            {"value": "auto", "translation_key": "reasoning_always_on"},
+            {"value": "auto", "translation_key": "reasoning_always_on.options"},
             None,
         ),
         (
             MistralModel(id="ministral-14b-latest", function_calling=True),
             "high",
-            {"value": "none", "translation_key": "reasoning_unavailable"},
+            {"value": "none", "translation_key": "reasoning_unavailable.options"},
             None,
         ),
         (
@@ -97,6 +98,27 @@ async def test_reconfigure_reasoning_choices(
     if isinstance(choices, dict):
         assert selector.selector_type == "constant"
         assert selector.config == choices
+        # Match the frontend's constant-selector lookup in both UI languages.
+        translation_path = (
+            f"component.{DOMAIN}.selector.{choices['translation_key']}.value"
+        )
+        for language in ("en", "fr"):
+            translations = await async_get_translations(
+                hass, language, "selector", {DOMAIN}
+            )
+            assert (
+                translations[translation_path]
+                == {
+                    "en": {
+                        "auto": "Reasoning always active",
+                        "none": "Reasoning unavailable",
+                    },
+                    "fr": {
+                        "auto": "Raisonnement toujours actif",
+                        "none": "Raisonnement non disponible",
+                    },
+                }[language][choices["value"]]
+            )
     else:
         assert selector.config["options"] == choices
     assert subentry.data == data

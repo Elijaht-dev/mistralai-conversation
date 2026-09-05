@@ -152,6 +152,25 @@ def test_get_model_info_exact_alias_and_unknown(
     assert not unknown.function_calling
 
 
+@pytest.mark.parametrize("reverse", [False, True])
+def test_exact_model_id_wins_over_another_models_alias(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry, reverse: bool
+) -> None:
+    """Model-list ordering cannot redirect an explicit ID to legacy metadata."""
+    small = MistralModel(
+        id="mistral-small-latest", aliases=("magistral-small-latest",), reasoning=True
+    )
+    magistral = MistralModel(
+        id="magistral-small-latest", aliases=("mistral-small-latest",), reasoning=True
+    )
+    coordinator = MistralCoordinator(hass, mock_config_entry)
+    coordinator.async_set_updated_data(
+        [small, magistral] if reverse else [magistral, small]
+    )
+    assert coordinator.get_model_info("MISTRAL-SMALL-LATEST") == (small, True)
+    assert coordinator.get_model_info("magistral-small-latest") == (magistral, True)
+
+
 def test_mark_connection_error_and_restore(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,

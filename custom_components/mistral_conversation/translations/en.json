@@ -66,7 +66,7 @@
             "max_tokens": "Maximum tokens Mistral may generate. Input and output together must fit within the model's context window.",
             "model": "Select a model returned by your account, or enter a custom or fine-tuned model ID.",
             "name": "Name shown for this AI Task entity in Home Assistant.",
-            "reasoning_effort": "Automatic uses the provider's default. Available controls depend on the model.",
+            "reasoning_effort": "Automatic uses the provider's default. Models with fixed reasoning apply their only supported behavior when saved.",
             "safe_prompt": "Ask Mistral to inject its safety prompt before the task.",
             "temperature": "Lower values are more predictable; higher values are more varied."
           },
@@ -110,7 +110,7 @@
             "model": "Select a model returned by your account, or enter a custom or fine-tuned model ID.",
             "name": "Name shown for this conversation agent in Home Assistant.",
             "prompt": "Instructions for the model. Home Assistant templates are supported.",
-            "reasoning_effort": "Automatic uses the provider's default. Available controls depend on the model.",
+            "reasoning_effort": "Automatic uses the provider's default. Models with fixed reasoning apply their only supported behavior when saved.",
             "safe_prompt": "Ask Mistral to inject its safety prompt before the conversation.",
             "temperature": "Lower values are more predictable; higher values are more varied."
           },
@@ -322,7 +322,7 @@
     },
     "reasoning_unavailable": {
       "options": {
-        "value": "Reasoning unavailable"
+        "value": "Reasoning always disabled"
       }
     },
     "reasoning_always_on": {

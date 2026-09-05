@@ -103,13 +103,14 @@ the HACS dashboard:
 
 The default model is `mistral-small-latest`, with the built-in Assist API enabled.
 
-**Reasoning** adapts to the model:
+During creation, **Reasoning** always offers Automatic, Disabled, and Enabled.
+On reconfiguration, the control reflects the saved model:
 
 | Model | Reasoning choices |
 | --- | --- |
 | Mistral Small 4 and Medium 3.5 | Automatic, Disabled, Enabled |
 | Magistral Small and Medium | Fixed text: Reasoning always active |
-| Discovered models without reasoning, including Ministral | Fixed text: Reasoning unavailable |
+| Discovered models without reasoning, including Ministral | Fixed text: Reasoning always disabled |
 | Other or unknown custom models | Automatic, Disabled, Enabled; other SDK efforts can be entered manually if supported |
 
 **Automatic** omits the reasoning parameter and lets Mistral choose its behavior.
@@ -118,11 +119,10 @@ parameter for non-reasoning and unknown models; for compatible adjustable models
 it explicitly sends `none`. Magistral's fixed state uses provider-default native
 reasoning, which cannot be disabled this way.
 
-The controls reflect the currently configured model. When changing a model
-switches between an editable control and a fixed state, or between fixed states,
-the form shows the updated controls for review before saving. Existing settings
-remain unchanged until you explicitly save; a fixed state replaces an
-incompatible saved effort only on that confirmation. Other incompatible efforts
+Model changes save in one submission; controls update when you reopen the
+configuration. Models with fixed reasoning apply their only supported behavior
+when saved, regardless of an incompatible dropdown selection. Existing settings
+remain unchanged until you explicitly save. Other incompatible efforts
 require a compatible selection and fail locally at runtime until reconfigured.
 Custom efforts remain visible when already saved and can still be entered
 manually; they are not silently mapped to High. See Mistral's

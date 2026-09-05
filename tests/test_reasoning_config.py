@@ -1,6 +1,6 @@
 """Tests for model-specific reasoning choices and reconfiguration."""
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from homeassistant import config_entries
@@ -29,7 +29,10 @@ from custom_components.mistral_conversation.const import (
     [
         (
             MistralModel(
-                id="mistral-small-latest", reasoning=True, function_calling=True
+                id="mistral-small-latest",
+                aliases=("magistral-small-latest",),
+                reasoning=True,
+                function_calling=True,
             ),
             "low",
             ["auto", "none", "high"],
@@ -45,7 +48,10 @@ from custom_components.mistral_conversation.const import (
         ),
         (
             MistralModel(
-                id="magistral-small-2509", reasoning=True, function_calling=True
+                id="magistral-small-2509",
+                aliases=("mistral-small-latest",),
+                reasoning=True,
+                function_calling=True,
             ),
             "none",
             {"value": "auto", "translation_key": "reasoning_always_on.options"},
@@ -111,11 +117,11 @@ async def test_reconfigure_reasoning_choices(
                 == {
                     "en": {
                         "auto": "Reasoning always active",
-                        "none": "Reasoning unavailable",
+                        "none": "Reasoning always disabled",
                     },
                     "fr": {
                         "auto": "Raisonnement toujours actif",
-                        "none": "Raisonnement non disponible",
+                        "none": "Raisonnement toujours désactivé",
                     },
                 }[language][choices["value"]]
             )
@@ -142,6 +148,34 @@ async def test_reconfigure_reasoning_choices(
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reconfigure_successful"
     mock_provider.chat.stream_async.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "subentry_type", [SUBENTRY_TYPE_CONVERSATION, SUBENTRY_TYPE_AI_TASK]
+)
+@pytest.mark.parametrize(
+    "model", [MistralModel(id="mistral-small-latest", function_calling=True)]
+)
+async def test_creation_keeps_dropdown_for_fixed_default(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_init_component: MagicMock,
+    model: MistralModel,
+    subentry_type: str,
+) -> None:
+    """Even a default model without reasoning cannot lock the creation control."""
+    assert not model.reasoning
+    result = await hass.config_entries.subentries.async_init(
+        (mock_config_entry.entry_id, subentry_type),
+        context={"source": config_entries.SOURCE_USER},
+    )
+    selector = next(
+        value
+        for key, value in result["data_schema"].schema.items()
+        if key.schema == CONF_REASONING_EFFORT
+    )
+    assert selector.selector_type == "select"
+    assert selector.config["options"] == ["auto", "none", "high"]
 
 
 async def test_model_change_revalidates_reasoning(
@@ -194,27 +228,30 @@ async def test_custom_reasoning_rejects_invalid_value(
 @pytest.mark.parametrize(
     "subentry_type", [SUBENTRY_TYPE_CONVERSATION, SUBENTRY_TYPE_AI_TASK]
 )
+@pytest.mark.parametrize("create", [False, True])
 @pytest.mark.parametrize(
     ("initial_model", "initial_effort", "new_model", "new_effort"),
     [
-        ("ministral-14b-latest", "none", "mistral-small-latest", "high"),
+        ("ministral-14b-latest", "none", "mistral-small-latest", "none"),
         ("mistral-small-latest", "none", "magistral-small-latest", "auto"),
         ("magistral-small-latest", "auto", "ministral-14b-latest", "auto"),
         ("mistral-small-latest", "high", "ministral-14b-latest", "none"),
-        ("magistral-small-latest", "auto", "mistral-small-latest", "high"),
+        ("magistral-small-latest", "auto", "mistral-small-latest", "auto"),
     ],
 )
-async def test_changed_reasoning_control_requires_review(
+async def test_changed_reasoning_control_saves_once(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
     mock_provider: MagicMock,
+    monkeypatch: pytest.MonkeyPatch,
     subentry_type: str,
+    create: bool,
     initial_model: str,
     initial_effort: str,
     new_model: str,
     new_effort: str,
 ) -> None:
-    """Changing the control presents the new state before writing any settings."""
+    """Save a model change once and show its fixed state only on reconfiguration."""
     subentry = next(
         item
         for item in mock_config_entry.subentries.values()
@@ -228,28 +265,57 @@ async def test_changed_reasoning_control_requires_review(
     hass.config_entries.async_update_subentry(
         mock_config_entry, subentry, data=initial_data
     )
+    monkeypatch.setattr(
+        "custom_components.mistral_conversation.coordinator.async_get_models",
+        AsyncMock(
+            return_value=[
+                MistralModel(id="ministral-14b-latest", function_calling=True),
+                MistralModel(
+                    id="mistral-small-latest", reasoning=True, function_calling=True
+                ),
+                MistralModel(
+                    id="magistral-small-latest", reasoning=True, function_calling=True
+                ),
+            ]
+        ),
+    )
     assert await async_setup_component(hass, DOMAIN, {})
     await hass.async_block_till_done()
-    mock_config_entry.runtime_data.async_set_updated_data(
-        [
-            MistralModel(id="ministral-14b-latest", function_calling=True),
-            MistralModel(
-                id="mistral-small-latest", reasoning=True, function_calling=True
-            ),
-            MistralModel(
-                id="magistral-small-latest", reasoning=True, function_calling=True
-            ),
-        ]
-    )
-    result = await mock_config_entry.start_subentry_reconfigure_flow(
-        hass, subentry.subentry_id
-    )
+    existing_ids = set(mock_config_entry.subentries)
+    if create:
+        result = await hass.config_entries.subentries.async_init(
+            (mock_config_entry.entry_id, subentry_type),
+            context={"source": config_entries.SOURCE_USER},
+        )
+        selector = next(
+            value
+            for key, value in result["data_schema"].schema.items()
+            if key.schema == CONF_REASONING_EFFORT
+        )
+        assert selector.selector_type == "select"
+        assert selector.config["options"] == ["auto", "none", "high"]
+    else:
+        result = await mock_config_entry.start_subentry_reconfigure_flow(
+            hass, subentry.subentry_id
+        )
     changed_data = {**initial_data, CONF_NAME: subentry.title, CONF_MODEL: new_model}
+    changed_data = result["data_schema"](changed_data)
     result = await hass.config_entries.subentries.async_configure(
         result["flow_id"], changed_data
     )
-    assert result["type"] is FlowResultType.FORM
-    assert subentry.data == initial_data
+    if create:
+        assert result["type"] is FlowResultType.CREATE_ENTRY
+        new_id = (set(mock_config_entry.subentries) - existing_ids).pop()
+        subentry = mock_config_entry.subentries[new_id]
+    else:
+        assert result["type"] is FlowResultType.ABORT
+        assert result["reason"] == "reconfigure_successful"
+    assert subentry.data[CONF_MODEL] == new_model
+    assert subentry.data[CONF_REASONING_EFFORT] == new_effort
+    await hass.async_block_till_done()
+    result = await mock_config_entry.start_subentry_reconfigure_flow(
+        hass, subentry.subentry_id
+    )
     selector = next(
         value
         for key, value in result["data_schema"].schema.items()
@@ -259,14 +325,3 @@ async def test_changed_reasoning_control_requires_review(
         assert selector.config["options"] == ["auto", "none", "high"]
     else:
         assert selector.config["value"] == new_effort
-    # Validate the actual rendered schema as well as the public flow handler.
-    confirmed_data = result["data_schema"](
-        {**changed_data, CONF_REASONING_EFFORT: new_effort}
-    )
-    result = await hass.config_entries.subentries.async_configure(
-        result["flow_id"], confirmed_data
-    )
-    assert result["type"] is FlowResultType.ABORT
-    assert result["reason"] == "reconfigure_successful"
-    assert subentry.data[CONF_MODEL] == new_model
-    assert subentry.data[CONF_REASONING_EFFORT] == new_effort

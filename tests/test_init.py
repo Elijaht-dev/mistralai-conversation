@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from homeassistant.components import conversation
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import (
@@ -189,6 +190,38 @@ async def test_remove_entry_clears_deprecation_issue(
     await async_remove_entry(hass, mock_config_entry)
 
     assert issue_registry.async_get_issue(DOMAIN, issue_id) is None
+
+
+@pytest.mark.parametrize(
+    "effort", ["auto", "none", "minimal", "low", "medium", "high", "xhigh"]
+)
+async def test_migration_preserves_reasoning_selection(
+    hass: HomeAssistant,
+    effort: str,
+) -> None:
+    """Migration preserves reasoning settings for explicit later reconfiguration."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_API_KEY: "test-api-key"},
+        version=1,
+        minor_version=1,
+        subentries_data=[
+            {
+                "data": {
+                    **DEFAULT_CONVERSATION_OPTIONS,
+                    CONF_REASONING_EFFORT: effort,
+                },
+                "subentry_type": SUBENTRY_TYPE_CONVERSATION,
+                "title": "Test assistant",
+                "unique_id": None,
+            }
+        ],
+    )
+    entry.add_to_hass(hass)
+    subentry = next(iter(entry.subentries.values()))
+
+    assert await async_migrate_entry(hass, entry)
+    assert subentry.data[CONF_REASONING_EFFORT] == effort
 
 
 async def test_migration_normalizes_preview_data(

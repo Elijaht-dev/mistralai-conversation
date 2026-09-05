@@ -45,6 +45,7 @@
       "error": {
         "max_tokens_context": "Le nombre maximal de jetons de réponse ne peut pas dépasser la fenêtre de contexte de {max_context_length} jetons de ce modèle.",
         "model_no_reasoning": "Le modèle sélectionné n'indique pas prendre en charge le raisonnement.",
+        "model_reasoning_effort": "Ce modèle ne prend pas en charge ce réglage. Vérifiez le champ Raisonnement avant d’enregistrer.",
         "model_no_tools": "Le modèle sélectionné n'indique pas prendre en charge les appels de fonction."
       },
       "initiate_flow": {
@@ -57,7 +58,7 @@
             "max_tokens": "Nombre maximal de jetons de réponse",
             "model": "Modèle",
             "name": "Nom",
-            "reasoning_effort": "Effort de raisonnement",
+            "reasoning_effort": "Raisonnement",
             "safe_prompt": "Activer le message de sécurité Mistral",
             "temperature": "Température"
           },
@@ -65,7 +66,7 @@
             "max_tokens": "Nombre maximal de jetons que Mistral peut générer. L'entrée et la sortie doivent tenir ensemble dans la fenêtre de contexte du modèle.",
             "model": "Sélectionnez un modèle proposé pour votre compte, ou saisissez l'identifiant d'un modèle personnalisé ou affiné.",
             "name": "Nom affiché pour cette entité de tâche IA dans Home Assistant.",
-            "reasoning_effort": "Activez le raisonnement et choisissez son intensité. Utilisez Aucun pour les modèles qui ne le prennent pas en charge.",
+            "reasoning_effort": "Automatique utilise le réglage du fournisseur. Les contrôles disponibles dépendent du modèle.",
             "safe_prompt": "Demander à Mistral d'ajouter son message de sécurité avant la tâche.",
             "temperature": "Une valeur faible donne des réponses plus prévisibles ; une valeur élevée les rend plus variées."
           },
@@ -84,6 +85,7 @@
       "error": {
         "max_tokens_context": "Le nombre maximal de jetons de réponse ne peut pas dépasser la fenêtre de contexte de {max_context_length} jetons de ce modèle.",
         "model_no_reasoning": "Le modèle sélectionné n'indique pas prendre en charge le raisonnement.",
+        "model_reasoning_effort": "Ce modèle ne prend pas en charge ce réglage. Vérifiez le champ Raisonnement avant d’enregistrer.",
         "model_no_tools": "Le modèle sélectionné n'indique pas prendre en charge les appels de fonction. Désélectionnez les API Home Assistant ou choisissez un autre modèle."
       },
       "initiate_flow": {
@@ -98,7 +100,7 @@
             "model": "Modèle",
             "name": "Nom",
             "prompt": "Instructions",
-            "reasoning_effort": "Effort de raisonnement",
+            "reasoning_effort": "Raisonnement",
             "safe_prompt": "Activer le message de sécurité Mistral",
             "temperature": "Température"
           },
@@ -108,7 +110,7 @@
             "model": "Sélectionnez un modèle proposé pour votre compte, ou saisissez l'identifiant d'un modèle personnalisé ou affiné.",
             "name": "Nom affiché pour cet agent de conversation dans Home Assistant.",
             "prompt": "Instructions données au modèle. Les modèles de texte Home Assistant sont pris en charge.",
-            "reasoning_effort": "Activez le raisonnement et choisissez son intensité. Utilisez Aucun pour les modèles qui ne le prennent pas en charge.",
+            "reasoning_effort": "Automatique utilise le réglage du fournisseur. Les contrôles disponibles dépendent du modèle.",
             "safe_prompt": "Demander à Mistral d'ajouter son message de sécurité avant la conversation.",
             "temperature": "Une valeur faible donne des réponses plus prévisibles ; une valeur élevée les rend plus variées."
           },
@@ -232,6 +234,9 @@
     "model_no_documents": {
       "message": "Le modèle {model} n'indique pas prendre en charge les documents PDF."
     },
+    "model_reasoning_effort": {
+      "message": "Le modèle {model} n’accepte pas l’effort de raisonnement {effort}. Reconfigurez l’entité et vérifiez le champ Raisonnement."
+    },
     "model_no_reasoning": {
       "message": "Le modèle {model} n'indique pas prendre en charge le raisonnement."
     },
@@ -306,12 +311,23 @@
   "selector": {
     "reasoning_effort": {
       "options": {
-        "high": "Élevé",
+        "auto": "Automatique",
+        "high": "Activé",
         "low": "Faible",
         "medium": "Moyen",
         "minimal": "Minimal",
-        "none": "Aucun",
+        "none": "Désactivé",
         "xhigh": "Très élevé"
+      }
+    },
+    "reasoning_unavailable": {
+      "options": {
+        "value": "Raisonnement non disponible"
+      }
+    },
+    "reasoning_always_on": {
+      "options": {
+        "value": "Raisonnement toujours actif"
       }
     }
   }

@@ -27,6 +27,8 @@ from homeassistant.core import callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import llm
 from homeassistant.helpers.selector import (
+    ConstantSelector,
+    ConstantSelectorConfig,
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
@@ -63,7 +65,7 @@ from .const import (
     DOMAIN,
     MAX_CONFIGURED_TOKENS,
     REASONING_EFFORT_NONE,
-    REASONING_EFFORTS,
+    REASONING_MODEL_DEFAULT,
     SUBENTRY_TYPE_AI_TASK,
     SUBENTRY_TYPE_CONVERSATION,
     SUBENTRY_TYPE_STT,
@@ -74,6 +76,7 @@ from .const import (
 )
 from .coordinator import MistralConfigEntry
 from .errors import api_error_message, classify_api_error
+from .reasoning import fixed_reasoning_setting, reasoning_error, reasoning_options
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -94,19 +97,16 @@ def _validate_model_options(
     options: dict[str, Any],
 ) -> dict[str, str]:
     """Validate options against advertised model capabilities."""
-    if not known:
-        return {}
-
     errors: dict[str, str] = {}
+    if error := reasoning_error(
+        model, known, options.get(CONF_REASONING_EFFORT, REASONING_EFFORT_NONE)
+    ):
+        errors[CONF_REASONING_EFFORT] = error
+
+    if not known:
+        return errors
     if options.get(CONF_LLM_HASS_API) and not model.function_calling:
         errors[CONF_MODEL] = "model_no_tools"
-
-    if (
-        options.get(CONF_REASONING_EFFORT, REASONING_EFFORT_NONE)
-        != REASONING_EFFORT_NONE
-        and not model.reasoning
-    ):
-        errors[CONF_REASONING_EFFORT] = "model_no_reasoning"
 
     max_tokens = options.get(CONF_MAX_TOKENS)
     if (
@@ -117,6 +117,41 @@ def _validate_model_options(
         errors[CONF_MAX_TOKENS] = "max_tokens_context"
 
     return errors
+
+
+def _reasoning_selector(
+    model: MistralModel, known: bool, suggested: dict[str, Any]
+) -> tuple[ConstantSelector | SelectSelector, str]:
+    """Build a simple control or a fixed state without mutating saved data."""
+    default = cast(str, suggested.get(CONF_REASONING_EFFORT, REASONING_EFFORT_NONE))
+    if fixed_setting := fixed_reasoning_setting(model, known):
+        translation_key, fixed_default = fixed_setting
+        if default not in reasoning_options(model, known):
+            default = fixed_default
+        return (
+            ConstantSelector(
+                ConstantSelectorConfig(
+                    value=default,
+                    # Constant selectors append ".value" to this path. Nest
+                    # the label under options, supported by Hassfest's schema.
+                    translation_key=f"{translation_key}.options",
+                )
+            ),
+            default,
+        )
+    return (
+        SelectSelector(
+            SelectSelectorConfig(
+                options=[REASONING_MODEL_DEFAULT, REASONING_EFFORT_NONE, "high"],
+                # Preserve custom-model efforts and show older saved values
+                # without promoting unsupported SDK efforts in the list.
+                custom_value=True,
+                mode=SelectSelectorMode.DROPDOWN,
+                translation_key=CONF_REASONING_EFFORT,
+            )
+        ),
+        default,
+    )
 
 
 class MistralConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -279,13 +314,19 @@ class ConversationSubentryFlowHandler(ConfigSubentryFlow):
             suggested = self.options | user_input
             model_id = user_input[CONF_MODEL]
             model, known = coordinator.get_model_info(model_id)
+            previous_model, previous_known = coordinator.get_model_info(
+                self.options.get(CONF_MODEL, DEFAULT_MODEL)
+            )
+            reasoning_control_changed = fixed_reasoning_setting(
+                previous_model, previous_known
+            ) != fixed_reasoning_setting(model, known)
             errors = _validate_model_options(model, known, user_input)
             if model.max_context_length is not None:
                 description_placeholders["max_context_length"] = str(
                     model.max_context_length
                 )
 
-            if not errors:
+            if not errors and not reasoning_control_changed:
                 data = user_input.copy()
                 name = data.pop(CONF_NAME)
                 if self._subentry_type == SUBENTRY_TYPE_CONVERSATION and not data.get(
@@ -302,6 +343,10 @@ class ConversationSubentryFlowHandler(ConfigSubentryFlow):
                     title=name,
                     data=data,
                 )
+
+            # Let the user review a changed fixed state or newly available
+            # control before saving. Persist nothing until explicit submission.
+            self.options = suggested
 
         configured_model = suggested.get(CONF_MODEL, DEFAULT_MODEL)
         model_options = [
@@ -328,6 +373,11 @@ class ConversationSubentryFlowHandler(ConfigSubentryFlow):
         selected_model, selected_model_known = coordinator.get_model_info(
             configured_model
         )
+        reasoning_selector, reasoning_default = _reasoning_selector(
+            selected_model, selected_model_known, suggested
+        )
+        # A stale suggestion must not override the fixed value in the form.
+        suggested = {**suggested, CONF_REASONING_EFFORT: reasoning_default}
         max_token_limit = MAX_CONFIGURED_TOKENS
         if selected_model_known and selected_model.max_context_length:
             max_token_limit = min(
@@ -399,14 +449,8 @@ class ConversationSubentryFlowHandler(ConfigSubentryFlow):
                 ),
                 vol.Required(
                     CONF_REASONING_EFFORT,
-                    default=suggested.get(CONF_REASONING_EFFORT, REASONING_EFFORT_NONE),
-                ): SelectSelector(
-                    SelectSelectorConfig(
-                        options=list(REASONING_EFFORTS),
-                        mode=SelectSelectorMode.DROPDOWN,
-                        translation_key=CONF_REASONING_EFFORT,
-                    )
-                ),
+                    default=reasoning_default,
+                ): reasoning_selector,
                 vol.Required(
                     CONF_SAFE_PROMPT,
                     default=suggested.get(CONF_SAFE_PROMPT, False),

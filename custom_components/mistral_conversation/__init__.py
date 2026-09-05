@@ -25,7 +25,7 @@ from .const import (
     DEFAULT_STT_OPTIONS,
     DOMAIN,
     LOGGER,
-    REASONING_EFFORTS,
+    REASONING_SETTINGS,
     SUBENTRY_TYPE_AI_TASK,
     SUBENTRY_TYPE_CONVERSATION,
     SUBENTRY_TYPE_STT,
@@ -152,7 +152,7 @@ def _migrate_subentry_data(data: dict[str, Any]) -> dict[str, Any]:
         migrated[CONF_LLM_HASS_API] = [api_ids]
 
     reasoning_effort = migrated.get(CONF_REASONING_EFFORT)
-    if reasoning_effort not in REASONING_EFFORTS:
+    if reasoning_effort not in REASONING_SETTINGS:
         migrated[CONF_REASONING_EFFORT] = DEFAULT_CONVERSATION_OPTIONS[
             CONF_REASONING_EFFORT
         ]

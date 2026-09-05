@@ -66,7 +66,7 @@
             "max_tokens": "Nombre maximal de jetons que Mistral peut générer. L'entrée et la sortie doivent tenir ensemble dans la fenêtre de contexte du modèle.",
             "model": "Sélectionnez un modèle proposé pour votre compte, ou saisissez l'identifiant d'un modèle personnalisé ou affiné.",
             "name": "Nom affiché pour cette entité de tâche IA dans Home Assistant.",
-            "reasoning_effort": "Automatique utilise le réglage du fournisseur. Les contrôles disponibles dépendent du modèle.",
+            "reasoning_effort": "Automatique utilise le réglage du fournisseur. Les modèles au raisonnement fixe appliquent leur seul comportement possible à l’enregistrement.",
             "safe_prompt": "Demander à Mistral d'ajouter son message de sécurité avant la tâche.",
             "temperature": "Une valeur faible donne des réponses plus prévisibles ; une valeur élevée les rend plus variées."
           },
@@ -110,7 +110,7 @@
             "model": "Sélectionnez un modèle proposé pour votre compte, ou saisissez l'identifiant d'un modèle personnalisé ou affiné.",
             "name": "Nom affiché pour cet agent de conversation dans Home Assistant.",
             "prompt": "Instructions données au modèle. Les modèles de texte Home Assistant sont pris en charge.",
-            "reasoning_effort": "Automatique utilise le réglage du fournisseur. Les contrôles disponibles dépendent du modèle.",
+            "reasoning_effort": "Automatique utilise le réglage du fournisseur. Les modèles au raisonnement fixe appliquent leur seul comportement possible à l’enregistrement.",
             "safe_prompt": "Demander à Mistral d'ajouter son message de sécurité avant la conversation.",
             "temperature": "Une valeur faible donne des réponses plus prévisibles ; une valeur élevée les rend plus variées."
           },
@@ -322,7 +322,7 @@
     },
     "reasoning_unavailable": {
       "options": {
-        "value": "Raisonnement non disponible"
+        "value": "Raisonnement toujours désactivé"
       }
     },
     "reasoning_always_on": {

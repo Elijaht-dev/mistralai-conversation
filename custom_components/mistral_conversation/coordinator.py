@@ -111,6 +111,9 @@ class MistralCoordinator(DataUpdateCoordinator[list[MistralModel]]):
     def get_model_info(self, model_id: str) -> tuple[MistralModel, bool]:
         """Return cached metadata and whether the model was recognized."""
         for model in self.data or []:
+            if model.id.casefold() == model_id.casefold():
+                return model, True
+        for model in self.data or []:
             if model.matches(model_id):
                 return model, True
         return MistralModel(id=model_id), False

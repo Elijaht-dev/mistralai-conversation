@@ -52,9 +52,12 @@ drift.
   models; exact documented IDs and discovered aliases constrain Small 4 / Medium
   3.5 to None / High and Magistral to provider-default native reasoning. The SDK
   does not expose per-model effort lists, so other models remain permissive.
+  Exact model IDs take precedence over aliases, and canonical reasoning rules
+  take precedence over legacy aliases attached to a newer model.
 - The UI labels auto / none / high as Automatic / Disabled / Enabled and shows
-  fixed translated states for non-reasoning and native-reasoning models. Model
-  changes that alter the control require a form review before saving. Custom
+  fixed translated states for non-reasoning and native-reasoning models only
+  during reconfiguration. Creation always shows the dropdown. Model changes save
+  in one submission, applying the model's fixed behavior where necessary. Custom
   efforts remain manually configurable and retain their stored meaning.
 - Automatic omits the reasoning parameter. Disabled also omits it for
   non-reasoning and unknown models. Existing incompatible settings are preserved

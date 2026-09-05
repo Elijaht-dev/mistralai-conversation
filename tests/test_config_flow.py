@@ -256,13 +256,15 @@ async def test_create_chat_only_subentry_removes_empty_api_list(
             "model_no_tools",
         ),
         (
-            MistralModel(id="limited", function_calling=True),
+            MistralModel(
+                id="mistral-small-latest", function_calling=True, reasoning=True
+            ),
             {
-                CONF_MODEL: "limited",
-                CONF_REASONING_EFFORT: "high",
+                CONF_MODEL: "mistral-small-latest",
+                CONF_REASONING_EFFORT: "low",
             },
             CONF_REASONING_EFFORT,
-            "model_no_reasoning",
+            "model_reasoning_effort",
         ),
         (
             MistralModel(

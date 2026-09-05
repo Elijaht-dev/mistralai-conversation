@@ -35,10 +35,16 @@ def reasoning_options(model: MistralModel, known: bool) -> tuple[ReasoningSettin
         return REASONING_SETTINGS
     if not model.reasoning:
         return (REASONING_MODEL_DEFAULT, REASONING_EFFORT_NONE)
-    if any(model.matches(model_id) for model_id in _NATIVE_MODELS):
-        return (REASONING_MODEL_DEFAULT,)
-    if any(model.matches(model_id) for model_id in _ADJUSTABLE_MODELS):
-        return (REASONING_MODEL_DEFAULT, REASONING_EFFORT_NONE, "high")
+    # A redirected legacy alias must not override a model's canonical ID.
+    # In particular, Small 4 can carry Magistral aliases while remaining hybrid.
+    for model_id in (
+        model.id.casefold(),
+        *(alias.casefold() for alias in model.aliases),
+    ):
+        if model_id in _ADJUSTABLE_MODELS:
+            return (REASONING_MODEL_DEFAULT, REASONING_EFFORT_NONE, "high")
+        if model_id in _NATIVE_MODELS:
+            return (REASONING_MODEL_DEFAULT,)
     return REASONING_SETTINGS
 
 

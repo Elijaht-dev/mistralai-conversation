@@ -7,6 +7,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.2.0b2] - 2026-09-05
+
+### Fixed
+
+- Keep Small 4 reasoning adjustable when its metadata includes legacy Magistral
+  aliases. Exact model IDs now take precedence over aliases during discovery
+  lookup, and canonical model reasoning rules take precedence over alias rules.
+
+### Changed
+
+- Always show the reasoning dropdown when creating Conversation or AI Task
+  entities. Fixed reasoning labels appear only during reconfiguration.
+- Save model changes in one submission without an intermediate control review.
+  Models with fixed reasoning apply their supported behavior when saved; the
+  corresponding label appears when reopening the configuration.
+
 ## [0.2.0b1] - 2026-09-05
 
 ### Fixed

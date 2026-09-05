@@ -120,11 +120,11 @@ def _validate_model_options(
 
 
 def _reasoning_selector(
-    model: MistralModel, known: bool, suggested: dict[str, Any]
+    model: MistralModel, known: bool, suggested: dict[str, Any], *, reconfigure: bool
 ) -> tuple[ConstantSelector | SelectSelector, str]:
     """Build a simple control or a fixed state without mutating saved data."""
     default = cast(str, suggested.get(CONF_REASONING_EFFORT, REASONING_EFFORT_NONE))
-    if fixed_setting := fixed_reasoning_setting(model, known):
+    if reconfigure and (fixed_setting := fixed_reasoning_setting(model, known)):
         translation_key, fixed_default = fixed_setting
         if default not in reasoning_options(model, known):
             default = fixed_default
@@ -314,19 +314,22 @@ class ConversationSubentryFlowHandler(ConfigSubentryFlow):
             suggested = self.options | user_input
             model_id = user_input[CONF_MODEL]
             model, known = coordinator.get_model_info(model_id)
-            previous_model, previous_known = coordinator.get_model_info(
-                self.options.get(CONF_MODEL, DEFAULT_MODEL)
-            )
-            reasoning_control_changed = fixed_reasoning_setting(
-                previous_model, previous_known
-            ) != fixed_reasoning_setting(model, known)
+            # A fixed model ignores an inapplicable dropdown choice. Apply its
+            # only behavior on this submission; show the fixed label on reopen.
+            if (
+                fixed_setting := fixed_reasoning_setting(model, known)
+            ) and user_input.get(CONF_REASONING_EFFORT) not in reasoning_options(
+                model, known
+            ):
+                user_input = {**user_input, CONF_REASONING_EFFORT: fixed_setting[1]}
+                suggested = self.options | user_input
             errors = _validate_model_options(model, known, user_input)
             if model.max_context_length is not None:
                 description_placeholders["max_context_length"] = str(
                     model.max_context_length
                 )
 
-            if not errors and not reasoning_control_changed:
+            if not errors:
                 data = user_input.copy()
                 name = data.pop(CONF_NAME)
                 if self._subentry_type == SUBENTRY_TYPE_CONVERSATION and not data.get(
@@ -344,8 +347,6 @@ class ConversationSubentryFlowHandler(ConfigSubentryFlow):
                     data=data,
                 )
 
-            # Let the user review a changed fixed state or newly available
-            # control before saving. Persist nothing until explicit submission.
             self.options = suggested
 
         configured_model = suggested.get(CONF_MODEL, DEFAULT_MODEL)
@@ -374,7 +375,10 @@ class ConversationSubentryFlowHandler(ConfigSubentryFlow):
             configured_model
         )
         reasoning_selector, reasoning_default = _reasoning_selector(
-            selected_model, selected_model_known, suggested
+            selected_model,
+            selected_model_known,
+            suggested,
+            reconfigure=not self._is_new,
         )
         # A stale suggestion must not override the fixed value in the form.
         suggested = {**suggested, CONF_REASONING_EFFORT: reasoning_default}

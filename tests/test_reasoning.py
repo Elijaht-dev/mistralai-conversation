@@ -61,6 +61,8 @@ def model() -> MistralModel:
         ("mistral-small-latest", "auto", None),
         ("mistral-small-latest", "none", "none"),
         ("mistral-small-latest", "high", "high"),
+        ("mistral-small-2603", "none", "none"),
+        ("mistral-small-2603", "high", "high"),
         ("mistral-medium-3-5", "high", "high"),
         ("magistral-small-latest", "auto", None),
         ("magistral-medium-latest", "auto", None),
@@ -107,13 +109,13 @@ async def test_reasoning_request_body(
             MistralModel(id="reasoning-model", reasoning=True),
             MistralModel(
                 id="mistral-small-2603",
-                aliases=("mistral-small-latest",),
+                aliases=("mistral-small-latest", "magistral-small-latest"),
                 reasoning=True,
             ),
             MistralModel(id="mistral-medium-3-5", reasoning=True),
             MistralModel(
-                id="magistral-small-2509",
-                aliases=("magistral-small-latest",),
+                id="magistral-small-latest",
+                aliases=("magistral-small-2509",),
                 reasoning=True,
             ),
             MistralModel(

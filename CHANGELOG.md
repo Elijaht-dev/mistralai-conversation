@@ -151,7 +151,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - English and French translations.
 - Ruff, strict mypy, pytest coverage, HACS, Hassfest, and Dependabot automation.
 
-[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.1.8b1...HEAD
+[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.2.0b2...v0.2.0
+[0.2.0b2]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.2.0b1...v0.2.0b2
+[0.2.0b1]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.1.8b1...v0.2.0b1
 [0.1.8b1]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.1.7...v0.1.8b1
 [0.1.7]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.1.5...v0.1.6

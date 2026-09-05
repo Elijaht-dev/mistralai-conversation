@@ -7,6 +7,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-05
+
+### Fixed
+
+- Restore setup on Home Assistant 2026.9 while retaining the legacy OpenAPI
+  converter on older supported versions.
+- Omit unsupported reasoning parameters for non-reasoning models and respect
+  model-specific reasoning controls, including Small 4 with Magistral aliases.
+
+### Changed
+
+- Promote the beta fixes to stable without further runtime changes.
+- Simplify reasoning configuration to Automatic / Disabled / Enabled during
+  creation, with fixed model states on reconfiguration and single-submit saves.
+
+### Validation
+
+- The maintainer tested the beta on two real Home Assistant installations,
+  running 2026.8.6 and 2026.9.0, and approved stable publication.
+
 ## [0.2.0b2] - 2026-09-05
 
 ### Fixed

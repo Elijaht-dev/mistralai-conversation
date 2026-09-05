@@ -52,6 +52,9 @@ Mistral account.
 
 The integration pins `mistralai==2.9.3`.
 
+The 0.2.0 release was tested by the maintainer on Home Assistant 2026.8.6 and
+2026.9.0. The declared minimum remains 2026.7.4.
+
 ## Installation
 
 ### HACS

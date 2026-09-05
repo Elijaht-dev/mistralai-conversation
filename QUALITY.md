@@ -81,3 +81,8 @@ The public repository gate requires a clean secret and privacy review plus green
 quality, HACS, and Hassfest validation. A versioned release should additionally
 wait for a real Home Assistant installation to complete Conversation, tool-call,
 AI Task, speech-to-text, and text-to-speech smoke tests.
+
+For 0.2.0, the maintainer reported testing the beta on two real Home Assistant
+installations (2026.8.6 and 2026.9.0) and approved stable publication. This is
+maintainer-reported installation testing; individual feature results were not
+recorded in this repository. Runtime code is unchanged from 0.2.0b2.

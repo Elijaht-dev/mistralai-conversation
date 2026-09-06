@@ -7,6 +7,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-09-06
+
+### Changed
+
+- Updated the official `mistralai` SDK baseline from 2.9.3 to 2.9.4.
+- Updated the Ruff development baseline from 0.16.4 to 0.16.5.
+
+### Fixed
+
+- Corrected the changelog comparison links for the 0.2.0 release history.
+
 ## [0.2.0] - 2026-09-05
 
 ### Fixed
@@ -151,7 +162,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - English and French translations.
 - Ruff, strict mypy, pytest coverage, HACS, Hassfest, and Dependabot automation.
 
-[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.2.0b2...v0.2.0
 [0.2.0b2]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.2.0b1...v0.2.0b2
 [0.2.0b1]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.1.8b1...v0.2.0b1

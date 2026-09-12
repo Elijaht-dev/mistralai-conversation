@@ -7,6 +7,6 @@ mistralai==2.9.4
 mypy==2.3.1
 mutagen==1.47.0
 pytest-cov==7.1.0
-pytest-homeassistant-custom-component==0.13.363
+pytest-homeassistant-custom-component==0.13.364
 PyTurboJPEG==1.8.3
 ruff==0.16.5

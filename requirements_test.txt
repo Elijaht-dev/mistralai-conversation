@@ -9,4 +9,4 @@ mutagen==1.47.0
 pytest-cov==7.1.0
 pytest-homeassistant-custom-component==0.13.363
 PyTurboJPEG==1.8.3
-ruff==0.16.5
+ruff==0.16.6

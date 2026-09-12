@@ -2,6 +2,24 @@
 
 These instructions apply to the entire repository.
 
+## Working approach
+
+- Inspect the current worktree and relevant code before editing. Preserve
+  unrelated changes and keep each patch focused on the requested outcome.
+- Carry authorized work through implementation and validation. Resolve routine
+  choices from repository conventions. Ask only when a missing answer blocks
+  correctness or authorization; continue independent work meanwhile.
+- Apply user corrections to the ongoing task without losing completed work or
+  abandoning the original objective unless requested.
+- User instructions take precedence over skill guidelines. If a skill blocks
+  progress, identify its exact file and instruction and explain the conflict.
+- Keep updates concise and concrete: describe the outcome, validation, and
+  remaining blockers in plain language.
+- Review the final diff and report what changed, which checks passed, and any
+  checks that could not run. Never claim unperformed validation succeeded.
+- When asked to commit, stage only the intended files. A local commit request
+  does not authorize pushing or publishing a release.
+
 ## Mission
 
 Maintain a production-quality HACS custom integration that gives Home Assistant
@@ -143,7 +161,8 @@ python -m pip install --upgrade pip
 python -m pip install --requirement requirements_test.txt
 ```
 
-Run focused tests while iterating, then the complete gate:
+For code, dependency, or configuration changes, run focused tests while
+iterating, then the complete gate:
 
 ```bash
 ruff format --check .
@@ -152,6 +171,11 @@ mypy
 pytest --cov=custom_components.mistral_conversation --cov-report=term-missing
 python scripts/validate_hacs.py
 ```
+
+For documentation-only changes, review accuracy and links and run
+`git diff --check`; the Python gate is not required. Add tests for meaningful
+behavior, not prose edits. Repeat passing checks only after relevant changes or
+when a failure or unresolved concern warrants it.
 
 Branch coverage must remain at or above 85%. GitHub Actions is authoritative for
 Hassfest and the official public HACS validation. Do not relax lint, typing,
@@ -164,8 +188,9 @@ A change is complete only when:
 - the intended Home Assistant behavior works through the public integration
   surface;
 - relevant success, failure, cleanup, and boundary paths are tested;
-- strict typing, formatting, linting, tests, coverage, and offline HACS
-  validation pass;
+- the applicable checks in Validation pass; code, dependency, and configuration
+  changes require strict typing, formatting, linting, tests, coverage, and
+  offline HACS validation;
 - translations, documentation, migrations, and version metadata are updated
   where applicable;
 - no credential, private data, generated artifact, or unrelated worktree change

@@ -2,7 +2,7 @@
 
 [![Validate](https://github.com/Elijaht-dev/mistralai-conversation/actions/workflows/validate.yml/badge.svg)](https://github.com/Elijaht-dev/mistralai-conversation/actions/workflows/validate.yml)
 [![Home Assistant 2026.7.4+](https://img.shields.io/badge/Home%20Assistant-2026.7.4%2B-41BDF5.svg)](https://www.home-assistant.io/)
-[![Mistral SDK 2.9.4](https://img.shields.io/badge/mistralai-2.9.4-FA520F.svg)](https://pypi.org/project/mistralai/)
+[![Mistral SDK 2.10.0](https://img.shields.io/badge/mistralai-2.10.0-FA520F.svg)](https://pypi.org/project/mistralai/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 [![Open your Home Assistant instance and add this repository to HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Elijaht-dev&repository=mistralai-conversation&category=integration)
@@ -50,7 +50,7 @@ configurable because their capabilities may not be present in model discovery.
 Text-to-speech additionally requires a preset or saved voice available to the
 Mistral account.
 
-The integration pins `mistralai==2.9.4`.
+The integration pins `mistralai==2.10.0`.
 
 The 0.2.0 release was tested by the maintainer on Home Assistant 2026.8.6 and
 2026.9.0. The declared minimum remains 2026.7.4.

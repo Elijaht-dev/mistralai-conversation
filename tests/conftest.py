@@ -116,7 +116,7 @@ def mock_provider(
     """Patch coordinator client creation and model discovery."""
     with (
         patch(
-            "custom_components.mistral_conversation.coordinator.create_client",
+            "custom_components.mistral_conversation.coordinator.async_create_client",
             return_value=mock_mistral_client,
         ),
         patch(

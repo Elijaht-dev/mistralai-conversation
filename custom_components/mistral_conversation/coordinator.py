@@ -14,7 +14,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from mistralai.client import Mistral
 from mistralai.client.errors import MistralError, NoResponseError
 
-from .api import async_close_client, async_get_models, create_client
+from .api import async_close_client, async_create_client, async_get_models
 from .const import DOMAIN, LOGGER, ApiErrorKind, MistralModel
 from .errors import api_error_message, classify_api_error
 
@@ -50,12 +50,14 @@ class MistralCoordinator(DataUpdateCoordinator[list[MistralModel]]):
     @override
     async def _async_setup(self) -> None:
         """Create the SDK client before the first refresh."""
-        self._client = create_client(self.hass, self.config_entry.data[CONF_API_KEY])
+        self._client = await async_create_client(
+            self.hass, self.config_entry.data[CONF_API_KEY]
+        )
 
     async def async_close(self) -> None:
         """Close resources created by the coordinator."""
         if hasattr(self, "_client"):
-            await async_close_client(self._client)
+            await async_close_client(self.hass, self._client)
 
     @callback
     @override

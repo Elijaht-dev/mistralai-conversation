@@ -45,6 +45,15 @@ drift.
 
 ## Deliberate boundaries
 
+- SDK construction and synchronous cleanup run in Home Assistant's executor.
+  Services are prepared before use. For the pinned SDK 2.10.0, selected lazy
+  model exports and the utility/error exports are resolved and cached during
+  integration import. This binds the original SDK objects without replacing
+  their behavior or disabling Home Assistant's blocking-call detection.
+- Fresh-process tests enable Home Assistant's blocking detector before importing
+  the integration and exercise the real SDK against a mocked HTTP transport.
+  These complement the Home Assistant-native tests, whose imports can otherwise
+  hide first-use SDK imports. No live provider request is made.
 - Unknown custom model IDs are allowed because model-card capabilities may be
   unavailable; Mistral remains the final capability authority.
 - Conversation and AI Task share model-specific reasoning validation in setup
@@ -76,6 +85,15 @@ drift.
   user-facing minimum.
 
 ## Release gate
+
+The `0.2.3b1` beta targets SDK startup blocking (issue #51). Configuration
+validation and a full restart passed on Home Assistant 2026.9.2, with no Mistral
+blocking-call warnings or setup errors in the observed startup logs.
+Live Conversation, tool-call, AI Task, STT, and TTS smoke tests remain pending;
+the SSH app used for the startup check does not have Home Assistant API access.
+Reloading an integration alone cannot verify a cold-start fix because it may
+reuse already imported modules. This limited real-instance check supports the
+prerelease; it does not satisfy the full stable-release smoke test below.
 
 The public repository gate requires a clean secret and privacy review plus green
 quality, HACS, and Hassfest validation. A versioned release should additionally

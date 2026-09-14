@@ -7,6 +7,25 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.2.3b1] - 2026-09-14
+
+### Fixed
+
+- Move Mistral SDK construction and synchronous cleanup off Home Assistant's
+  event loop while preserving the shared asynchronous HTTP transport.
+- Prepare SDK services and cache the original lazy exports used by model
+  discovery, chat, speech, transcription, and voice discovery before requests.
+- Close SDK-owned resources when initialization fails or setup is cancelled.
+
+### Validation
+
+- Add fresh-process regression tests using Home Assistant's blocking-call
+  detector and the real SDK with mocked HTTP responses.
+- All 239 tests pass with 93.77% branch-enabled coverage.
+- Configuration validation and a full restart passed on Home Assistant 2026.9.2,
+  with no Mistral blocking-call warnings or setup errors in the observed logs.
+  Live Conversation, tool-call, AI Task, STT, and TTS smoke tests remain pending.
+
 ## [0.2.2] - 2026-09-12
 
 ### Changed
@@ -172,7 +191,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - English and French translations.
 - Ruff, strict mypy, pytest coverage, HACS, Hassfest, and Dependabot automation.
 
-[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.2.3b1...HEAD
+[0.2.3b1]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.2.2...v0.2.3b1
 [0.2.2]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.2.0b2...v0.2.0

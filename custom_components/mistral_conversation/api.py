@@ -2,15 +2,22 @@
 
 from __future__ import annotations
 
+import asyncio
 from contextlib import suppress
 from datetime import datetime
 from types import TracebackType
 from typing import Protocol, cast
 
+import httpx
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.httpx_client import get_async_client
-from mistralai.client import Mistral
+from mistralai.client import Mistral, errors, models, utils
+
+# Load lazy SDK services through HA's integration import executor, before setup.
+from mistralai.client.audio import Audio  # noqa: F401
+from mistralai.client.chat import Chat  # noqa: F401
 from mistralai.client.models import BaseModelCard, FTModelCard
+from mistralai.client.models_ import Models  # noqa: F401
 
 from .const import (
     LOGGER,
@@ -20,6 +27,39 @@ from .const import (
     MistralModel,
     MistralVoice,
 )
+
+# SDK 2.10.0's lazy exports do not cache resolved attributes. Merely importing
+# their modules still calls import_module (with relative names) on every access.
+# Bind the original public objects once while HA imports this integration in its
+# import executor. No SDK function is replaced and no blocking warning is muted.
+# Limit model loading to the request/response types used by our five endpoints.
+for _name in (
+    "Security",
+    "ListModelsV1ModelsGetRequest",
+    "ModelList",
+    "ChatCompletionStreamRequest",
+    "ChatCompletionStreamRequestStop",
+    "ChatCompletionStreamRequestMessage",
+    "ChatCompletionStreamRequestTool",
+    "ChatCompletionStreamRequestToolChoice",
+    "ResponseFormat",
+    "Prediction",
+    "GuardrailConfig",
+    "CompletionEvent",
+    "AudioTranscriptionRequest",
+    "File",
+    "TimestampGranularity",
+    "TranscriptionResponse",
+    "SpeechRequest",
+    "SpeechResponse",
+    "SpeechStreamEvents",
+    "ListVoicesV1AudioVoicesGetRequest",
+    "VoiceListResponse",
+):
+    setattr(models, _name, getattr(models, _name))
+for _module in (errors, utils):
+    for _name in _module.__all__:
+        setattr(_module, _name, getattr(_module, _name))
 
 
 class _ClosableMistralClient(Protocol):
@@ -44,15 +84,39 @@ class _ClosableMistralClient(Protocol):
         ...
 
 
-def create_client(hass: HomeAssistant, api_key: str) -> Mistral:
-    """Create a Mistral client backed by Home Assistant's shared HTTP client."""
-    return Mistral(
+def _create_client(api_key: str, http_client: httpx.AsyncClient) -> Mistral:
+    """Construct and prime the SDK in an executor without making requests."""
+    client = Mistral(
         api_key=api_key,
-        async_client=get_async_client(hass),
+        async_client=http_client,
     )
+    try:
+        # Mistral also creates a sync HTTP client and lazily initializes services.
+        # Do both here, including the audio service's speech/transcription/voices.
+        _ = client.models, client.chat, client.audio
+    except BaseException:
+        with suppress(Exception):
+            cast(_ClosableMistralClient, client).__exit__(None, None, None)
+        raise
+    return client
 
 
-async def async_close_client(client: Mistral) -> None:
+async def async_create_client(hass: HomeAssistant, api_key: str) -> Mistral:
+    """Keep HA transport access on the loop and blocking SDK setup off it."""
+    future = hass.async_add_executor_job(
+        _create_client, api_key, get_async_client(hass)
+    )
+    try:
+        return await asyncio.shield(future)
+    except asyncio.CancelledError:
+        # Cancelling the await cannot stop the worker; reclaim its eventual client.
+        with suppress(Exception):
+            client = await future
+            await async_close_client(hass, client)
+        raise
+
+
+async def async_close_client(hass: HomeAssistant, client: Mistral) -> None:
     """Release resources owned by a Mistral client.
 
     The asynchronous HTTP transport is supplied by Home Assistant. The SDK
@@ -60,7 +124,7 @@ async def async_close_client(client: Mistral) -> None:
     """
     closable_client = cast(_ClosableMistralClient, client)
     with suppress(Exception):
-        closable_client.__exit__(None, None, None)
+        await hass.async_add_executor_job(closable_client.__exit__, None, None, None)
     with suppress(Exception):
         await closable_client.__aexit__(None, None, None)
 
@@ -158,8 +222,8 @@ async def async_validate_api_key(
     hass: HomeAssistant, api_key: str
 ) -> list[MistralModel]:
     """Validate an API key and return available chat models."""
-    client = create_client(hass, api_key)
+    client = await async_create_client(hass, api_key)
     try:
         return await async_get_models(client)
     finally:
-        await async_close_client(client)
+        await async_close_client(hass, client)

@@ -104,7 +104,7 @@ async def test_setup_auth_failure_closes_client(
     """A first-refresh auth failure starts reauth and releases resources."""
     with (
         patch(
-            "custom_components.mistral_conversation.coordinator.create_client",
+            "custom_components.mistral_conversation.coordinator.async_create_client",
             return_value=mock_mistral_client,
         ),
         patch(
@@ -129,7 +129,7 @@ async def test_setup_connection_failure_enters_retry(
     """Transient first-refresh failures leave the entry retryable."""
     with (
         patch(
-            "custom_components.mistral_conversation.coordinator.create_client",
+            "custom_components.mistral_conversation.coordinator.async_create_client",
             return_value=mock_mistral_client,
         ),
         patch(

@@ -89,11 +89,12 @@ drift.
 The `0.2.3b1` beta targets SDK startup blocking (issue #51). Configuration
 validation and a full restart passed on Home Assistant 2026.9.2, with no Mistral
 blocking-call warnings or setup errors in the observed startup logs.
-Live Conversation, tool-call, AI Task, STT, and TTS smoke tests remain pending;
-the SSH app used for the startup check does not have Home Assistant API access.
+The maintainer subsequently confirmed successful Conversation, Assist tool-call,
+AI Task, STT, and TTS smoke tests on that instance. These functional results are
+maintainer-reported and complement the startup-log and installed-file checks.
 Reloading an integration alone cannot verify a cold-start fix because it may
-reuse already imported modules. This limited real-instance check supports the
-prerelease; it does not satisfy the full stable-release smoke test below.
+reuse already imported modules. Version `0.2.3` promotes this tested beta to
+stable without runtime code changes.
 
 The public repository gate requires a clean secret and privacy review plus green
 quality, HACS, and Hassfest validation. A versioned release should additionally

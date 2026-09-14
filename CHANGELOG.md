@@ -7,6 +7,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-09-14
+
+### Changed
+
+- Promote the SDK startup blocking fixes from `0.2.3b1` to stable without
+  runtime code changes.
+
+### Validation
+
+- The maintainer confirmed successful Conversation, Assist tool-call, AI Task,
+  STT, and TTS smoke tests on Home Assistant 2026.9.2 after the beta's full
+  restart check. These functional results are maintainer-reported.
+
 ## [0.2.3b1] - 2026-09-14
 
 ### Fixed
@@ -191,7 +204,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - English and French translations.
 - Ruff, strict mypy, pytest coverage, HACS, Hassfest, and Dependabot automation.
 
-[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.2.3b1...HEAD
+[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.2.3b1...v0.2.3
 [0.2.3b1]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.2.2...v0.2.3b1
 [0.2.2]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.2.0...v0.2.1

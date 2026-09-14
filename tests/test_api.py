@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
+import threading
 from datetime import UTC, datetime
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
 from homeassistant.core import HomeAssistant
@@ -12,10 +14,10 @@ from mistralai.client.models import BaseModelCard, FTModelCard, ModelCapabilitie
 
 from custom_components.mistral_conversation.api import (
     async_close_client,
+    async_create_client,
     async_get_models,
     async_get_voices,
     async_validate_api_key,
-    create_client,
 )
 from custom_components.mistral_conversation.const import (
     SETUP_TIMEOUT_MS,
@@ -173,29 +175,92 @@ async def test_get_voices_stops_on_empty_page() -> None:
     client.audio.voices.list_async.assert_awaited_once()
 
 
-def test_create_client_uses_home_assistant_http_client(
+async def test_create_client_uses_home_assistant_http_client(
     hass: HomeAssistant,
 ) -> None:
     """The SDK shares Home Assistant's managed asynchronous transport."""
     shared_client = object()
-    sdk_client = object()
+    sdk_client = MagicMock()
+    loop_thread = threading.get_ident()
+
+    def shared_transport(hass: HomeAssistant) -> object:
+        assert threading.get_ident() == loop_thread
+        return shared_client
+
+    def construct(**kwargs: object) -> MagicMock:
+        assert threading.get_ident() != loop_thread
+        return sdk_client
+
     with (
         patch(
             "custom_components.mistral_conversation.api.get_async_client",
-            return_value=shared_client,
+            side_effect=shared_transport,
         ),
         patch(
             "custom_components.mistral_conversation.api.Mistral",
-            return_value=sdk_client,
+            side_effect=construct,
         ) as mistral,
     ):
-        result = create_client(hass, "secret")
+        result = await async_create_client(hass, "test-api-key")
 
     assert result is sdk_client
     mistral.assert_called_once_with(
-        api_key="secret",
+        api_key="test-api-key",
         async_client=shared_client,
     )
+
+
+async def test_create_client_closes_on_service_initialization_failure(
+    hass: HomeAssistant,
+) -> None:
+    """A failed lazy service initialization releases SDK-owned resources."""
+    client = MagicMock()
+    loop_thread = threading.get_ident()
+
+    def close(*args: object) -> None:
+        assert threading.get_ident() != loop_thread
+
+    client.__exit__.side_effect = close
+    with (
+        patch(
+            "custom_components.mistral_conversation.api.Mistral", return_value=client
+        ),
+        patch.object(
+            type(client), "audio", new_callable=PropertyMock, create=True
+        ) as audio,
+        pytest.raises(RuntimeError, match="service initialization"),
+    ):
+        audio.side_effect = RuntimeError("service initialization")
+        await async_create_client(hass, "test-api-key")
+    client.__exit__.assert_called_once_with(None, None, None)
+
+
+async def test_create_client_closes_after_cancellation(hass: HomeAssistant) -> None:
+    """Cancellation during worker construction cannot leak the resulting client."""
+    started = asyncio.Event()
+    release = threading.Event()
+    client = MagicMock()
+    client.__aexit__ = AsyncMock()
+    loop = asyncio.get_running_loop()
+
+    def construct(**kwargs: object) -> MagicMock:
+        loop.call_soon_threadsafe(started.set)
+        assert release.wait(timeout=10)
+        return client
+
+    with patch(
+        "custom_components.mistral_conversation.api.Mistral", side_effect=construct
+    ):
+        task = asyncio.create_task(async_create_client(hass, "test-api-key"))
+        try:
+            await asyncio.wait_for(started.wait(), timeout=10)
+            task.cancel()
+        finally:
+            release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+    client.__exit__.assert_called_once_with(None, None, None)
+    client.__aexit__.assert_awaited_once_with(None, None, None)
 
 
 async def test_validate_api_key_closes_client(
@@ -206,7 +271,7 @@ async def test_validate_api_key_closes_client(
     models = []
     with (
         patch(
-            "custom_components.mistral_conversation.api.create_client",
+            "custom_components.mistral_conversation.api.async_create_client",
             return_value=client,
         ),
         patch(
@@ -222,7 +287,7 @@ async def test_validate_api_key_closes_client(
         result = await async_validate_api_key(hass, "secret")
 
     assert result is models
-    close_client.assert_awaited_once_with(client)
+    close_client.assert_awaited_once_with(hass, client)
 
 
 async def test_validate_api_key_closes_client_on_error(
@@ -232,7 +297,7 @@ async def test_validate_api_key_closes_client_on_error(
     client = MagicMock()
     with (
         patch(
-            "custom_components.mistral_conversation.api.create_client",
+            "custom_components.mistral_conversation.api.async_create_client",
             return_value=client,
         ),
         patch(
@@ -248,16 +313,16 @@ async def test_validate_api_key_closes_client_on_error(
     ):
         await async_validate_api_key(hass, "secret")
 
-    close_client.assert_awaited_once_with(client)
+    close_client.assert_awaited_once_with(hass, client)
 
 
-async def test_close_client_suppresses_cleanup_errors() -> None:
+async def test_close_client_suppresses_cleanup_errors(hass: HomeAssistant) -> None:
     """Cleanup cannot mask the original setup or unload failure."""
     client = MagicMock()
     client.__exit__.side_effect = RuntimeError("sync close")
     client.__aexit__ = AsyncMock(side_effect=RuntimeError("async close"))
 
-    await async_close_client(client)
+    await async_close_client(hass, client)
 
     client.__exit__.assert_called_once_with(None, None, None)
     client.__aexit__.assert_awaited_once_with(None, None, None)

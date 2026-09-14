@@ -31,7 +31,7 @@ async def test_setup_and_refresh_create_client_and_load_models(
     coordinator = MistralCoordinator(hass, mock_config_entry)
     with (
         patch(
-            "custom_components.mistral_conversation.coordinator.create_client",
+            "custom_components.mistral_conversation.coordinator.async_create_client",
             return_value=mock_mistral_client,
         ) as create_client,
         patch(
@@ -47,7 +47,7 @@ async def test_setup_and_refresh_create_client_and_load_models(
     assert coordinator.data == [model]
     assert coordinator.last_update_success
     assert coordinator.update_interval == UPDATE_INTERVAL_CONNECTED
-    create_client.assert_called_once_with(hass, "test-api-key")
+    create_client.assert_awaited_once_with(hass, "test-api-key")
     get_models.assert_awaited_once_with(mock_mistral_client)
 
 
@@ -209,4 +209,4 @@ async def test_close_delegates_to_api_helper(
     ) as close_client:
         await coordinator.async_close()
 
-    close_client.assert_awaited_once_with(mock_mistral_client)
+    close_client.assert_awaited_once_with(hass, mock_mistral_client)

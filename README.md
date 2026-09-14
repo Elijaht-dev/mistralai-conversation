@@ -52,6 +52,14 @@ Mistral account.
 
 The integration pins `mistralai==2.10.0`.
 
+The `0.2.3b1` beta addresses blocking SDK initialization and lazy imports reported
+at startup in issue [#51](https://github.com/Elijaht-dev/mistralai-conversation/issues/51).
+It keeps Home Assistant's shared asynchronous HTTP client and prepares SDK
+services before their first request. A full restart on Home Assistant 2026.9.2
+showed no Mistral blocking-call warnings or setup errors in the observed logs.
+Live Conversation, AI Task, STT, and TTS smoke tests remain pending;
+the stable release remains `0.2.2`.
+
 The 0.2.0 release was tested by the maintainer on Home Assistant 2026.8.6 and
 2026.9.0. The declared minimum remains 2026.7.4.
 

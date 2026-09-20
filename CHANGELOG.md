@@ -7,6 +7,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-20
+
+### Added
+
+- Offer Voxtral Realtime as an optional speech-to-text model for Assist, sending
+  audio while the user speaks and returning the completed transcript. Existing
+  entities and the default batch model remain unchanged.
+- Bound Realtime audio and request duration, close WebSocket connections on
+  cancellation and unload, and preserve authentication and availability handling.
+
+### Validation
+
+- All 282 tests pass with 94.56% branch-enabled coverage, including fresh-process
+  SDK and local TLS WebSocket tests with Home Assistant's blocking detector.
+- On Home Assistant 2026.9.2, configuration validation and a full restart passed
+  with no Mistral blocking-call warnings or errors in the observed logs.
+- Real-instance checks passed for Realtime Assist transcription, cancellation
+  and recovery, existing batch STT, Conversation, a read-only Assist tool round
+  trip, structured AI Task output, and TTS generation without playback.
+
 ## [0.2.3] - 2026-09-14
 
 ### Changed

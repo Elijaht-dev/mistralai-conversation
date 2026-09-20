@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import io
 import wave
 from collections.abc import AsyncIterable
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from homeassistant.components import stt
@@ -15,12 +16,16 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.mistral_conversation.const import (
     DEFAULT_STT_MODEL,
+    REALTIME_STT_MODEL,
     REQUEST_TIMEOUT_MS,
 )
 
 from .helpers import mistral_error
+from .test_realtime import Socket, connection
 
 ENTITY_ID = "stt.mistral_speech_to_text"
+
+pytestmark = pytest.mark.usefixtures("mock_realtime_connect")
 
 
 async def _audio_stream(*chunks: bytes) -> AsyncIterable[bytes]:
@@ -151,3 +156,91 @@ async def test_stt_rejects_empty_and_oversized_audio(
     )
     assert oversized.result is stt.SpeechResultState.ERROR
     mock_init_component.audio.transcriptions.complete_async.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "selected_model", [REALTIME_STT_MODEL, "custom-realtime-model"]
+)
+async def test_stt_routes_exact_realtime_model(
+    hass: HomeAssistant, mock_init_component: MagicMock, selected_model: str
+) -> None:
+    """Only the explicitly supported model changes transport; custom IDs stay valid."""
+    entity = hass.data[stt.DOMAIN].get_entity(ENTITY_ID)
+    entity.model = selected_model
+    socket = Socket()
+    mock_init_component.audio.realtime.connect = AsyncMock(
+        return_value=connection(socket)
+    )
+    mock_init_component.audio.transcriptions.complete_async.return_value = (
+        SimpleNamespace(text="Hello")
+    )
+    result = await entity.async_process_audio_stream(_metadata(), _audio_stream(b"ab"))
+    assert result == stt.SpeechResult("Hello", stt.SpeechResultState.SUCCESS)
+    if selected_model == REALTIME_STT_MODEL:
+        assert socket.closed
+        mock_init_component.audio.transcriptions.complete_async.assert_not_awaited()
+    else:
+        mock_init_component.audio.realtime.connect.assert_not_awaited()
+
+
+@pytest.mark.parametrize("phase", ["connect", "upload", "final"])
+async def test_stt_unload_cancels_active_realtime_requests(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_init_component: MagicMock,
+    phase: str,
+) -> None:
+    """Entity removal reclaims connecting, uploading and final-waiting requests."""
+    entity = hass.data[stt.DOMAIN].get_entity(ENTITY_ID)
+    entity.model = REALTIME_STT_MODEL
+    socket = Socket(hold_final=phase == "final")
+    started = asyncio.Event()
+    finish_connect = asyncio.Event()
+
+    async def connect(**kwargs):
+        started.set()
+        if phase == "connect":
+            await finish_connect.wait()
+        return connection(socket)
+
+    mock_init_component.audio.realtime.connect = AsyncMock(side_effect=connect)
+
+    async def endless_audio():
+        yield b"ab"
+        if phase != "final":
+            await asyncio.Event().wait()
+
+    request = asyncio.create_task(
+        entity.async_process_audio_stream(_metadata(), endless_audio())
+    )
+    await started.wait()
+    if phase == "upload":
+        await socket.audio_sent.wait()
+    elif phase == "final":
+        await socket.finished.wait()
+        await asyncio.sleep(0)
+    unload = asyncio.create_task(
+        hass.config_entries.async_unload(mock_config_entry.entry_id)
+    )
+    assert await unload
+    with pytest.raises(asyncio.CancelledError):
+        await request
+    assert socket.closed is (phase != "connect")
+    assert (
+        await entity.async_process_audio_stream(_metadata(), _audio_stream(b"ab"))
+    ).result is stt.SpeechResultState.ERROR
+
+
+async def test_stt_realtime_connection_failure_updates_health(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_init_component: MagicMock,
+) -> None:
+    entity = hass.data[stt.DOMAIN].get_entity(ENTITY_ID)
+    entity.model = REALTIME_STT_MODEL
+    mock_init_component.audio.realtime.connect = AsyncMock(
+        side_effect=OSError("private-data")
+    )
+    result = await entity.async_process_audio_stream(_metadata(), _audio_stream(b"ab"))
+    assert result.result is stt.SpeechResultState.ERROR
+    assert not mock_config_entry.runtime_data.last_update_success

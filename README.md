@@ -21,7 +21,7 @@ endorsed by Home Assistant or Mistral AI.
 - Multiple independently configured conversation agents per Mistral account
 - Home Assistant AI Task data generation with native Mistral JSON-schema output
 - AI Task image and PDF attachments on compatible multimodal models
-- Voxtral speech-to-text for Home Assistant Assist voice pipelines
+- Voxtral batch and Realtime speech-to-text for Home Assistant Assist voice pipelines
 - Streaming Voxtral text-to-speech with preset and saved custom Mistral voices
 - Live model discovery, aliases, capability metadata, and custom model IDs
 - Streamed text, reasoning, token usage, and parallel tool calls
@@ -50,7 +50,8 @@ configurable because their capabilities may not be present in model discovery.
 Text-to-speech additionally requires a preset or saved voice available to the
 Mistral account.
 
-The integration pins `mistralai==2.10.0`.
+The integration pins `mistralai[realtime]==2.10.0`, including the SDK's WebSocket
+support for Realtime transcription.
 
 Version `0.2.3` addresses blocking SDK initialization and lazy imports reported
 at startup in issue [#51](https://github.com/Elijaht-dev/mistralai-conversation/issues/51).
@@ -154,6 +155,19 @@ Speech-to-text defaults to `voxtral-mini-latest`. It accepts the conservative
 Assist format of mono, 16-bit, 16 kHz PCM audio, adds the WAV container expected
 by the batch transcription API, and forwards the pipeline language to Mistral.
 The input is bounded locally before upload.
+
+Select `voxtral-mini-transcribe-realtime-2602` to transcribe audio as Assist
+receives it. This option uses Mistral's WebSocket API with the same PCM format,
+without buffering the complete recording. Audio starts leaving Home Assistant
+during the STT stage. The default model and existing configurations stay unchanged;
+other custom model IDs continue to use the batch transcription API.
+
+Realtime uses automatic language detection and the provider's default streaming
+delay. Assist still determines when the utterance ends and receives one final
+transcript before starting the conversation agent. This can reduce the wait after
+speaking; it does not add live captions or interruption of spoken responses.
+An interrupted or failed Realtime request returns an error without retrying the
+recording through the batch API.
 
 ### Text-to-speech
 

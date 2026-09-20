@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import suppress
+import json
+from collections.abc import AsyncGenerator, AsyncIterable
+from contextlib import asynccontextmanager, suppress
 from datetime import datetime
 from types import TracebackType
 from typing import Protocol, cast
+from urllib.parse import urlencode, urlparse, urlunparse
 
 import httpx
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.httpx_client import get_async_client
+from homeassistant.util.ssl import get_default_context
 from mistralai.client import Mistral, errors, models, utils
 
 # Load lazy SDK services through HA's integration import executor, before setup.
@@ -18,15 +22,27 @@ from mistralai.client.audio import Audio  # noqa: F401
 from mistralai.client.chat import Chat  # noqa: F401
 from mistralai.client.models import BaseModelCard, FTModelCard
 from mistralai.client.models_ import Models  # noqa: F401
+from mistralai.extra.exceptions import RealtimeTranscriptionException
+from mistralai.extra.realtime.connection import (
+    RealtimeConnection,
+    UnknownRealtimeEvent,
+    parse_realtime_event,
+)
+from websockets.asyncio.client import connect as websocket_connect
+from websockets.exceptions import InvalidStatus, WebSocketException
 
 from .const import (
     LOGGER,
+    MAX_STT_AUDIO_BYTES,
     MAX_VOICES,
+    REQUEST_TIMEOUT_MS,
     SETUP_TIMEOUT_MS,
     VOICE_LIST_PAGE_SIZE,
+    ApiErrorKind,
     MistralModel,
     MistralVoice,
 )
+from .errors import RealtimeError
 
 # SDK 2.10.0's lazy exports do not cache resolved attributes. Merely importing
 # their modules still calls import_module (with relative names) on every access.
@@ -55,6 +71,10 @@ for _name in (
     "SpeechStreamEvents",
     "ListVoicesV1AudioVoicesGetRequest",
     "VoiceListResponse",
+    "AudioFormat",
+    "RealtimeTranscriptionError",
+    "RealtimeTranscriptionSessionCreated",
+    "TranscriptionStreamDone",
 ):
     setattr(models, _name, getattr(models, _name))
 for _module in (errors, utils):
@@ -93,7 +113,9 @@ def _create_client(api_key: str, http_client: httpx.AsyncClient) -> Mistral:
     try:
         # Mistral also creates a sync HTTP client and lazily initializes services.
         # Do both here, including the audio service's speech/transcription/voices.
-        _ = client.models, client.chat, client.audio
+        _ = client.models, client.chat, client.audio.realtime
+        # Populate HA's cached, verified TLS context in this executor as well.
+        get_default_context()
     except BaseException:
         with suppress(Exception):
             cast(_ClosableMistralClient, client).__exit__(None, None, None)
@@ -127,6 +149,154 @@ async def async_close_client(hass: HomeAssistant, client: Mistral) -> None:
         await hass.async_add_executor_job(closable_client.__exit__, None, None, None)
     with suppress(Exception):
         await closable_client.__aexit__(None, None, None)
+
+
+def _realtime_error(err: Exception) -> RealtimeError:
+    """Classify structured transport failures without exposing provider content."""
+    kind = ApiErrorKind.API
+    cause: BaseException | None = err
+    while cause is not None:
+        if isinstance(cause, InvalidStatus):
+            status = cause.response.status_code
+            if status in (401, 403):
+                kind = ApiErrorKind.AUTHENTICATION
+            elif status == 429:
+                kind = ApiErrorKind.RATE_LIMIT
+            elif status in (408, 504):
+                kind = ApiErrorKind.TIMEOUT
+            elif status >= 500:
+                kind = ApiErrorKind.CONNECTION
+            break
+        if isinstance(cause, TimeoutError):
+            kind = ApiErrorKind.TIMEOUT
+            break
+        if isinstance(cause, OSError | WebSocketException):
+            kind = ApiErrorKind.CONNECTION
+            break
+        cause = cause.__cause__
+    return RealtimeError("Realtime transcription failed", kind)
+
+
+@asynccontextmanager
+async def _connect_realtime(
+    client: Mistral, model: str
+) -> AsyncGenerator[RealtimeConnection]:
+    """Open a verified HA-safe socket, then use the SDK's protocol objects."""
+    # SDK 2.10.0 connect() cannot accept a prepared SSLContext. Its default
+    # websockets transport loads certificates on HA's loop. Keep this narrow
+    # connection adapter until that public SDK API can receive HA's context;
+    # all audio messages and event parsing remain owned by the official SDK.
+    config = client.sdk_configuration
+    base_url, _ = config.get_server_details()
+    endpoint = utils.generate_url(base_url, "/v1/audio/transcriptions/realtime", None)
+    parsed = urlparse(endpoint)
+    if parsed.scheme != "https":
+        raise RealtimeError("Realtime transcription requires a secure cloud endpoint")
+    security = config.security() if callable(config.security) else config.security
+    resolved_security = utils.get_security_from_env(security, models.Security)
+    headers: dict[str, str] = {}
+    query = {"model": model}
+    if resolved_security is not None:
+        headers, security_query = utils.get_security(resolved_security)
+        query.update(
+            {key: values[0] for key, values in security_query.items() if values}
+        )
+    url = urlunparse(parsed._replace(scheme="wss", query=urlencode(query)))
+    setup_deadline = asyncio.get_running_loop().time() + SETUP_TIMEOUT_MS / 1000
+    async with websocket_connect(
+        url,
+        additional_headers=headers,
+        user_agent_header=config.user_agent,
+        ssl=get_default_context(),
+        open_timeout=SETUP_TIMEOUT_MS / 1000,
+    ) as websocket:
+        async with asyncio.timeout_at(setup_deadline):
+            event = parse_realtime_event(json.loads(await websocket.recv()))
+            if not isinstance(event, models.RealtimeTranscriptionSessionCreated):
+                raise RealtimeError("Invalid Realtime session handshake")
+            connection = RealtimeConnection(websocket, event.session)
+            await connection.update_session(
+                models.AudioFormat(encoding="pcm_s16le", sample_rate=16000)
+            )
+        yield connection
+
+
+async def _send_realtime_audio(
+    connection: RealtimeConnection, stream: AsyncIterable[bytes]
+) -> None:
+    """Send bounded PCM chunks without retaining the recording."""
+    size = 0
+    async for chunk in stream:
+        size += len(chunk)
+        if size > MAX_STT_AUDIO_BYTES:
+            raise RealtimeError("STT audio exceeded the local size limit")
+        if chunk:
+            await connection.send_audio(chunk)
+    if not size:
+        raise RealtimeError("STT audio was empty")
+    await connection.flush_audio()
+    await connection.end_audio()
+
+
+async def _receive_realtime_text(
+    connection: RealtimeConnection, sender: asyncio.Task[None]
+) -> str:
+    """Require a well-formed final response after all audio has been sent."""
+    async for event in connection:
+        if isinstance(event, UnknownRealtimeEvent):
+            raise RealtimeError("Invalid Realtime transcription event")
+        if isinstance(event, models.RealtimeTranscriptionError):
+            # error.code is documented as an internal code, not an HTTP status.
+            raise RealtimeError("Realtime transcription was rejected")
+        if isinstance(event, models.TranscriptionStreamDone):
+            if not sender.done():
+                raise RealtimeError("Realtime transcription ended before audio input")
+            sender.result()
+            if not event.text.strip():
+                raise RealtimeError("Realtime transcription returned empty text")
+            return event.text
+    raise RealtimeError("Realtime transcription ended without a final result")
+
+
+async def _transcribe_realtime(
+    client: Mistral, model: str, stream: AsyncIterable[bytes]
+) -> str:
+    """Supervise upload and download so neither can mask the other's failure."""
+    async with _connect_realtime(client, model) as connection:
+        sender = asyncio.create_task(_send_realtime_audio(connection, stream))
+        receiver = asyncio.create_task(_receive_realtime_text(connection, sender))
+        try:
+            done, _ = await asyncio.wait(
+                (sender, receiver), return_when=asyncio.FIRST_COMPLETED
+            )
+            if sender in done:
+                sender.result()
+            # SDK event iteration consumes CancelledError. Waiting without
+            # forwarding cancellation keeps it on this supervisor; finally
+            # explicitly cancels and retrieves both tasks' outcomes.
+            await asyncio.wait((receiver,))
+            return receiver.result()
+        finally:
+            sender.cancel()
+            receiver.cancel()
+            await asyncio.gather(sender, receiver, return_exceptions=True)
+
+
+async def async_transcribe_realtime(
+    client: Mistral, model: str, stream: AsyncIterable[bytes]
+) -> str:
+    """Transcribe a bounded Assist PCM stream using the official Realtime SDK."""
+    try:
+        async with asyncio.timeout(REQUEST_TIMEOUT_MS / 1000):
+            return await _transcribe_realtime(client, model, stream)
+    except (
+        RealtimeTranscriptionException,
+        WebSocketException,
+        OSError,
+        ValueError,
+        RuntimeError,
+    ) as err:
+        raise _realtime_error(err) from None
 
 
 def _optional_string(value: object) -> str | None:

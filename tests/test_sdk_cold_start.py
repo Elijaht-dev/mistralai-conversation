@@ -7,7 +7,9 @@ from pathlib import Path
 import pytest
 
 
-@pytest.mark.parametrize("endpoint", ["models", "chat", "voices", "stt", "tts"])
+@pytest.mark.parametrize(
+    "endpoint", ["models", "chat", "voices", "stt", "tts", "realtime"]
+)
 @pytest.mark.parametrize("status", [200, 422])
 async def test_first_sdk_request_does_not_block(endpoint: str, status: int) -> None:
     """A fresh SDK handles success/error responses with HA detection enabled."""

@@ -137,10 +137,10 @@
             "name": "Name"
           },
           "data_description": {
-            "model": "Mistral audio transcription model ID. The recommended model is Voxtral Mini Transcribe 2.",
+            "model": "Voxtral Mini Transcribe 2 is the default. Select voxtral-mini-transcribe-realtime-2602 to send audio during speech, with automatic language detection. Other custom IDs use batch transcription.",
             "name": "Name shown for this speech-to-text entity in Home Assistant."
           },
-          "description": "Configure Mistral batch transcription for Assist. Voice audio is sent to Mistral AI for processing.",
+          "description": "Configure Mistral transcription for Assist. Voice audio is sent to Mistral AI, during speech when using Realtime. Assist receives the final transcript when speech ends.",
           "title": "Mistral speech-to-text"
         }
       }

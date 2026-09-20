@@ -137,10 +137,10 @@
             "name": "Nom"
           },
           "data_description": {
-            "model": "Identifiant du modèle de transcription audio Mistral. Le modèle recommandé est Voxtral Mini Transcribe 2.",
+            "model": "Voxtral Mini Transcribe 2 est le modèle par défaut. Choisissez voxtral-mini-transcribe-realtime-2602 pour envoyer l'audio pendant la parole, avec détection automatique de la langue. Les autres identifiants personnalisés utilisent la transcription par lot.",
             "name": "Nom affiché pour cette entité de reconnaissance vocale dans Home Assistant."
           },
-          "description": "Configurez la transcription par lot de Mistral pour Assist. L'audio vocal est envoyé à Mistral AI pour être traité.",
+          "description": "Configurez la transcription Mistral pour Assist. L'audio vocal est envoyé à Mistral AI, pendant la parole avec Realtime. Assist reçoit la transcription finale à la fin de la phrase.",
           "title": "Reconnaissance vocale Mistral"
         }
       }

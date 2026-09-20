@@ -28,10 +28,12 @@ from custom_components.mistral_conversation.const import (
     DEFAULT_AI_TASK_OPTIONS,
     DEFAULT_CONVERSATION_NAME,
     DEFAULT_CONVERSATION_OPTIONS,
+    DEFAULT_STT_MODEL,
     DEFAULT_STT_NAME,
     DEFAULT_STT_OPTIONS,
     DEFAULT_TTS_MODEL,
     DOMAIN,
+    REALTIME_STT_MODEL,
     SUBENTRY_TYPE_AI_TASK,
     SUBENTRY_TYPE_CONVERSATION,
     SUBENTRY_TYPE_STT,
@@ -409,27 +411,52 @@ async def test_create_ai_task_subentry(
     assert result["data"] == DEFAULT_AI_TASK_OPTIONS
 
 
+@pytest.mark.parametrize(
+    "selected_model", [DEFAULT_STT_MODEL, REALTIME_STT_MODEL, "custom-stt-model"]
+)
 async def test_create_stt_subentry(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
     mock_init_component: MagicMock,
+    selected_model: str,
 ) -> None:
     """Speech-to-text subentries support the recommended or a custom model."""
     result = await hass.config_entries.subentries.async_init(
         (mock_config_entry.entry_id, SUBENTRY_TYPE_STT),
         context={"source": config_entries.SOURCE_USER},
     )
+    selector = result["data_schema"].schema[CONF_MODEL]
+    assert DEFAULT_STT_MODEL in selector.config["options"]
+    assert REALTIME_STT_MODEL in selector.config["options"]
+    assert selector.config["custom_value"]
     result = await hass.config_entries.subentries.async_configure(
         result["flow_id"],
         {
             CONF_NAME: "Hall microphone",
-            **DEFAULT_STT_OPTIONS,
+            CONF_MODEL: selected_model,
         },
     )
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["title"] == "Hall microphone"
-    assert result["data"] == DEFAULT_STT_OPTIONS
+    assert result["data"] == {CONF_MODEL: selected_model}
+
+    subentry = next(
+        subentry
+        for subentry in mock_config_entry.subentries.values()
+        if subentry.title == "Hall microphone"
+    )
+    result = await mock_config_entry.start_subentry_reconfigure_flow(
+        hass, subentry.subentry_id
+    )
+    selector = result["data_schema"].schema[CONF_MODEL]
+    assert selected_model in selector.config["options"]
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        {CONF_NAME: "Hall microphone", CONF_MODEL: REALTIME_STT_MODEL},
+    )
+    assert result["reason"] == "reconfigure_successful"
+    assert subentry.data[CONF_MODEL] == REALTIME_STT_MODEL
 
 
 async def test_create_and_reconfigure_tts_subentry(

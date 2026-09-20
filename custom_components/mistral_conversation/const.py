@@ -21,6 +21,7 @@ DEFAULT_STT_NAME: Final = "Mistral speech-to-text"
 DEFAULT_TTS_NAME: Final = "Mistral text-to-speech"
 DEFAULT_MODEL: Final = "mistral-small-latest"
 DEFAULT_STT_MODEL: Final = "voxtral-mini-latest"
+REALTIME_STT_MODEL: Final = "voxtral-mini-transcribe-realtime-2602"
 DEFAULT_TTS_MODEL: Final = "voxtral-mini-tts-2603"
 
 SUBENTRY_TYPE_CONVERSATION: Final = "conversation"

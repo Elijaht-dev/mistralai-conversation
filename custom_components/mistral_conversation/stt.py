@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import io
 import wave
 from collections.abc import AsyncIterable
@@ -9,18 +10,22 @@ from typing import override
 
 import httpx
 from homeassistant.components import stt
+from homeassistant.config_entries import ConfigSubentry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from mistralai.client.errors import MistralError, NoResponseError
 
+from .api import async_transcribe_realtime
 from .const import (
     LOGGER,
     MAX_STT_AUDIO_BYTES,
+    REALTIME_STT_MODEL,
     REQUEST_TIMEOUT_MS,
     SUBENTRY_TYPE_STT,
 )
 from .coordinator import MistralConfigEntry
 from .entity import MistralBaseEntity
+from .errors import RealtimeError
 
 PARALLEL_UPDATES = 0
 
@@ -60,6 +65,43 @@ class MistralSTTEntity(stt.SpeechToTextEntity, MistralBaseEntity):
     """Transcribe Home Assistant voice audio with Mistral."""
 
     _attr_translation_key = "stt"
+
+    def __init__(self, entry: MistralConfigEntry, subentry: ConfigSubentry) -> None:
+        """Track active WebSockets for deterministic entity removal."""
+        super().__init__(entry, subentry)
+        self._realtime_tasks: set[asyncio.Task[str]] = set()
+        self._removing = False
+
+    @override
+    async def async_will_remove_from_hass(self) -> None:
+        """Stop active requests, including connections still being established."""
+        self._removing = True
+        tasks = tuple(self._realtime_tasks)
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        await super().async_will_remove_from_hass()
+
+    async def _async_process_realtime(
+        self, stream: AsyncIterable[bytes]
+    ) -> stt.SpeechResult:
+        """Convert the typed provider boundary into an Assist result."""
+        if self._removing:
+            return stt.SpeechResult(None, stt.SpeechResultState.ERROR)
+        task = asyncio.create_task(
+            async_transcribe_realtime(self.coordinator.client, self.model, stream)
+        )
+        self._realtime_tasks.add(task)
+        try:
+            text = await task
+        except RealtimeError as err:
+            translation_key, message = await self._async_process_api_error(err)
+            LOGGER.warning("Mistral STT failed (%s): %s", translation_key, message)
+            return stt.SpeechResult(None, stt.SpeechResultState.ERROR)
+        finally:
+            self._realtime_tasks.discard(task)
+        self.coordinator.async_set_updated_data(self.coordinator.data or [])
+        return stt.SpeechResult(text, stt.SpeechResultState.SUCCESS)
 
     @property
     @override
@@ -103,7 +145,9 @@ class MistralSTTEntity(stt.SpeechToTextEntity, MistralBaseEntity):
         metadata: stt.SpeechMetadata,
         stream: AsyncIterable[bytes],
     ) -> stt.SpeechResult:
-        """Buffer a bounded Assist stream and transcribe it with Voxtral."""
+        """Choose the documented transport for the selected Voxtral model."""
+        if self.model == REALTIME_STT_MODEL:
+            return await self._async_process_realtime(stream)
         audio_bytes = bytearray()
         async for chunk in stream:
             if len(audio_bytes) + len(chunk) > MAX_STT_AUDIO_BYTES:

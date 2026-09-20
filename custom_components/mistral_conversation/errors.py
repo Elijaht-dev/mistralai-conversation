@@ -13,9 +13,20 @@ _MAX_ERROR_MESSAGE_LENGTH = 400
 _WHITESPACE = re.compile(r"\s+")
 
 
+class RealtimeError(Exception):
+    """A classified Realtime failure with a safe, integration-owned message."""
+
+    def __init__(self, message: str, kind: ApiErrorKind = ApiErrorKind.API) -> None:
+        """Keep provider events and connection credentials out of errors."""
+        super().__init__(message)
+        self.kind = kind
+
+
 def classify_api_error(err: BaseException) -> ApiErrorKind:
     """Classify an exception raised while communicating with Mistral."""
     error_kind = ApiErrorKind.API
+    if isinstance(err, RealtimeError):
+        return err.kind
     if isinstance(err, MistralError):
         if err.status_code in (401, 403):
             error_kind = ApiErrorKind.AUTHENTICATION

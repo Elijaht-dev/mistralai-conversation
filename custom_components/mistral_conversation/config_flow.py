@@ -64,6 +64,7 @@ from .const import (
     DEFAULT_TTS_OPTIONS,
     DOMAIN,
     MAX_CONFIGURED_TOKENS,
+    REALTIME_STT_MODEL,
     REASONING_EFFORT_NONE,
     REASONING_MODEL_DEFAULT,
     SUBENTRY_TYPE_AI_TASK,
@@ -523,7 +524,9 @@ class STTSubentryFlowHandler(ConfigSubentryFlow):
             if self._is_new
             else suggested.get(CONF_NAME, self._get_reconfigure_subentry().title)
         )
-        model_options = list(dict.fromkeys((DEFAULT_STT_MODEL, configured_model)))
+        model_options = list(
+            dict.fromkeys((DEFAULT_STT_MODEL, REALTIME_STT_MODEL, configured_model))
+        )
         schema = vol.Schema(
             {
                 vol.Required(CONF_NAME, default=subentry_name): cv.string,

@@ -21,6 +21,7 @@ status, Home Assistant review, or a Quality Scale certification.
 | Structured data | Native strict Mistral JSON-schema response format |
 | Multimodal | Bounded AI Task and conversation image/PDF attachments |
 | Voice | Bounded Voxtral transcription and streamed speech generation |
+| Realtime STT | Incremental PCM upload, supervised WebSocket lifecycle, final transcript only |
 | Voice identity | Explicit preset/saved voice selection; no silent cloning |
 | Reasoning | Streamed display plus provider-native signed replay |
 | Model lifecycle | Discovery, aliases, capabilities, deprecation repairs |
@@ -78,6 +79,20 @@ drift.
   must be designed in Home Assistant.
 - Speech recordings and text-to-speech input leave Home Assistant for Mistral;
   custom voice creation, consent, and retention remain outside this integration.
+- Realtime STT is an explicit model choice. It sends PCM chunks during Assist's
+  STT stage, uses provider language detection, and returns only a completed final
+  transcript. Home Assistant retains end-of-speech detection. The batch model
+  remains the default, and custom IDs retain their existing batch behavior.
+- Realtime opens a separate WebSocket per request using Home Assistant's cached,
+  verified TLS context. SDK 2.10.0's connection helper cannot accept that context,
+  so a small connection adapter handles the handshake while the official SDK
+  owns audio messages and transcription events. No global SDK or TLS function is
+  replaced. The shared Home Assistant HTTP client remains in use for HTTP
+  requests. Request tasks and connections are closed on completion, failure,
+  cancellation, and entity unload.
+  The audio size limit remains 25 MiB, with a 10-second connection deadline and
+  a 300-second overall request deadline. A failed request is not retried through
+  a different transcription endpoint.
 - TTS is not auto-created during migration because the provider requires an
   explicit preset or saved voice choice.
 - Compatibility is declared from Home Assistant 2026.7.4. Automated tests use
@@ -85,6 +100,17 @@ drift.
   user-facing minimum.
 
 ## Release gate
+
+Version `0.3.0` was checked on Home Assistant 2026.9.2 after configuration
+validation and a full restart. The installed runtime matched the tested files,
+and the observed logs contained no Mistral blocking-call warnings or errors.
+Synthetic audio passed through a temporary Assist STT pipeline using Realtime;
+cancellation and a subsequent transcription also passed. The temporary STT
+subentry and pipeline were removed, preserving the original configuration.
+Existing batch STT, Conversation, an Assist date/time tool round trip, structured
+AI Task output, and TTS generation without playback also passed through Home
+Assistant's public APIs. These checks do not measure physical microphone or
+speaker behavior, nor establish a latency improvement over batch STT.
 
 The `0.2.3b1` beta targets SDK startup blocking (issue #51). Configuration
 validation and a full restart passed on Home Assistant 2026.9.2, with no Mistral

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Generator
+from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -149,3 +150,19 @@ def mock_setup_entry() -> Generator[AsyncMock]:
         return_value=True,
     ) as setup_entry:
         yield setup_entry
+
+
+@pytest.fixture
+def mock_realtime_connect():
+    """Mock socket establishment while keeping SDK audio/event handling real."""
+
+    @asynccontextmanager
+    async def connect(client, model):
+        connection = await client.audio.realtime.connect(model=model)
+        try:
+            yield connection
+        finally:
+            await connection.close()
+
+    with patch("custom_components.mistral_conversation.api._connect_realtime", connect):
+        yield

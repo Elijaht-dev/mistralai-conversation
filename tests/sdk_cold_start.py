@@ -147,16 +147,22 @@ async def main() -> None:
         client = await api.async_create_client(hass, "test-api-key")
         sync_transport = client.sdk_configuration.client
         try:
-            await exercise(api, client, endpoint)
+            if endpoint == "realtime":
+                realtime = await hass.async_add_executor_job(
+                    importlib.import_module, "tests.realtime_cold_start"
+                )
+                await realtime.exercise_realtime(hass, api, client, status)
+            else:
+                await exercise(api, client, endpoint)
         except api.errors.MistralError:
             assert status != 200
         else:
-            assert status == 200
+            assert status == 200 or endpoint == "realtime"
         finally:
             await api.async_close_client(hass, client)
         assert sync_transport.is_closed
         assert not transport.is_closed
-        assert len(requests) == 1
+        assert len(requests) == (0 if endpoint == "realtime" else 1)
     await hass.async_stop()
     assert not detections.calls, detections.calls
 

@@ -1,6 +1,6 @@
 hassil==3.12.0
 ha-ffmpeg==3.2.2
-gazetteer-matcher==1.1.0
+gazetteer-matcher==1.2.0
 home-assistant-intents==2026.8.28
 homeassistant==2026.9.1
 mistralai[realtime]==2.10.0

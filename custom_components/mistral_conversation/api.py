@@ -44,7 +44,7 @@ from .const import (
 )
 from .errors import RealtimeError
 
-# SDK 2.10.0's lazy exports do not cache resolved attributes. Merely importing
+# SDK 2.10.1's lazy exports do not cache resolved attributes. Merely importing
 # their modules still calls import_module (with relative names) on every access.
 # Bind the original public objects once while HA imports this integration in its
 # import executor. No SDK function is replaced and no blocking warning is muted.
@@ -182,7 +182,7 @@ async def _connect_realtime(
     client: Mistral, model: str
 ) -> AsyncGenerator[RealtimeConnection]:
     """Open a verified HA-safe socket, then use the SDK's protocol objects."""
-    # SDK 2.10.0 connect() cannot accept a prepared SSLContext. Its default
+    # SDK 2.10.1 connect() cannot accept a prepared SSLContext. Its default
     # websockets transport loads certificates on HA's loop. Keep this narrow
     # connection adapter until that public SDK API can receive HA's context;
     # all audio messages and event parsing remain owned by the official SDK.

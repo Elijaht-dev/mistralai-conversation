@@ -47,7 +47,7 @@ drift.
 ## Deliberate boundaries
 
 - SDK construction and synchronous cleanup run in Home Assistant's executor.
-  Services are prepared before use. For the pinned SDK 2.10.0, selected lazy
+  Services are prepared before use. For the pinned SDK 2.10.1, selected lazy
   model exports and the utility/error exports are resolved and cached during
   integration import. This binds the original SDK objects without replacing
   their behavior or disabling Home Assistant's blocking-call detection.
@@ -84,7 +84,7 @@ drift.
   transcript. Home Assistant retains end-of-speech detection. The batch model
   remains the default, and custom IDs retain their existing batch behavior.
 - Realtime opens a separate WebSocket per request using Home Assistant's cached,
-  verified TLS context. SDK 2.10.0's connection helper cannot accept that context,
+  verified TLS context. SDK 2.10.1's connection helper cannot accept that context,
   so a small connection adapter handles the handshake while the official SDK
   owns audio messages and transcription events. No global SDK or TLS function is
   replaced. The shared Home Assistant HTTP client remains in use for HTTP
@@ -96,10 +96,15 @@ drift.
 - TTS is not auto-created during migration because the provider requires an
   explicit preset or saved voice choice.
 - Compatibility is declared from Home Assistant 2026.7.4. Automated tests use
-  the newer Home Assistant 2026.9.1 development baseline without raising the
+  the newer Home Assistant 2026.9.2 development baseline without raising the
   user-facing minimum.
 
 ## Release gate
+
+Version `0.3.1` is dependency maintenance. The maintainer authorized release
+after the complete automated gate without repeating the real-instance smoke
+test. Its voice-discovery cold-start test covers preset and custom voice
+responses, including the `type` field required by SDK 2.10.1.
 
 Version `0.3.0` was checked on Home Assistant 2026.9.2 after configuration
 validation and a full restart. The installed runtime matched the tested files,

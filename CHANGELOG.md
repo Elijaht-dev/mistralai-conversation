@@ -7,6 +7,28 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-09-21
+
+### Changed
+
+- Update the official `mistralai[realtime]` SDK from 2.10.0 to 2.10.1.
+- Update the automated test baseline to Home Assistant 2026.9.2 and
+  `pytest-homeassistant-custom-component` 0.13.365 together, resolving the
+  dependency conflicts in their separate updates. The supported Home Assistant
+  minimum remains 2026.7.4.
+- Update development dependencies to `gazetteer-matcher` 1.2.0 and Ruff 0.16.7.
+
+### Validation
+
+- Extend real-SDK cold-start coverage to populated preset and custom voice
+  responses, including the required voice type in SDK 2.10.1.
+- Real-instance smoke testing is not repeated for this dependency maintenance
+  release, as explicitly accepted by the maintainer.
+
+### Fixed
+
+- Restore the missing 0.3.0 changelog comparison link.
+
 ## [0.3.0] - 2026-09-20
 
 ### Added
@@ -224,7 +246,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - English and French translations.
 - Ruff, strict mypy, pytest coverage, HACS, Hassfest, and Dependabot automation.
 
-[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.2.3...v0.3.0
 [0.2.3]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.2.3b1...v0.2.3
 [0.2.3b1]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.2.2...v0.2.3b1
 [0.2.2]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.2.1...v0.2.2

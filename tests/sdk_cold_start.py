@@ -29,7 +29,11 @@ async def exercise(api, client, endpoint: str) -> None:
     if endpoint == "models":
         assert await api.async_get_models(client) == []
     elif endpoint == "voices":
-        assert await api.async_get_voices(client) == []
+        voices = await api.async_get_voices(client)
+        assert [(voice.id, voice.name, voice.languages) for voice in voices] == [
+            ("test-custom", "Custom", ("fr",)),
+            ("test-preset", "Preset", ("en",)),
+        ]
     elif endpoint == "chat":
         stream = await client.chat.stream_async(
             model="test-model",
@@ -133,11 +137,28 @@ async def main() -> None:
             return httpx.Response(
                 200,
                 json={
-                    "items": [],
-                    "total": 0,
+                    "items": [
+                        {
+                            "id": "test-preset",
+                            "name": "Preset",
+                            "created_at": "2026-09-01T00:00:00Z",
+                            "user_id": None,
+                            "type": "preset",
+                            "languages": ["en"],
+                        },
+                        {
+                            "id": "test-custom",
+                            "name": "Custom",
+                            "created_at": "2026-09-01T00:00:00Z",
+                            "user_id": "test-user",
+                            "type": "custom",
+                            "languages": ["fr"],
+                        },
+                    ],
+                    "total": 2,
                     "page": 0,
                     "page_size": 100,
-                    "total_pages": 0,
+                    "total_pages": 1,
                 },
             )
         return httpx.Response(200, json={"object": "list", "data": []})

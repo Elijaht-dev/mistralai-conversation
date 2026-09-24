@@ -8,6 +8,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any, override
 
 import httpx
+from homeassistant.components.ffmpeg import get_ffmpeg_manager
 from homeassistant.components.tts import (
     ATTR_PREFERRED_FORMAT,
     ATTR_VOICE,
@@ -24,8 +25,12 @@ from mistralai.client.models import SpeechOutputFormat, SpeechStreamAudioDelta
 from propcache.api import cached_property
 
 from .api import async_get_voices
+from .audio import AudioNormalizer, AudioOutputTooLargeError, AudioProcessingError
 from .const import (
+    CONF_NORMALIZE_AUDIO,
+    CONF_TARGET_LOUDNESS,
     CONF_VOICE_ID,
+    DEFAULT_TARGET_LOUDNESS,
     DOMAIN,
     LOGGER,
     MAX_TTS_AUDIO_BYTES,
@@ -33,6 +38,7 @@ from .const import (
     REQUEST_TIMEOUT_MS,
     SUBENTRY_TYPE_TTS,
     MistralVoice,
+    validate_target_loudness,
 )
 from .coordinator import MistralConfigEntry
 from .entity import MistralBaseEntity
@@ -59,6 +65,33 @@ SUPPORTED_FORMATS: tuple[SpeechOutputFormat, ...] = (
     "wav",
     "pcm",
 )
+
+
+def _bool_option(value: object) -> bool:
+    """Parse service and media-source boolean option values."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().casefold()
+        if normalized in ("1", "true", "yes", "on"):
+            return True
+        if normalized in ("0", "false", "no", "off"):
+            return False
+    raise HomeAssistantError(
+        translation_domain=DOMAIN,
+        translation_key="tts_option_invalid",
+    )
+
+
+def _target_loudness_option(value: object) -> int:
+    """Parse and validate a whole-LU target from entity or URL options."""
+    try:
+        return validate_target_loudness(value)
+    except ValueError as err:
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="tts_option_invalid",
+        ) from err
 
 
 def _voice_label(voice: MistralVoice) -> str:
@@ -109,9 +142,13 @@ async def async_setup_entry(
         )
         voices = []
 
+    normalizer = config_entry.runtime_data.get_audio_normalizer(
+        get_ffmpeg_manager(hass).binary
+    )
+
     for subentry in subentries:
         async_add_entities(
-            [MistralTTSEntity(config_entry, subentry, voices)],
+            [MistralTTSEntity(config_entry, subentry, voices, normalizer)],
             config_subentry_id=subentry.subentry_id,
         )
 
@@ -128,11 +165,18 @@ class MistralTTSEntity(TextToSpeechEntity, MistralBaseEntity):
         entry: MistralConfigEntry,
         subentry: ConfigSubentry,
         voices: Sequence[MistralVoice],
+        normalizer: AudioNormalizer,
     ) -> None:
         """Initialize the text-to-speech entity."""
         super().__init__(entry, subentry)
         self._attr_name = subentry.title
-        self._attr_supported_options = [ATTR_VOICE, ATTR_PREFERRED_FORMAT]
+        self._attr_supported_options = [
+            ATTR_VOICE,
+            ATTR_PREFERRED_FORMAT,
+            CONF_NORMALIZE_AUDIO,
+            CONF_TARGET_LOUDNESS,
+        ]
+        self._normalizer = normalizer
 
         configured_voice = subentry.data.get(CONF_VOICE_ID)
         available_voices = {voice.id: voice for voice in voices}
@@ -159,7 +203,13 @@ class MistralTTSEntity(TextToSpeechEntity, MistralBaseEntity):
     @override
     def default_options(self) -> Mapping[str, Any]:
         """Return the configured voice and preferred audio format."""
-        options: dict[str, Any] = {ATTR_PREFERRED_FORMAT: "mp3"}
+        options: dict[str, Any] = {
+            ATTR_PREFERRED_FORMAT: "mp3",
+            CONF_NORMALIZE_AUDIO: self.subentry.data.get(CONF_NORMALIZE_AUDIO, False),
+            CONF_TARGET_LOUDNESS: self.subentry.data.get(
+                CONF_TARGET_LOUDNESS, DEFAULT_TARGET_LOUDNESS
+            ),
+        }
         configured_voice = self.subentry.data.get(CONF_VOICE_ID)
         if isinstance(configured_voice, str) and configured_voice.strip():
             options[ATTR_VOICE] = configured_voice.strip()
@@ -191,6 +241,18 @@ class MistralTTSEntity(TextToSpeechEntity, MistralBaseEntity):
         response_format, provider_format = _audio_format(
             options.get(ATTR_PREFERRED_FORMAT)
         )
+        normalize_audio = _bool_option(
+            options.get(
+                CONF_NORMALIZE_AUDIO,
+                self.subentry.data.get(CONF_NORMALIZE_AUDIO, False),
+            )
+        )
+        target_loudness = _target_loudness_option(
+            options.get(
+                CONF_TARGET_LOUDNESS,
+                self.subentry.data.get(CONF_TARGET_LOUDNESS, DEFAULT_TARGET_LOUDNESS),
+            )
+        )
         response_data = bytearray()
 
         try:
@@ -199,7 +261,7 @@ class MistralTTSEntity(TextToSpeechEntity, MistralBaseEntity):
                 model=self.model,
                 stream=True,
                 voice_id=voice_id,
-                response_format=provider_format,
+                response_format="wav" if normalize_audio else provider_format,
                 timeout_ms=REQUEST_TIMEOUT_MS,
             )
             async with stream:
@@ -238,5 +300,26 @@ class MistralTTSEntity(TextToSpeechEntity, MistralBaseEntity):
                 translation_key="tts_response_empty",
             )
 
+        if normalize_audio:
+            try:
+                processed_audio = await self._normalizer.async_normalize(
+                    bytes(response_data), provider_format, target_loudness
+                )
+            except AudioOutputTooLargeError as err:
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="tts_audio_too_large",
+                    translation_placeholders={
+                        "maximum_mb": str(MAX_TTS_AUDIO_BYTES // (1024 * 1024))
+                    },
+                ) from err
+            except AudioProcessingError as err:
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="tts_processing_failed",
+                ) from err
+        else:
+            processed_audio = bytes(response_data)
+
         self.coordinator.async_set_updated_data(self.coordinator.data or [])
-        return response_format, bytes(response_data)
+        return response_format, processed_audio

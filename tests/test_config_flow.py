@@ -15,13 +15,17 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.helpers import config_validation as cv
 from mistralai.client.errors import NoResponseError
+from probatio import to_field_list
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.mistral_conversation.const import (
     CONF_MAX_TOKENS,
+    CONF_NORMALIZE_AUDIO,
     CONF_REASONING_EFFORT,
     CONF_SAFE_PROMPT,
+    CONF_TARGET_LOUDNESS,
     CONF_TEMPERATURE,
     CONF_VOICE_ID,
     DEFAULT_AI_TASK_NAME,
@@ -31,6 +35,7 @@ from custom_components.mistral_conversation.const import (
     DEFAULT_STT_MODEL,
     DEFAULT_STT_NAME,
     DEFAULT_STT_OPTIONS,
+    DEFAULT_TARGET_LOUDNESS,
     DEFAULT_TTS_MODEL,
     DOMAIN,
     REALTIME_STT_MODEL,
@@ -482,6 +487,7 @@ async def test_create_and_reconfigure_tts_subentry(
         )
 
     get_voices.assert_awaited_once_with(mock_config_entry.runtime_data.client)
+    to_field_list(result["data_schema"], custom_serializer=cv.custom_serializer)
     result = await hass.config_entries.subentries.async_configure(
         result["flow_id"],
         {
@@ -496,6 +502,8 @@ async def test_create_and_reconfigure_tts_subentry(
     assert result["data"] == {
         CONF_MODEL: DEFAULT_TTS_MODEL,
         CONF_VOICE_ID: "voice-1",
+        CONF_NORMALIZE_AUDIO: True,
+        CONF_TARGET_LOUDNESS: DEFAULT_TARGET_LOUDNESS,
     }
 
     tts_subentry = next(
@@ -511,12 +519,27 @@ async def test_create_and_reconfigure_tts_subentry(
         result = await mock_config_entry.start_subentry_reconfigure_flow(
             hass, tts_subentry.subentry_id
         )
+        result = await hass.config_entries.subentries.async_configure(
+            result["flow_id"],
+            {
+                CONF_NAME: "Updated speaker",
+                CONF_MODEL: DEFAULT_TTS_MODEL,
+                CONF_VOICE_ID: "custom-voice-id",
+                CONF_NORMALIZE_AUDIO: False,
+                CONF_TARGET_LOUDNESS: -16.5,
+            },
+        )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {CONF_TARGET_LOUDNESS: "target_loudness_invalid"}
+    to_field_list(result["data_schema"], custom_serializer=cv.custom_serializer)
     result = await hass.config_entries.subentries.async_configure(
         result["flow_id"],
         {
             CONF_NAME: "Updated speaker",
             CONF_MODEL: DEFAULT_TTS_MODEL,
             CONF_VOICE_ID: "custom-voice-id",
+            CONF_NORMALIZE_AUDIO: False,
+            CONF_TARGET_LOUDNESS: -20,
         },
     )
 
@@ -524,3 +547,5 @@ async def test_create_and_reconfigure_tts_subentry(
     assert result["reason"] == "reconfigure_successful"
     assert tts_subentry.title == "Updated speaker"
     assert tts_subentry.data[CONF_VOICE_ID] == "custom-voice-id"
+    assert tts_subentry.data[CONF_NORMALIZE_AUDIO] is False
+    assert tts_subentry.data[CONF_TARGET_LOUDNESS] == -20

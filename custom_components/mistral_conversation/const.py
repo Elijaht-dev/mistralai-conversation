@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
@@ -34,6 +35,8 @@ CONF_REASONING_EFFORT: Final = "reasoning_effort"
 CONF_SAFE_PROMPT: Final = "safe_prompt"
 CONF_TEMPERATURE: Final = "temperature"
 CONF_VOICE_ID: Final = "voice_id"
+CONF_NORMALIZE_AUDIO: Final = "normalize_audio"
+CONF_TARGET_LOUDNESS: Final = "target_loudness"
 
 type ReasoningEffort = Literal[
     "none",
@@ -90,7 +93,30 @@ DEFAULT_STT_OPTIONS = {
 
 DEFAULT_TTS_OPTIONS = {
     CONF_MODEL: DEFAULT_TTS_MODEL,
+    CONF_NORMALIZE_AUDIO: True,
+    CONF_TARGET_LOUDNESS: -16,
 }
+
+DEFAULT_TARGET_LOUDNESS: Final = -16
+MIN_TARGET_LOUDNESS: Final = -24
+MAX_TARGET_LOUDNESS: Final = -12
+
+
+def validate_target_loudness(value: object) -> int:
+    """Return a finite whole-LU target inside the supported range."""
+    if isinstance(value, bool) or not isinstance(value, str | int | float):
+        raise ValueError("target loudness must be a number")
+    try:
+        numeric = float(value)
+    except (OverflowError, ValueError) as err:
+        raise ValueError("target loudness must be a number") from err
+    if not math.isfinite(numeric) or not numeric.is_integer():
+        raise ValueError("target loudness must be a finite whole number")
+    target = int(numeric)
+    if not MIN_TARGET_LOUDNESS <= target <= MAX_TARGET_LOUDNESS:
+        raise ValueError("target loudness is outside the supported range")
+    return target
+
 
 MAX_ATTACHMENT_BYTES: Final = 20 * 1024 * 1024
 MAX_ATTACHMENTS: Final = 10

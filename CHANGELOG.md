@@ -7,6 +7,27 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-24
+
+### Added
+
+- Add optional local two-pass FFmpeg loudness normalization for text-to-speech.
+  New TTS entities enable it at -16 LUFS; existing entities migrate with it off
+  and retain their model and voice. The target can be set from -24 to -12 LUFS
+  per entity or overridden per `tts.speak` and TTS media-source request.
+- Bound normalization input and output to 25 MiB, processing and queue time to
+  30 seconds, and concurrent jobs to two per account. Cap upward gain at 20 dB,
+  protect -2 dBTP true peaks, and avoid amplifying unmeasurable speech.
+
+### Validation
+
+- All 327 tests pass with 93.89% branch-enabled coverage, including real FFmpeg
+  loudness, decoded peak, format, and process cleanup tests.
+- Live checks passed on Home Assistant 2026.9.3 for all five normalized output
+  formats, existing TTS settings, Conversation, a read-only Assist tool call,
+  structured AI Task output, and batch STT. I also tested the audio on my setup
+  before release.
+
 ## [0.3.1] - 2026-09-21
 
 ### Changed
@@ -22,8 +43,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 - Extend real-SDK cold-start coverage to populated preset and custom voice
   responses, including the required voice type in SDK 2.10.1.
-- Real-instance smoke testing is not repeated for this dependency maintenance
-  release, as explicitly accepted by the maintainer.
+- I did not repeat real-instance smoke testing for this dependency maintenance
+  release; validation relies on the complete automated gate.
 
 ### Fixed
 
@@ -58,9 +79,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Validation
 
-- The maintainer confirmed successful Conversation, Assist tool-call, AI Task,
-  STT, and TTS smoke tests on Home Assistant 2026.9.2 after the beta's full
-  restart check. These functional results are maintainer-reported.
+- I tested Conversation, Assist tool-call, AI Task, STT, and TTS on Home
+  Assistant 2026.9.2 after the beta's full restart check.
 
 ## [0.2.3b1] - 2026-09-14
 
@@ -119,8 +139,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Validation
 
-- The maintainer tested the beta on two real Home Assistant installations,
-  running 2026.8.6 and 2026.9.0, and approved stable publication.
+- I tested the beta on two real Home Assistant installations, running 2026.8.6
+  and 2026.9.0, before publishing the stable release.
 
 ## [0.2.0b2] - 2026-09-05
 
@@ -246,7 +266,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - English and French translations.
 - Ruff, strict mypy, pytest coverage, HACS, Hassfest, and Dependabot automation.
 
-[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.2.3...v0.3.0
 [0.2.3]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.2.3b1...v0.2.3

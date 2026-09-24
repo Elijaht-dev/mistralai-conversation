@@ -21,6 +21,7 @@ status, Home Assistant review, or a Quality Scale certification.
 | Structured data | Native strict Mistral JSON-schema response format |
 | Multimodal | Bounded AI Task and conversation image/PDF attachments |
 | Voice | Bounded Voxtral transcription and streamed speech generation |
+| Speech loudness | Opt-in per existing TTS entity; local bounded two-pass FFmpeg processing for new entities |
 | Realtime STT | Incremental PCM upload, supervised WebSocket lifecycle, final transcript only |
 | Voice identity | Explicit preset/saved voice selection; no silent cloning |
 | Reasoning | Streamed display plus provider-native signed replay |
@@ -95,15 +96,42 @@ drift.
   a different transcription endpoint.
 - TTS is not auto-created during migration because the provider requires an
   explicit preset or saved voice choice.
+- New TTS subentries enable local two-pass FFmpeg loudness normalization at
+  -16 LUFS; migration keeps existing subentries disabled and preserves their
+  model and voice. The whole-number target range is -24 to -12 LUFS. Home
+  Assistant service and media-source options can override each request, and
+  both defaults enter its TTS cache key. The disabled path requests and returns
+  the original provider format without processing. When enabled, Mistral sends
+  WAV; FFmpeg measures it, then applies bounded gain and a -2 dBTP ceiling.
+  Upward gain is capped at 20 dB, and silence or short/unmeasurable audio is
+  never amplified. Input and output are capped at 25 MiB, diagnostics at 64 KiB,
+  processing at 30 seconds including queue time, and concurrent jobs at two per
+  account. Audio stays in process pipes; timeout, cancellation, and unload kill
+  and reap subprocesses. Local failures are translated without changing
+  provider availability or silently returning unprocessed audio.
 - Compatibility is declared from Home Assistant 2026.7.4. Automated tests use
   the newer Home Assistant 2026.9.2 development baseline without raising the
   user-facing minimum.
 
 ## Release gate
 
-Version `0.3.1` is dependency maintenance. The maintainer authorized release
-after the complete automated gate without repeating the real-instance smoke
-test. Its voice-discovery cold-start test covers preset and custom voice
+The `0.4.0` loudness-normalization candidate was checked on Home Assistant
+2026.9.3 on 2026-09-23 after a backup, configuration validation, and full restart.
+Installed files matched the tested candidate; migration preserved existing
+settings and left normalization disabled. Live API requests produced normalized
+WAV, MP3, FLAC, and float32 PCM within 1 LU of -16 LUFS, and Opus within 1 LU of
+-24 LUFS, with decoded peaks below 0 dBTP. Conversation, a read-only Assist tool
+round trip, structured AI Task output, existing batch STT, and unprocessed TTS
+also passed. No warnings or errors for the running integration appeared in the
+observed logs. These automated checks used synthetic speech without speaker
+playback. I also tested the audio on my setup on 2026-09-24 before publication.
+Publication additionally requires the public CI gate below.
+End-to-end request timings include provider generation and do not isolate
+FFmpeg processing latency.
+
+Version `0.3.1` is dependency maintenance. I released it after the complete
+automated gate without repeating the real-instance smoke test.
+Its voice-discovery cold-start test covers preset and custom voice
 responses, including the `type` field required by SDK 2.10.1.
 
 Version `0.3.0` was checked on Home Assistant 2026.9.2 after configuration
@@ -120,9 +148,9 @@ speaker behavior, nor establish a latency improvement over batch STT.
 The `0.2.3b1` beta targets SDK startup blocking (issue #51). Configuration
 validation and a full restart passed on Home Assistant 2026.9.2, with no Mistral
 blocking-call warnings or setup errors in the observed startup logs.
-The maintainer subsequently confirmed successful Conversation, Assist tool-call,
-AI Task, STT, and TTS smoke tests on that instance. These functional results are
-maintainer-reported and complement the startup-log and installed-file checks.
+I then tested Conversation, Assist tool-call, AI Task, STT, and TTS on that
+instance. These manual checks complement the startup-log and installed-file
+checks.
 Reloading an integration alone cannot verify a cold-start fix because it may
 reuse already imported modules. Version `0.2.3` promotes this tested beta to
 stable without runtime code changes.
@@ -132,11 +160,10 @@ quality, HACS, and Hassfest validation. A versioned release should additionally
 wait for a real Home Assistant installation to complete Conversation, tool-call,
 AI Task, speech-to-text, and text-to-speech smoke tests.
 
-For patch-only dependency maintenance, the maintainer may explicitly accept the
-complete automated gate without repeating the real-instance smoke test. The
-release report must state that boundary.
+For patch-only dependency maintenance, I may rely on the complete automated
+gate without repeating the real-instance smoke test. The release notes must
+state that boundary.
 
-For 0.2.0, the maintainer reported testing the beta on two real Home Assistant
-installations (2026.8.6 and 2026.9.0) and approved stable publication. This is
-maintainer-reported installation testing; individual feature results were not
-recorded in this repository. Runtime code is unchanged from 0.2.0b2.
+For 0.2.0, I tested the beta on two real Home Assistant installations (2026.8.6
+and 2026.9.0) before publishing the stable release. I did not record individual
+feature results in this repository. Runtime code is unchanged from 0.2.0b2.

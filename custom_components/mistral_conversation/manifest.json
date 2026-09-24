@@ -1,7 +1,7 @@
 {
   "domain": "mistral_conversation",
   "name": "Mistral AI Conversation",
-  "after_dependencies": ["assist_pipeline", "intent"],
+  "after_dependencies": ["assist_pipeline", "ffmpeg", "intent"],
   "codeowners": ["@Elijaht-dev"],
   "config_flow": true,
   "dependencies": ["conversation"],
@@ -11,5 +11,5 @@
   "issue_tracker": "https://github.com/Elijaht-dev/mistralai-conversation/issues",
   "loggers": ["mistralai"],
   "requirements": ["mistralai[realtime]==2.10.1"],
-  "version": "0.3.1"
+  "version": "0.4.0"
 }

@@ -152,6 +152,9 @@
         "unknown": "Unexpected error."
       },
       "entry_type": "Text-to-speech",
+      "error": {
+        "target_loudness_invalid": "Choose a whole-number loudness target between -24 and -12 LUFS."
+      },
       "initiate_flow": {
         "reconfigure": "Reconfigure text-to-speech",
         "user": "Add text-to-speech"
@@ -161,11 +164,15 @@
           "data": {
             "model": "Speech model",
             "name": "Name",
+            "normalize_audio": "Normalize speech loudness",
+            "target_loudness": "Target loudness (LUFS)",
             "voice_id": "Voice"
           },
           "data_description": {
             "model": "Mistral text-to-speech model ID.",
             "name": "Name shown for this text-to-speech entity in Home Assistant.",
+            "normalize_audio": "Use local FFmpeg processing to make generated speech more consistent in level. New entities enable this by default; existing entities stay unchanged until enabled.",
+            "target_loudness": "Whole-number target from -24 to -12 LUFS (default -16). Upward gain is limited to 20 dB; short or unmeasurable speech is not amplified.",
             "voice_id": "Select a preset or saved custom Mistral voice, or enter its voice ID. Only use a cloned voice when you have the speaker's consent."
           },
           "description": "Configure Mistral speech generation. Text sent to this entity is processed by Mistral AI using the selected saved voice.",
@@ -268,7 +275,13 @@
       "message": "Mistral AI returned an invalid tool call: {message}."
     },
     "tts_audio_too_large": {
-      "message": "Mistral AI returned more than the supported maximum of {maximum_mb} MB of speech audio."
+      "message": "Speech audio exceeds the supported maximum of {maximum_mb} MB."
+    },
+    "tts_option_invalid": {
+      "message": "Speech normalization options are invalid. Use true or false and a whole-number target from -24 to -12 LUFS."
+    },
+    "tts_processing_failed": {
+      "message": "Speech audio could not be normalized locally. Check that FFmpeg is available and try again."
     },
     "tts_response_empty": {
       "message": "Mistral AI returned no speech audio."

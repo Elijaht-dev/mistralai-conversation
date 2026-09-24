@@ -152,6 +152,9 @@
         "unknown": "Erreur inattendue."
       },
       "entry_type": "Synthèse vocale",
+      "error": {
+        "target_loudness_invalid": "Choisissez une cible entière entre -24 et -12 LUFS."
+      },
       "initiate_flow": {
         "reconfigure": "Reconfigurer la synthèse vocale",
         "user": "Ajouter la synthèse vocale"
@@ -161,11 +164,15 @@
           "data": {
             "model": "Modèle vocal",
             "name": "Nom",
+            "normalize_audio": "Normaliser le volume de la voix",
+            "target_loudness": "Volume cible (LUFS)",
             "voice_id": "Voix"
           },
           "data_description": {
             "model": "Identifiant du modèle de synthèse vocale Mistral.",
             "name": "Nom affiché pour cette entité de synthèse vocale dans Home Assistant.",
+            "normalize_audio": "Utilise FFmpeg localement pour uniformiser le volume de la voix générée. Cette option est activée par défaut pour les nouvelles entités ; les entités existantes conservent leur comportement jusqu'à son activation.",
+            "target_loudness": "Cible entière entre -24 et -12 LUFS (-16 par défaut). L'amplification est limitée à 20 dB ; les extraits courts ou non mesurables ne sont pas amplifiés.",
             "voice_id": "Sélectionnez une voix Mistral prédéfinie ou personnalisée enregistrée, ou saisissez son identifiant. N'utilisez une voix clonée qu'avec le consentement de la personne concernée."
           },
           "description": "Configurez la génération vocale de Mistral. Le texte envoyé à cette entité est traité par Mistral AI avec la voix enregistrée sélectionnée.",
@@ -268,7 +275,13 @@
       "message": "Mistral AI a renvoyé un appel d'outil incorrect : {message}."
     },
     "tts_audio_too_large": {
-      "message": "Mistral AI a renvoyé plus que la taille maximale prise en charge de {maximum_mb} Mo d'audio vocal."
+      "message": "L'audio vocal dépasse la taille maximale prise en charge de {maximum_mb} Mo."
+    },
+    "tts_option_invalid": {
+      "message": "Les options de normalisation vocale sont invalides. Utilisez vrai ou faux et une cible entière entre -24 et -12 LUFS."
+    },
+    "tts_processing_failed": {
+      "message": "L'audio vocal n'a pas pu être normalisé localement. Vérifiez que FFmpeg est disponible, puis réessayez."
     },
     "tts_response_empty": {
       "message": "Mistral AI n'a renvoyé aucun audio vocal."

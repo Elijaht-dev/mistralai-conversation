@@ -33,16 +33,22 @@ from custom_components.mistral_conversation import (
 )
 from custom_components.mistral_conversation.const import (
     CONF_MAX_TOKENS,
+    CONF_NORMALIZE_AUDIO,
     CONF_REASONING_EFFORT,
     CONF_SAFE_PROMPT,
+    CONF_TARGET_LOUDNESS,
     CONF_TEMPERATURE,
+    CONF_VOICE_ID,
     DEFAULT_AI_TASK_OPTIONS,
     DEFAULT_CONVERSATION_OPTIONS,
     DEFAULT_STT_OPTIONS,
+    DEFAULT_TARGET_LOUDNESS,
+    DEFAULT_TTS_MODEL,
     DOMAIN,
     SUBENTRY_TYPE_AI_TASK,
     SUBENTRY_TYPE_CONVERSATION,
     SUBENTRY_TYPE_STT,
+    SUBENTRY_TYPE_TTS,
     MistralModel,
 )
 
@@ -263,7 +269,7 @@ async def test_migration_normalizes_preview_data(
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.minor_version == 3
+    assert entry.minor_version == 4
     chat_only, legacy = [
         subentry
         for subentry in entry.subentries.values()
@@ -326,7 +332,7 @@ async def test_migration_does_not_duplicate_voice_platform_subentries(
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.minor_version == 3
+    assert entry.minor_version == 4
     assert [subentry.subentry_type for subentry in entry.subentries.values()].count(
         SUBENTRY_TYPE_AI_TASK
     ) == 1
@@ -351,3 +357,38 @@ async def test_migration_rejects_unknown_major_version(
     assert not await async_migrate_entry(hass, entry)
     assert entry.version == 2
     assert entry.minor_version == 1
+
+
+async def test_migration_keeps_existing_tts_audio_unchanged(
+    hass: HomeAssistant,
+) -> None:
+    """Version 1.3 TTS settings retain their voice and opt out of normalization."""
+    entry = MockConfigEntry(
+        title="Mistral AI",
+        domain=DOMAIN,
+        data={CONF_API_KEY: "test-api-key"},
+        version=1,
+        minor_version=3,
+        subentries_data=[
+            {
+                "data": {CONF_MODEL: DEFAULT_TTS_MODEL, CONF_VOICE_ID: "voice-1"},
+                "subentry_type": SUBENTRY_TYPE_TTS,
+                "title": "Existing speaker",
+                "unique_id": None,
+            }
+        ],
+    )
+    entry.add_to_hass(hass)
+    subentry = next(iter(entry.subentries.values()))
+
+    assert await async_migrate_entry(hass, entry)
+    assert entry.minor_version == 4
+    assert subentry.data == {
+        CONF_MODEL: DEFAULT_TTS_MODEL,
+        CONF_VOICE_ID: "voice-1",
+        CONF_NORMALIZE_AUDIO: False,
+        CONF_TARGET_LOUDNESS: DEFAULT_TARGET_LOUDNESS,
+    }
+    assert await async_migrate_entry(hass, entry)
+    assert entry.minor_version == 4
+    assert len(entry.subentries) == 1

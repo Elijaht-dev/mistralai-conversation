@@ -58,11 +58,11 @@ at startup in issue [#51](https://github.com/Elijaht-dev/mistralai-conversation/
 It keeps Home Assistant's shared asynchronous HTTP client and prepares SDK
 services before their first request. A full restart on Home Assistant 2026.9.2
 showed no Mistral blocking-call warnings or setup errors in the observed logs.
-The maintainer confirmed Conversation, Assist tools, AI Task, STT, and TTS smoke
-tests on that instance. Runtime code is unchanged from the tested `0.2.3b1` beta.
+I also tested Conversation, Assist tools, AI Task, STT, and TTS on that instance.
+Runtime code is unchanged from the tested `0.2.3b1` beta.
 
-The 0.2.0 release was tested by the maintainer on Home Assistant 2026.8.6 and
-2026.9.0. The declared minimum remains 2026.7.4.
+I tested the 0.2.0 release on Home Assistant 2026.8.6 and 2026.9.0.
+The declared minimum remains 2026.7.4.
 
 ## Installation
 
@@ -175,6 +175,40 @@ Text-to-speech defaults to `voxtral-mini-tts-2603` and supports MP3, Opus, FLAC,
 WAV, and raw PCM output. The setup flow reads preset and saved custom voices
 available to the account while still allowing a custom voice ID.
 
+New text-to-speech entities normalize generated speech locally to **-16 LUFS**
+by default. The entity's **Normalize speech loudness** switch and **Target
+loudness** control accept whole-number targets from -24 to -12 LUFS. Existing
+entities keep normalization off during migration, preserving their previous
+audio and voice settings; enable it when ready. Normalization requires an
+available FFmpeg executable through Home Assistant's FFmpeg integration.
+It measures the generated WAV response before applying a second processing pass.
+The processor limits upward gain to 20 dB, protects true peaks at -2 dBTP,
+and does not amplify silence or very short/unmeasurable clips. Processing is
+limited to 30 seconds including queue time and two concurrent jobs per account;
+failure returns a translated error rather than unprocessed audio.
+The -2 dBTP ceiling applies during processing; output resampling and lossy
+MP3 or Opus encoding can slightly shift decoded peaks. MP3 uses high-quality
+variable-bitrate encoding.
+
+You can override either setting for one `tts.speak` call with its `options`:
+
+```yaml
+action: tts.speak
+target:
+  entity_id: tts.mistral_text_to_speech
+data:
+  media_player_entity_id: media_player.living_room
+  message: "Hello"
+  options:
+    normalize_audio: true
+    target_loudness: -18
+```
+
+TTS media-source URLs also accept string query values, for example
+`media-source://tts/tts.mistral_text_to_speech?message=Hello&normalize_audio=true&target_loudness=-18`.
+Use `normalize_audio=false` to request the original Mistral output for one call.
+The effective options are part of Home Assistant's TTS cache key.
+
 Mistral requires an explicit `voice_id`, so the integration does not silently
 create, clone, or select a voice. Only use a cloned voice with the speaker's
 informed consent. Voice creation and retention are managed by Mistral, not by
@@ -201,6 +235,10 @@ request to 10 files. The configured model must support the input type.
 Speech-to-text input and decoded text-to-speech output are each limited to 25 MB
 per request. Text-to-speech input is limited to 5,000 characters. These local
 bounds protect Home Assistant memory independently of provider-side limits.
+When normalization is enabled, both the received WAV and the processed output
+retain the 25 MB bound. FFmpeg receives audio over pipes; the integration does
+not write a temporary recording or generated clip to disk. Home Assistant's
+own TTS cache can still store the resulting audio.
 
 See [SECURITY.md](SECURITY.md) for vulnerability reporting and deployment
 guidance.
@@ -236,6 +274,8 @@ guidance.
   preset or saved voice.
 - **Voice missing from the list:** enter its saved Mistral voice ID manually, or
   confirm that the API key can list voices.
+- **Speech normalization fails:** confirm FFmpeg is installed and available to
+  Home Assistant, then retry or disable normalization for that entity.
 - **No entities can be controlled:** confirm that the voice assistant exposes
   them and that an appropriate Home Assistant API is selected.
 

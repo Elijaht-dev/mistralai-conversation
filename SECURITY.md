@@ -8,7 +8,7 @@ Security fixes are applied to the latest released version and the current
 ## Reporting a vulnerability
 
 Use GitHub's private vulnerability reporting for this repository when available.
-If that feature is unavailable, contact the repository owner privately before
+If that feature is unavailable, contact me privately before
 disclosing details. Do not open a public issue containing an API key, exploit,
 prompt transcript, entity inventory, attachment, or personal data.
 

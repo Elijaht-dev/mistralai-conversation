@@ -15,20 +15,24 @@ from homeassistant.helpers.typing import ConfigType
 
 from .const import (
     CONF_MAX_TOKENS,
+    CONF_NORMALIZE_AUDIO,
     CONF_REASONING_EFFORT,
     CONF_SAFE_PROMPT,
+    CONF_TARGET_LOUDNESS,
     CONF_TEMPERATURE,
     DEFAULT_AI_TASK_NAME,
     DEFAULT_AI_TASK_OPTIONS,
     DEFAULT_CONVERSATION_OPTIONS,
     DEFAULT_STT_NAME,
     DEFAULT_STT_OPTIONS,
+    DEFAULT_TARGET_LOUDNESS,
     DOMAIN,
     LOGGER,
     REASONING_SETTINGS,
     SUBENTRY_TYPE_AI_TASK,
     SUBENTRY_TYPE_CONVERSATION,
     SUBENTRY_TYPE_STT,
+    SUBENTRY_TYPE_TTS,
 )
 from .coordinator import MistralConfigEntry, MistralCoordinator
 
@@ -227,6 +231,16 @@ async def async_migrate_entry(
                 ),
             )
         hass.config_entries.async_update_entry(entry, minor_version=3)
+
+    if entry.minor_version < 4:
+        for subentry in entry.subentries.values():
+            if subentry.subentry_type != SUBENTRY_TYPE_TTS:
+                continue
+            data = dict(subentry.data)
+            data.setdefault(CONF_NORMALIZE_AUDIO, False)
+            data.setdefault(CONF_TARGET_LOUDNESS, DEFAULT_TARGET_LOUDNESS)
+            hass.config_entries.async_update_subentry(entry, subentry, data=data)
+        hass.config_entries.async_update_entry(entry, minor_version=4)
 
     return True
 

@@ -28,7 +28,7 @@ async def test_entry_diagnostics_are_complete_and_redacted(
     assert str(mock_config_entry.data[CONF_API_KEY]) not in serialized
     assert mock_config_entry.entry_id in serialized
     assert diagnostics["client"].startswith("mistralai==")
-    assert diagnostics["entry_version"] == "1.3"
+    assert diagnostics["entry_version"] == "1.4"
     assert diagnostics["coordinator"]["last_update_success"]
     assert diagnostics["coordinator"]["models"][0]["function_calling"]
     assert diagnostics["entities"]

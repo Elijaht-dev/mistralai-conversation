@@ -16,8 +16,12 @@ from homeassistant.setup import async_setup_component
 from mistralai.client.models import SpeechStreamAudioDelta, SpeechStreamEvents
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.mistral_conversation.audio import AudioProcessingError
 from custom_components.mistral_conversation.const import (
+    CONF_NORMALIZE_AUDIO,
+    CONF_TARGET_LOUDNESS,
     CONF_VOICE_ID,
+    DEFAULT_TARGET_LOUDNESS,
     DEFAULT_TTS_MODEL,
     DOMAIN,
     MAX_TTS_TEXT_LENGTH,
@@ -101,10 +105,17 @@ async def test_tts_properties_and_saved_voices(
 
     assert entity.default_language == "en-US"
     assert "fr-FR" in entity.supported_languages
-    assert entity.supported_options == [tts.ATTR_VOICE, tts.ATTR_PREFERRED_FORMAT]
+    assert entity.supported_options == [
+        tts.ATTR_VOICE,
+        tts.ATTR_PREFERRED_FORMAT,
+        CONF_NORMALIZE_AUDIO,
+        CONF_TARGET_LOUDNESS,
+    ]
     assert entity.default_options == {
         tts.ATTR_VOICE: "voice-1",
         tts.ATTR_PREFERRED_FORMAT: "mp3",
+        CONF_NORMALIZE_AUDIO: False,
+        CONF_TARGET_LOUDNESS: DEFAULT_TARGET_LOUDNESS,
     }
     voices = entity.async_get_supported_voices("en-US")
     assert [voice.voice_id for voice in voices] == ["voice-2", "voice-1"]
@@ -153,6 +164,171 @@ async def test_tts_streams_supported_audio_formats(
         response_format=provider_format,
         timeout_ms=REQUEST_TIMEOUT_MS,
     )
+
+
+@pytest.mark.parametrize(
+    ("normalize_option", "target_option", "requested_target"),
+    [
+        (True, -18, -18),
+        ("true", "-20", -20),
+    ],
+)
+async def test_tts_normalizes_with_per_call_options(
+    hass: HomeAssistant,
+    tts_component: tuple[MockConfigEntry, MagicMock],
+    normalize_option: object,
+    target_option: object,
+    requested_target: int,
+) -> None:
+    """Service and media-source option types request WAV and local processing."""
+    _entry, client = tts_component
+    source = b"provider WAV"
+    client.audio.speech.complete_async.return_value = _speech_stream(
+        base64.b64encode(source).decode()
+    )
+    entity = _entity(hass)
+    with patch.object(
+        entity._normalizer,
+        "async_normalize",
+        new_callable=AsyncMock,
+        return_value=b"processed mp3",
+    ) as normalize:
+        result = await entity.async_get_tts_audio(
+            "Hello",
+            "en-US",
+            {
+                tts.ATTR_PREFERRED_FORMAT: "mp3",
+                CONF_NORMALIZE_AUDIO: normalize_option,
+                CONF_TARGET_LOUDNESS: target_option,
+            },
+        )
+
+    assert result == ("mp3", b"processed mp3")
+    normalize.assert_awaited_once_with(source, "mp3", requested_target)
+    assert (
+        client.audio.speech.complete_async.await_args.kwargs["response_format"] == "wav"
+    )
+
+
+async def test_tts_media_source_options_and_cache(
+    hass: HomeAssistant,
+    tts_component: tuple[MockConfigEntry, MagicMock],
+) -> None:
+    """A TTS media-source URL applies string options and separates cache entries."""
+    _entry, client = tts_component
+    source = b"provider audio"
+    client.audio.speech.complete_async.return_value = _speech_stream(
+        base64.b64encode(source).decode()
+    )
+    entity = _entity(hass)
+    with patch.object(
+        entity._normalizer,
+        "async_normalize",
+        new_callable=AsyncMock,
+        return_value=b"processed opus",
+    ) as normalize:
+        original = await tts.async_get_media_source_audio(
+            hass,
+            f"{ENTITY_ID}?message=Cache+isolation&preferred_format=ogg&"
+            "normalize_audio=false&cache=false",
+        )
+        processed_url = (
+            f"{ENTITY_ID}?message=Cache+isolation&preferred_format=ogg&"
+            "normalize_audio=true&target_loudness=-18&cache=false"
+        )
+        processed = await tts.async_get_media_source_audio(hass, processed_url)
+        cached = await tts.async_get_media_source_audio(hass, processed_url)
+        await tts.async_get_media_source_audio(
+            hass, processed_url.replace("target_loudness=-18", "target_loudness=-20")
+        )
+
+    assert original == ("ogg", source)
+    assert processed == cached == ("ogg", b"processed opus")
+    assert normalize.await_count == 2
+    assert [call.args for call in normalize.await_args_list] == [
+        (source, "opus", -18),
+        (source, "opus", -20),
+    ]
+    assert client.audio.speech.complete_async.await_count == 3
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {CONF_NORMALIZE_AUDIO: "false", CONF_TARGET_LOUDNESS: "-18"},
+        {CONF_TARGET_LOUDNESS: "-18"},
+    ],
+)
+async def test_tts_disabled_override_keeps_original_audio(
+    hass: HomeAssistant,
+    tts_component: tuple[MockConfigEntry, MagicMock],
+    options: dict[str, str],
+) -> None:
+    """A target alone or a false string keeps provider bytes untouched."""
+    _entry, client = tts_component
+    source = b"provider bytes"
+    client.audio.speech.complete_async.return_value = _speech_stream(
+        base64.b64encode(source).decode()
+    )
+    entity = _entity(hass)
+    with patch.object(
+        entity._normalizer, "async_normalize", new_callable=AsyncMock
+    ) as normalize:
+        assert await entity.async_get_tts_audio("Hello", "en-US", options) == (
+            "mp3",
+            source,
+        )
+    normalize.assert_not_awaited()
+    assert (
+        client.audio.speech.complete_async.await_args.kwargs["response_format"] == "mp3"
+    )
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {CONF_NORMALIZE_AUDIO: "invalid"},
+        {CONF_TARGET_LOUDNESS: -25},
+        {CONF_TARGET_LOUDNESS: "-16.5"},
+        {CONF_TARGET_LOUDNESS: "nan"},
+        {CONF_TARGET_LOUDNESS: 10**1000},
+    ],
+)
+async def test_tts_rejects_invalid_normalization_options_before_provider_call(
+    hass: HomeAssistant,
+    tts_component: tuple[MockConfigEntry, MagicMock],
+    options: dict[str, object],
+) -> None:
+    """Invalid service or URL options fail locally and never reach Mistral."""
+    _entry, client = tts_component
+    with pytest.raises(HomeAssistantError) as raised:
+        await _entity(hass).async_get_tts_audio("Hello", "en-US", options)
+    assert raised.value.translation_key == "tts_option_invalid"
+    client.audio.speech.complete_async.assert_not_awaited()
+
+
+async def test_tts_processing_failure_is_local(
+    hass: HomeAssistant,
+    tts_component: tuple[MockConfigEntry, MagicMock],
+) -> None:
+    """FFmpeg failures are translated without marking the provider unavailable."""
+    _entry, client = tts_component
+    client.audio.speech.complete_async.return_value = _speech_stream(
+        base64.b64encode(b"source").decode()
+    )
+    entity = _entity(hass)
+    with (
+        patch.object(
+            entity._normalizer,
+            "async_normalize",
+            new_callable=AsyncMock,
+            side_effect=AudioProcessingError("ffmpeg failed"),
+        ),
+        pytest.raises(HomeAssistantError) as raised,
+    ):
+        await entity.async_get_tts_audio("Hello", "en-US", {CONF_NORMALIZE_AUDIO: True})
+    assert raised.value.translation_key == "tts_processing_failed"
+    assert entity.available
 
 
 async def test_tts_provider_error_is_translated(

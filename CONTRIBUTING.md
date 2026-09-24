@@ -12,6 +12,9 @@ python -m pip install --upgrade pip
 python -m pip install --requirement requirements_test.txt
 ```
 
+Install FFmpeg on your test machine and make `ffmpeg` available on `PATH` for
+the speech-normalization tests. CI installs it explicitly.
+
 Run the complete local quality gate before opening a pull request:
 
 ```bash

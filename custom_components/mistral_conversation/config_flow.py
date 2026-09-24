@@ -44,8 +44,10 @@ from mistralai.client.errors import MistralError, NoResponseError
 from .api import async_get_voices, async_validate_api_key
 from .const import (
     CONF_MAX_TOKENS,
+    CONF_NORMALIZE_AUDIO,
     CONF_REASONING_EFFORT,
     CONF_SAFE_PROMPT,
+    CONF_TARGET_LOUDNESS,
     CONF_TEMPERATURE,
     CONF_VOICE_ID,
     DEFAULT_AI_TASK_NAME,
@@ -57,6 +59,7 @@ from .const import (
     DEFAULT_STT_MODEL,
     DEFAULT_STT_NAME,
     DEFAULT_STT_OPTIONS,
+    DEFAULT_TARGET_LOUDNESS,
     DEFAULT_TEMPERATURE,
     DEFAULT_TITLE,
     DEFAULT_TTS_MODEL,
@@ -64,6 +67,8 @@ from .const import (
     DEFAULT_TTS_OPTIONS,
     DOMAIN,
     MAX_CONFIGURED_TOKENS,
+    MAX_TARGET_LOUDNESS,
+    MIN_TARGET_LOUDNESS,
     REALTIME_STT_MODEL,
     REASONING_EFFORT_NONE,
     REASONING_MODEL_DEFAULT,
@@ -74,6 +79,7 @@ from .const import (
     ApiErrorKind,
     MistralModel,
     MistralVoice,
+    validate_target_loudness,
 )
 from .coordinator import MistralConfigEntry
 from .errors import api_error_message, classify_api_error
@@ -159,7 +165,7 @@ class MistralConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Mistral AI Conversation."""
 
     VERSION = 1
-    MINOR_VERSION = 3
+    MINOR_VERSION = 4
 
     @classmethod
     @callback
@@ -608,21 +614,31 @@ class TTSSubentryFlowHandler(ConfigSubentryFlow):
         if entry.state is not ConfigEntryState.LOADED:
             return self.async_abort(reason="entry_not_loaded")
 
+        errors: dict[str, str] = {}
         if user_input is not None:
-            data = user_input.copy()
-            name = data.pop(CONF_NAME)
-            if self._is_new:
-                return self.async_create_entry(title=name, data=data)
-            return self.async_update_and_abort(
-                entry,
-                self._get_reconfigure_subentry(),
-                title=name,
-                data=data,
-            )
+            try:
+                user_input[CONF_TARGET_LOUDNESS] = validate_target_loudness(
+                    user_input[CONF_TARGET_LOUDNESS]
+                )
+            except KeyError, ValueError:
+                errors[CONF_TARGET_LOUDNESS] = "target_loudness_invalid"
+            else:
+                data = user_input.copy()
+                name = data.pop(CONF_NAME)
+                if self._is_new:
+                    return self.async_create_entry(title=name, data=data)
+                return self.async_update_and_abort(
+                    entry,
+                    self._get_reconfigure_subentry(),
+                    title=name,
+                    data=data,
+                )
 
         config_entry = cast(MistralConfigEntry, entry)
         voices = await self._async_get_voices(config_entry)
-        suggested = self.options
+        suggested = (
+            {**self.options, **user_input} if user_input is not None else self.options
+        )
         configured_model = suggested.get(CONF_MODEL, DEFAULT_TTS_MODEL)
         configured_voice = suggested.get(CONF_VOICE_ID)
         subentry_name = (
@@ -675,10 +691,28 @@ class TTSSubentryFlowHandler(ConfigSubentryFlow):
                         sort=True,
                     )
                 ),
+                vol.Required(
+                    CONF_NORMALIZE_AUDIO,
+                    default=suggested.get(CONF_NORMALIZE_AUDIO, self._is_new),
+                ): bool,
+                vol.Required(
+                    CONF_TARGET_LOUDNESS,
+                    default=suggested.get(
+                        CONF_TARGET_LOUDNESS, DEFAULT_TARGET_LOUDNESS
+                    ),
+                ): NumberSelector(
+                    NumberSelectorConfig(
+                        min=MIN_TARGET_LOUDNESS,
+                        max=MAX_TARGET_LOUDNESS,
+                        step=1,
+                        mode=NumberSelectorMode.SLIDER,
+                    )
+                ),
             }
         )
         return self.async_show_form(
             step_id="init",
             data_schema=self.add_suggested_values_to_schema(schema, suggested),
+            errors=errors,
             last_step=True,
         )

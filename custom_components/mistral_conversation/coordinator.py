@@ -15,6 +15,7 @@ from mistralai.client import Mistral
 from mistralai.client.errors import MistralError, NoResponseError
 
 from .api import async_close_client, async_create_client, async_get_models
+from .audio import AudioNormalizer
 from .const import DOMAIN, LOGGER, ApiErrorKind, MistralModel
 from .errors import api_error_message, classify_api_error
 
@@ -41,6 +42,7 @@ class MistralCoordinator(DataUpdateCoordinator[list[MistralModel]]):
             update_method=self.async_update_data,
             always_update=False,
         )
+        self._audio_normalizer: AudioNormalizer | None = None
 
     @property
     def client(self) -> Mistral:
@@ -56,8 +58,16 @@ class MistralCoordinator(DataUpdateCoordinator[list[MistralModel]]):
 
     async def async_close(self) -> None:
         """Close resources created by the coordinator."""
+        if self._audio_normalizer is not None:
+            await self._audio_normalizer.async_close()
         if hasattr(self, "_client"):
             await async_close_client(self.hass, self._client)
+
+    def get_audio_normalizer(self, ffmpeg_binary: str) -> AudioNormalizer:
+        """Return the account-scoped audio processor."""
+        if self._audio_normalizer is None:
+            self._audio_normalizer = AudioNormalizer(ffmpeg_binary)
+        return self._audio_normalizer
 
     @callback
     @override

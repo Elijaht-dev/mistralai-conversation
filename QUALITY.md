@@ -20,6 +20,7 @@ status, Home Assistant review, or a Quality Scale certification.
 | Tools | HA LLM APIs, typed schemas, parallel calls, bounded rounds |
 | Structured data | Native strict Mistral JSON-schema response format |
 | Multimodal | Bounded AI Task and conversation image/PDF attachments |
+| Image generation | Native AI Task image results, independent model, bounded download and best-effort remote cleanup |
 | Voice | Bounded Voxtral transcription and streamed speech generation |
 | Speech loudness | Opt-in per existing TTS entity; local bounded two-pass FFmpeg processing for new entities |
 | Realtime STT | Incremental PCM upload, supervised WebSocket lifecycle, final transcript only |
@@ -80,10 +81,11 @@ drift.
   must be designed in Home Assistant.
 - Speech recordings and text-to-speech input leave Home Assistant for Mistral;
   custom voice creation, consent, and retention remain outside this integration.
-- Realtime STT is an explicit model choice. It sends PCM chunks during Assist's
-  STT stage, uses provider language detection, and returns only a completed final
-  transcript. Home Assistant retains end-of-speech detection. The batch model
-  remains the default, and custom IDs retain their existing batch behavior.
+- Realtime STT is the default for newly created entities. It sends PCM chunks
+  during Assist's STT stage, uses provider language detection, and returns a final
+  transcript. Home Assistant retains end-of-speech detection. Existing entities,
+  legacy configurations with no saved model, and migration-created legacy STT
+  entities retain batch behavior. Custom IDs continue to use the batch API.
 - Realtime opens a separate WebSocket per request using Home Assistant's cached,
   verified TLS context. SDK 2.10.1's connection helper cannot accept that context,
   so a small connection adapter handles the handshake while the official SDK
@@ -96,6 +98,29 @@ drift.
   a different transcription endpoint.
 - TTS is not auto-created during migration because the provider requires an
   explicit preset or saved voice choice.
+- Existing AI Task entities also expose image generation. An optional image-model
+  setting defaults to `mistral-medium-latest` without rewriting saved data or
+  changing data-generation settings. No new config subentry or migration is needed.
+- Image requests use the pinned SDK's asynchronous Conversations and Files APIs
+  through Home Assistant's shared HTTP client. No saved agent is created and
+  `store=False` is explicit. Only the image-generation tool is enabled, with a
+  2,048-token text output limit and no automatic generation retry.
+- Image references reuse the bounded attachment encoder, restricted to supported
+  image types. Known model vision capabilities are checked; custom IDs remain
+  configurable. References provide visual context, not a promise of exact editing.
+- Image downloads are streamed with a 20 MiB limit and validated in the executor.
+  The first image is returned through `GenImageTaskResult`; Home Assistant owns
+  media storage and access. Generation/download share a 300-second deadline.
+  Entity unload cancels active requests before the shared client closes.
+- Remote cleanup attempts deletion of the deduplicated generated file IDs returned
+  by that request, with a separate ten-second deadline. A failed cleanup does not
+  mask the original failure or discard a downloaded image. Neither `store=False`
+  nor best-effort deletion guarantees zero provider retention: files can remain
+  when cleanup fails or the provider response containing their IDs is unavailable.
+  Remote deletion does not remove Home Assistant's local media copy.
+  I verified generated-file deletion against the live API on 2026-09-26:
+  deletion was confirmed and a subsequent download was rejected. The reference
+  request also succeeded; exact editing fidelity remains unverified.
 - New TTS subentries enable local two-pass FFmpeg loudness normalization at
   -16 LUFS; migration keeps existing subentries disabled and preserves their
   model and voice. The whole-number target range is -24 to -12 LUFS. Home
@@ -114,6 +139,25 @@ drift.
   user-facing minimum.
 
 ## Release gate
+
+Before releasing image generation, I must check text-only generation, image
+references, the native Home Assistant media result, and remote file deletion on
+a real instance. Deletion verification must include the API's deletion status
+and a subsequent failed retrieval of the test image. The existing Conversation,
+tool-call, structured AI Task, STT, and TTS smoke tests also remain required.
+
+I checked the image-generation candidate on Home Assistant 2026.9.3
+on 2026-09-26 after backing up the integration and its configuration, validating
+the configuration, and restarting Home Assistant. Installed files matched the
+tested candidate and existing settings were unchanged. Text-only generation,
+a generated-image reference, and both native media downloads succeeded.
+Conversation, a read-only Assist tool round trip, structured AI Task data, batch
+STT, Realtime transcription with cancellation and recovery, and TTS without
+speaker playback also passed. I observed no integration
+warnings, cleanup warnings, or blocking-call warnings. The automated gate passed
+374 tests with 94.03% total coverage and 88.23% branch coverage, Ruff, strict mypy,
+and local HACS validation. Publication also requires successful public HACS and
+Hassfest checks in CI.
 
 The `0.4.0` loudness-normalization candidate was checked on Home Assistant
 2026.9.3 on 2026-09-23 after a backup, configuration validation, and full restart.

@@ -21,6 +21,7 @@ from probatio import to_field_list
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.mistral_conversation.const import (
+    CONF_IMAGE_MODEL,
     CONF_MAX_TOKENS,
     CONF_NORMALIZE_AUDIO,
     CONF_REASONING_EFFORT,
@@ -32,9 +33,10 @@ from custom_components.mistral_conversation.const import (
     DEFAULT_AI_TASK_OPTIONS,
     DEFAULT_CONVERSATION_NAME,
     DEFAULT_CONVERSATION_OPTIONS,
+    DEFAULT_IMAGE_MODEL,
+    DEFAULT_NEW_STT_OPTIONS,
     DEFAULT_STT_MODEL,
     DEFAULT_STT_NAME,
-    DEFAULT_STT_OPTIONS,
     DEFAULT_TARGET_LOUDNESS,
     DEFAULT_TTS_MODEL,
     DOMAIN,
@@ -91,7 +93,7 @@ async def test_user_form_and_create_entry(
         },
         {
             "subentry_type": SUBENTRY_TYPE_STT,
-            "data": DEFAULT_STT_OPTIONS,
+            "data": DEFAULT_NEW_STT_OPTIONS,
             "title": DEFAULT_STT_NAME,
             "unique_id": None,
         },
@@ -402,18 +404,80 @@ async def test_create_ai_task_subentry(
     }
     assert CONF_PROMPT not in schema_keys
     assert CONF_LLM_HASS_API not in schema_keys
+    assert CONF_IMAGE_MODEL in schema_keys
+    image_selector = result["data_schema"].schema[CONF_IMAGE_MODEL]
+    assert image_selector.config["custom_value"]
+    assert any(
+        option["value"] == DEFAULT_IMAGE_MODEL
+        for option in image_selector.config["options"]
+    )
 
     result = await hass.config_entries.subentries.async_configure(
         result["flow_id"],
         {
             CONF_NAME: "Event summary",
             **DEFAULT_AI_TASK_OPTIONS,
+            CONF_IMAGE_MODEL: DEFAULT_IMAGE_MODEL,
         },
     )
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["title"] == "Event summary"
-    assert result["data"] == DEFAULT_AI_TASK_OPTIONS
+    assert result["data"] == {
+        **DEFAULT_AI_TASK_OPTIONS,
+        CONF_IMAGE_MODEL: DEFAULT_IMAGE_MODEL,
+    }
+
+
+async def test_ai_task_custom_image_model_and_legacy_reconfigure(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_init_component: MagicMock,
+) -> None:
+    """A legacy AI Task shows the new default and saves a custom image model."""
+    subentry = next(
+        subentry
+        for subentry in mock_config_entry.subentries.values()
+        if subentry.subentry_type == SUBENTRY_TYPE_AI_TASK
+    )
+    assert dict(subentry.data) == DEFAULT_AI_TASK_OPTIONS
+
+    result = await mock_config_entry.start_subentry_reconfigure_flow(
+        hass, subentry.subentry_id
+    )
+    assert result["type"] is FlowResultType.FORM
+    image_model_field = next(
+        marker
+        for marker in result["data_schema"].schema
+        if getattr(marker, "schema", None) == CONF_IMAGE_MODEL
+    )
+    assert image_model_field.default() == DEFAULT_IMAGE_MODEL
+    assert dict(subentry.data) == DEFAULT_AI_TASK_OPTIONS
+
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        {
+            CONF_NAME: subentry.title,
+            **DEFAULT_AI_TASK_OPTIONS,
+            CONF_IMAGE_MODEL: "ft:custom-image-model",
+        },
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert subentry.data == {
+        **DEFAULT_AI_TASK_OPTIONS,
+        CONF_IMAGE_MODEL: "ft:custom-image-model",
+    }
+
+    result = await mock_config_entry.start_subentry_reconfigure_flow(
+        hass, subentry.subentry_id
+    )
+    image_model_field = next(
+        marker
+        for marker in result["data_schema"].schema
+        if getattr(marker, "schema", None) == CONF_IMAGE_MODEL
+    )
+    assert image_model_field.default() == "ft:custom-image-model"
 
 
 @pytest.mark.parametrize(
@@ -434,6 +498,12 @@ async def test_create_stt_subentry(
     assert DEFAULT_STT_MODEL in selector.config["options"]
     assert REALTIME_STT_MODEL in selector.config["options"]
     assert selector.config["custom_value"]
+    model_field = next(
+        marker
+        for marker in result["data_schema"].schema
+        if getattr(marker, "schema", None) == CONF_MODEL
+    )
+    assert model_field.default() == REALTIME_STT_MODEL
     result = await hass.config_entries.subentries.async_configure(
         result["flow_id"],
         {
@@ -456,12 +526,35 @@ async def test_create_stt_subentry(
     )
     selector = result["data_schema"].schema[CONF_MODEL]
     assert selected_model in selector.config["options"]
+    model_field = next(
+        marker
+        for marker in result["data_schema"].schema
+        if getattr(marker, "schema", None) == CONF_MODEL
+    )
+    assert model_field.default() == selected_model
     result = await hass.config_entries.subentries.async_configure(
         result["flow_id"],
         {CONF_NAME: "Hall microphone", CONF_MODEL: REALTIME_STT_MODEL},
     )
     assert result["reason"] == "reconfigure_successful"
     assert subentry.data[CONF_MODEL] == REALTIME_STT_MODEL
+
+
+async def test_create_stt_subentry_with_default_model(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_init_component: MagicMock,
+) -> None:
+    """An omitted model on a new STT flow persists the Realtime default."""
+    result = await hass.config_entries.subentries.async_init(
+        (mock_config_entry.entry_id, SUBENTRY_TYPE_STT),
+        context={"source": config_entries.SOURCE_USER},
+    )
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"], {CONF_NAME: "Default microphone"}
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"] == {CONF_MODEL: REALTIME_STT_MODEL}
 
 
 async def test_create_and_reconfigure_tts_subentry(

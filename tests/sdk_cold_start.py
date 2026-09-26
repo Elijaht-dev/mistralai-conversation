@@ -62,8 +62,67 @@ async def exercise(api, client, endpoint: str) -> None:
         async with result:
             chunks = [chunk async for chunk in result]
         assert chunks[0].data.audio_data == "dGVzdA=="
+    elif endpoint == "image_start":
+        file_ids = await api.async_start_image_generation(
+            client, "test-model", "Draw a lighthouse", []
+        )
+        assert file_ids == ("test-file",)
+    elif endpoint == "image_download":
+        response = await api.async_download_image_file(client, "test-file")
+        try:
+            assert await response.aread() == b"test-image"
+        finally:
+            await response.aclose()
+    elif endpoint == "image_delete":
+        assert await api.async_delete_generated_file(client, "test-file")
     else:
         raise AssertionError(endpoint)
+
+
+def image_response(httpx, endpoint: str):
+    """Return one mocked SDK response for the image endpoints."""
+    if endpoint == "image_start":
+        return httpx.Response(
+            200,
+            json={
+                "conversation_id": "test-conversation",
+                "outputs": [
+                    {
+                        "type": "message.output",
+                        "content": [
+                            {
+                                "type": "tool_file",
+                                "tool": "image_generation",
+                                "file_id": "test-file",
+                            }
+                        ],
+                    }
+                ],
+                "usage": {},
+            },
+        )
+    if endpoint == "image_download":
+        return httpx.Response(200, content=b"test-image")
+    if endpoint == "image_delete":
+        return httpx.Response(
+            200,
+            json={"id": "test-file", "object": "file", "deleted": True},
+        )
+    raise AssertionError(endpoint)
+
+
+def assert_image_request(endpoint: str, request) -> None:
+    """Assert the SDK used the expected image route and safe request fields."""
+    if endpoint == "image_start":
+        assert request.url.path == "/v1/conversations"
+        body = json.loads(request.content)
+        assert body["model"] == "test-model"
+        assert body["store"] is False
+        assert body["tools"] == [{"type": "image_generation"}]
+    elif endpoint == "image_download":
+        assert request.url.path == "/v1/files/test-file/content"
+    elif endpoint == "image_delete":
+        assert request.url.path == "/v1/files/test-file"
 
 
 async def main() -> None:
@@ -161,7 +220,11 @@ async def main() -> None:
                     "total_pages": 1,
                 },
             )
-        return httpx.Response(200, json={"object": "list", "data": []})
+        return (
+            image_response(httpx, endpoint)
+            if endpoint.startswith("image_")
+            else httpx.Response(200, json={"object": "list", "data": []})
+        )
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as transport:
         api.get_async_client = lambda hass: transport
@@ -184,6 +247,8 @@ async def main() -> None:
         assert sync_transport.is_closed
         assert not transport.is_closed
         assert len(requests) == (0 if endpoint == "realtime" else 1)
+        if endpoint.startswith("image_"):
+            assert_image_request(endpoint, requests[0])
     await hass.async_stop()
     assert not detections.calls, detections.calls
 

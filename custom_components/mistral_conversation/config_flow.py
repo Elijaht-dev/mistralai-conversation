@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from typing import Any, cast, override
 
 import httpx
@@ -43,6 +44,7 @@ from mistralai.client.errors import MistralError, NoResponseError
 
 from .api import async_get_voices, async_validate_api_key
 from .const import (
+    CONF_IMAGE_MODEL,
     CONF_MAX_TOKENS,
     CONF_NORMALIZE_AUDIO,
     CONF_REASONING_EFFORT,
@@ -54,11 +56,12 @@ from .const import (
     DEFAULT_AI_TASK_OPTIONS,
     DEFAULT_CONVERSATION_NAME,
     DEFAULT_CONVERSATION_OPTIONS,
+    DEFAULT_IMAGE_MODEL,
     DEFAULT_MAX_TOKENS,
     DEFAULT_MODEL,
+    DEFAULT_NEW_STT_OPTIONS,
     DEFAULT_STT_MODEL,
     DEFAULT_STT_NAME,
-    DEFAULT_STT_OPTIONS,
     DEFAULT_TARGET_LOUDNESS,
     DEFAULT_TEMPERATURE,
     DEFAULT_TITLE,
@@ -161,6 +164,39 @@ def _reasoning_selector(
     )
 
 
+def _image_model_selector(
+    model_options: list[SelectOptionDict], suggested: dict[str, Any]
+) -> tuple[SelectSelector, str]:
+    """Offer discovered chat models and the saved or default image model."""
+    configured_model = cast(str, suggested.get(CONF_IMAGE_MODEL, DEFAULT_IMAGE_MODEL))
+    options = list(model_options)
+    if configured_model not in {option["value"] for option in options}:
+        options.append(SelectOptionDict(value=configured_model, label=configured_model))
+    return (
+        SelectSelector(
+            SelectSelectorConfig(
+                options=options,
+                custom_value=True,
+                mode=SelectSelectorMode.DROPDOWN,
+                sort=True,
+            )
+        ),
+        configured_model,
+    )
+
+
+def _chat_model_options(
+    discovered: Iterable[MistralModel], configured_model: str
+) -> list[SelectOptionDict]:
+    """Include the selected model even when discovery no longer lists it."""
+    options = [
+        SelectOptionDict(value=model.id, label=model.label) for model in discovered
+    ]
+    if configured_model not in {option["value"] for option in options}:
+        options.append(SelectOptionDict(value=configured_model, label=configured_model))
+    return options
+
+
 class MistralConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Mistral AI Conversation."""
 
@@ -222,7 +258,7 @@ class MistralConfigFlow(ConfigFlow, domain=DOMAIN):
                         },
                         {
                             "subentry_type": SUBENTRY_TYPE_STT,
-                            "data": DEFAULT_STT_OPTIONS,
+                            "data": DEFAULT_NEW_STT_OPTIONS,
                             "title": DEFAULT_STT_NAME,
                             "unique_id": None,
                         },
@@ -357,15 +393,7 @@ class ConversationSubentryFlowHandler(ConfigSubentryFlow):
             self.options = suggested
 
         configured_model = suggested.get(CONF_MODEL, DEFAULT_MODEL)
-        model_options = [
-            SelectOptionDict(value=model.id, label=model.label)
-            for model in coordinator.data or []
-        ]
-        known_model_ids = {model["value"] for model in model_options}
-        if configured_model not in known_model_ids:
-            model_options.append(
-                SelectOptionDict(value=configured_model, label=configured_model)
-            )
+        model_options = _chat_model_options(coordinator.data or [], configured_model)
 
         default_name = (
             DEFAULT_AI_TASK_NAME
@@ -432,6 +460,13 @@ class ConversationSubentryFlowHandler(ConfigSubentryFlow):
                     ),
                 }
             )
+        else:
+            image_selector, image_default = _image_model_selector(
+                model_options, suggested
+            )
+            schema_fields[vol.Required(CONF_IMAGE_MODEL, default=image_default)] = (
+                image_selector
+            )
         schema_fields.update(
             {
                 vol.Required(
@@ -493,7 +528,7 @@ class STTSubentryFlowHandler(ConfigSubentryFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
         """Create a speech-to-text entity."""
-        self.options = DEFAULT_STT_OPTIONS.copy()
+        self.options = DEFAULT_NEW_STT_OPTIONS.copy()
         return await self.async_step_init(user_input)
 
     async def async_step_reconfigure(
@@ -516,6 +551,7 @@ class STTSubentryFlowHandler(ConfigSubentryFlow):
             data = user_input.copy()
             name = data.pop(CONF_NAME)
             if self._is_new:
+                data.setdefault(CONF_MODEL, REALTIME_STT_MODEL)
                 return self.async_create_entry(title=name, data=data)
             return self.async_update_and_abort(
                 entry,

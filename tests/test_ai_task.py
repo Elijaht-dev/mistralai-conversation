@@ -53,6 +53,7 @@ async def test_generate_unstructured_data(
         entity_entry.supported_features
         == ai_task.AITaskEntityFeature.GENERATE_DATA
         | ai_task.AITaskEntityFeature.SUPPORT_ATTACHMENTS
+        | ai_task.AITaskEntityFeature.GENERATE_IMAGE
     )
 
 

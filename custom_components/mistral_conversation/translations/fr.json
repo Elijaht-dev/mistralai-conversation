@@ -55,22 +55,24 @@
       "step": {
         "init": {
           "data": {
+            "image_model": "Modèle pour la génération d’images",
             "max_tokens": "Nombre maximal de jetons de réponse",
-            "model": "Modèle",
+            "model": "Modèle pour la génération de données",
             "name": "Nom",
             "reasoning_effort": "Raisonnement",
             "safe_prompt": "Activer le message de sécurité Mistral",
             "temperature": "Température"
           },
           "data_description": {
-            "max_tokens": "Nombre maximal de jetons que Mistral peut générer. L'entrée et la sortie doivent tenir ensemble dans la fenêtre de contexte du modèle.",
-            "model": "Sélectionnez un modèle proposé pour votre compte, ou saisissez l'identifiant d'un modèle personnalisé ou affiné.",
+            "image_model": "Choisissez un modèle pour générer des images ou saisissez un identifiant personnalisé. Ce réglage est indépendant du modèle de génération de données.",
+            "max_tokens": "Nombre maximal de jetons que Mistral peut générer pour les tâches de données. L'entrée et la sortie doivent tenir ensemble dans la fenêtre de contexte du modèle.",
+            "model": "Choisissez un modèle pour générer des données ou saisissez l'identifiant d'un modèle personnalisé ou affiné.",
             "name": "Nom affiché pour cette entité de tâche IA dans Home Assistant.",
-            "reasoning_effort": "Automatique utilise le réglage du fournisseur. Les modèles au raisonnement fixe appliquent leur seul comportement possible à l’enregistrement.",
-            "safe_prompt": "Demander à Mistral d'ajouter son message de sécurité avant la tâche.",
-            "temperature": "Une valeur faible donne des réponses plus prévisibles ; une valeur élevée les rend plus variées."
+            "reasoning_effort": "Pour les tâches de données uniquement. Automatique utilise le réglage du fournisseur. Les modèles au raisonnement fixe appliquent leur seul comportement possible à l’enregistrement.",
+            "safe_prompt": "Pour les tâches de données uniquement. Demander à Mistral d'ajouter son message de sécurité avant la tâche.",
+            "temperature": "Pour les tâches de données uniquement. Une valeur faible donne des réponses plus prévisibles ; une valeur élevée les rend plus variées."
           },
-          "description": "Configurez Mistral pour la génération de données avec les tâches IA de Home Assistant. Des images et des documents PDF peuvent être joints aux modèles compatibles.",
+          "description": "Configurez Mistral pour générer des données et des images avec les tâches IA de Home Assistant. Les tâches de données acceptent les images et PDF sur les modèles compatibles. Les tâches d’images acceptent des images de référence.",
           "title": "Tâche IA Mistral"
         }
       }
@@ -137,7 +139,7 @@
             "name": "Nom"
           },
           "data_description": {
-            "model": "Voxtral Mini Transcribe 2 est le modèle par défaut. Choisissez voxtral-mini-transcribe-realtime-2602 pour envoyer l'audio pendant la parole, avec détection automatique de la langue. Les autres identifiants personnalisés utilisent la transcription par lot.",
+            "model": "Les nouvelles entités utilisent voxtral-mini-transcribe-realtime-2602 par défaut pour envoyer l'audio pendant la parole, avec détection automatique de la langue. Choisissez voxtral-mini-latest pour la transcription par lot. Les autres identifiants personnalisés utilisent aussi la transcription par lot.",
             "name": "Nom affiché pour cette entité de reconnaissance vocale dans Home Assistant."
           },
           "description": "Configurez la transcription Mistral pour Assist. L'audio vocal est envoyé à Mistral AI, pendant la parole avec Realtime. Assist reçoit la transcription finale à la fin de la phrase.",
@@ -225,6 +227,21 @@
     },
     "empty_response": {
       "message": "Mistral AI a renvoyé une réponse vide."
+    },
+    "image_attachment_unsupported": {
+      "message": "Les images de référence pour la génération doivent être au format PNG, JPEG, GIF ou WebP."
+    },
+    "image_generation_error": {
+      "message": "Mistral AI n’a pas pu générer d’image."
+    },
+    "image_response_invalid": {
+      "message": "Mistral AI a renvoyé une image invalide ou dans un format non pris en charge."
+    },
+    "image_response_not_found": {
+      "message": "Mistral AI n’a pas renvoyé d’image générée."
+    },
+    "image_response_too_large": {
+      "message": "L’image générée dépasse la taille maximale prise en charge de 20 Mo."
     },
     "invalid_repair_data": {
       "message": "La réparation du modèle ne contient pas de compte, d'entité configurée et de remplacement valides."

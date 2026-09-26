@@ -21,6 +21,8 @@ DEFAULT_AI_TASK_NAME: Final = "Mistral AI task"
 DEFAULT_STT_NAME: Final = "Mistral speech-to-text"
 DEFAULT_TTS_NAME: Final = "Mistral text-to-speech"
 DEFAULT_MODEL: Final = "mistral-small-latest"
+DEFAULT_IMAGE_MODEL: Final = "mistral-medium-latest"
+# Keep this fallback for saved STT subentries without a model and legacy migrations.
 DEFAULT_STT_MODEL: Final = "voxtral-mini-latest"
 REALTIME_STT_MODEL: Final = "voxtral-mini-transcribe-realtime-2602"
 DEFAULT_TTS_MODEL: Final = "voxtral-mini-tts-2603"
@@ -31,6 +33,7 @@ SUBENTRY_TYPE_STT: Final = "stt"
 SUBENTRY_TYPE_TTS: Final = "tts"
 
 CONF_MAX_TOKENS: Final = "max_tokens"
+CONF_IMAGE_MODEL: Final = "image_model"
 CONF_REASONING_EFFORT: Final = "reasoning_effort"
 CONF_SAFE_PROMPT: Final = "safe_prompt"
 CONF_TEMPERATURE: Final = "temperature"
@@ -90,6 +93,9 @@ DEFAULT_AI_TASK_OPTIONS = {
 DEFAULT_STT_OPTIONS = {
     CONF_MODEL: DEFAULT_STT_MODEL,
 }
+DEFAULT_NEW_STT_OPTIONS = {
+    CONF_MODEL: REALTIME_STT_MODEL,
+}
 
 DEFAULT_TTS_OPTIONS = {
     CONF_MODEL: DEFAULT_TTS_MODEL,
@@ -119,6 +125,9 @@ def validate_target_loudness(value: object) -> int:
 
 
 MAX_ATTACHMENT_BYTES: Final = 20 * 1024 * 1024
+MAX_GENERATED_IMAGE_BYTES: Final = 20 * 1024 * 1024
+IMAGE_CLEANUP_TIMEOUT: Final = 10
+IMAGE_MAX_TOKENS: Final = 2048
 MAX_ATTACHMENTS: Final = 10
 MAX_STT_AUDIO_BYTES: Final = 25 * 1024 * 1024
 MAX_TTS_AUDIO_BYTES: Final = 25 * 1024 * 1024

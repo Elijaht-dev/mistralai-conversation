@@ -19,7 +19,10 @@ from mistralai.client import Mistral, errors, models, utils
 
 # Load lazy SDK services through HA's integration import executor, before setup.
 from mistralai.client.audio import Audio  # noqa: F401
+from mistralai.client.beta import Beta  # noqa: F401
 from mistralai.client.chat import Chat  # noqa: F401
+from mistralai.client.conversations import Conversations  # noqa: F401
+from mistralai.client.files import Files  # noqa: F401
 from mistralai.client.models import BaseModelCard, FTModelCard
 from mistralai.client.models_ import Models  # noqa: F401
 from mistralai.extra.exceptions import RealtimeTranscriptionException
@@ -32,6 +35,7 @@ from websockets.asyncio.client import connect as websocket_connect
 from websockets.exceptions import InvalidStatus, WebSocketException
 
 from .const import (
+    IMAGE_MAX_TOKENS,
     LOGGER,
     MAX_STT_AUDIO_BYTES,
     MAX_VOICES,
@@ -75,6 +79,20 @@ for _name in (
     "RealtimeTranscriptionError",
     "RealtimeTranscriptionSessionCreated",
     "TranscriptionStreamDone",
+    "CompletionArgs",
+    "ConversationResponse",
+    "MessageInputEntry",
+    "MessageOutputEntry",
+    "TextChunk",
+    "ImageURLChunk",
+    "ImageGenerationTool",
+    "ToolFileChunk",
+    "DeleteFileResponse",
+    "ConversationInputs",
+    "ConversationRequest",
+    "ConversationRequestTool",
+    "FilesAPIRoutesDownloadFileRequest",
+    "FilesAPIRoutesDeleteFileRequest",
 ):
     setattr(models, _name, getattr(models, _name))
 for _module in (errors, utils):
@@ -113,7 +131,13 @@ def _create_client(api_key: str, http_client: httpx.AsyncClient) -> Mistral:
     try:
         # Mistral also creates a sync HTTP client and lazily initializes services.
         # Do both here, including the audio service's speech/transcription/voices.
-        _ = client.models, client.chat, client.audio.realtime
+        _ = (
+            client.models,
+            client.chat,
+            client.audio.realtime,
+            client.beta.conversations,
+            client.files,
+        )
         # Populate HA's cached, verified TLS context in this executor as well.
         get_default_context()
     except BaseException:
@@ -386,6 +410,65 @@ async def async_get_voices(client: Mistral) -> list[MistralVoice]:
             break
 
     return sorted(voices, key=lambda voice: (voice.name.casefold(), voice.id))
+
+
+async def async_start_image_generation(
+    client: Mistral, model: str, prompt: str, image_urls: list[str]
+) -> tuple[str, ...]:
+    """Start one image-tool conversation and return its unique generated files."""
+    content: list[models.MessageInputContentChunks] = [models.TextChunk(text=prompt)]
+    content.extend(models.ImageURLChunk(image_url=url) for url in image_urls)
+    inputs: list[models.InputEntries] = [
+        models.MessageInputEntry(role="user", content=content)
+    ]
+    response = await client.beta.conversations.start_async(
+        inputs=inputs,
+        instructions=(
+            "Generate exactly one image with the image_generation tool from the "
+            "user's request. Use supplied images as visual references."
+        ),
+        model=model,
+        tools=[models.ImageGenerationTool()],
+        completion_args=models.CompletionArgs(max_tokens=IMAGE_MAX_TOKENS),
+        store=False,
+        retries=None,
+        timeout_ms=REQUEST_TIMEOUT_MS,
+    )
+
+    file_ids: list[str] = []
+    seen: set[str] = set()
+    for output in response.outputs:
+        if not isinstance(output, models.MessageOutputEntry) or not isinstance(
+            output.content, list
+        ):
+            continue
+        for chunk in output.content:
+            if (
+                isinstance(chunk, models.ToolFileChunk)
+                and chunk.tool == "image_generation"
+                and chunk.file_id
+                and chunk.file_id not in seen
+            ):
+                seen.add(chunk.file_id)
+                file_ids.append(chunk.file_id)
+    return tuple(file_ids)
+
+
+async def async_download_image_file(client: Mistral, file_id: str) -> httpx.Response:
+    """Open a streaming response for one generated image file."""
+    return await client.files.download_async(
+        file_id=file_id,
+        http_headers={"Accept-Encoding": "identity"},
+        timeout_ms=REQUEST_TIMEOUT_MS,
+    )
+
+
+async def async_delete_generated_file(client: Mistral, file_id: str) -> bool:
+    """Attempt provider deletion and report its explicit confirmation."""
+    response = await client.files.delete_async(
+        file_id=file_id, timeout_ms=SETUP_TIMEOUT_MS
+    )
+    return response.deleted and response.id == file_id
 
 
 async def async_validate_api_key(

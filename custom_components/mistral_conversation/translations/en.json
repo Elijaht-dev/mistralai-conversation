@@ -55,22 +55,24 @@
       "step": {
         "init": {
           "data": {
+            "image_model": "Model for image generation",
             "max_tokens": "Maximum response tokens",
-            "model": "Model",
+            "model": "Model for data generation",
             "name": "Name",
             "reasoning_effort": "Reasoning",
             "safe_prompt": "Enable Mistral safety prompt",
             "temperature": "Temperature"
           },
           "data_description": {
-            "max_tokens": "Maximum tokens Mistral may generate. Input and output together must fit within the model's context window.",
-            "model": "Select a model returned by your account, or enter a custom or fine-tuned model ID.",
+            "image_model": "Choose a model for image generation or enter a custom model ID. This setting is independent of the data-generation model.",
+            "max_tokens": "Maximum tokens Mistral may generate for data tasks. Input and output together must fit within the model's context window.",
+            "model": "Choose a model for data generation or enter a custom or fine-tuned model ID.",
             "name": "Name shown for this AI Task entity in Home Assistant.",
-            "reasoning_effort": "Automatic uses the provider's default. Models with fixed reasoning apply their only supported behavior when saved.",
-            "safe_prompt": "Ask Mistral to inject its safety prompt before the task.",
-            "temperature": "Lower values are more predictable; higher values are more varied."
+            "reasoning_effort": "For data tasks only. Automatic uses the provider's default. Models with fixed reasoning apply their only supported behavior when saved.",
+            "safe_prompt": "For data tasks only. Ask Mistral to inject its safety prompt before the task.",
+            "temperature": "For data tasks only. Lower values are more predictable; higher values are more varied."
           },
-          "description": "Configure Mistral for Home Assistant AI Task data generation. Images and PDF documents can be attached to supported models.",
+          "description": "Configure Mistral for Home Assistant AI Task data and image generation. Data tasks can receive image and PDF attachments on compatible models. Image tasks can receive image references.",
           "title": "Mistral AI Task"
         }
       }
@@ -137,7 +139,7 @@
             "name": "Name"
           },
           "data_description": {
-            "model": "Voxtral Mini Transcribe 2 is the default. Select voxtral-mini-transcribe-realtime-2602 to send audio during speech, with automatic language detection. Other custom IDs use batch transcription.",
+            "model": "New entities use voxtral-mini-transcribe-realtime-2602 by default to send audio during speech with automatic language detection. Select voxtral-mini-latest for batch transcription. Other custom IDs also use batch transcription.",
             "name": "Name shown for this speech-to-text entity in Home Assistant."
           },
           "description": "Configure Mistral transcription for Assist. Voice audio is sent to Mistral AI, during speech when using Realtime. Assist receives the final transcript when speech ends.",
@@ -225,6 +227,21 @@
     },
     "empty_response": {
       "message": "Mistral AI returned an empty response."
+    },
+    "image_attachment_unsupported": {
+      "message": "Image generation references must be PNG, JPEG, GIF, or WebP images."
+    },
+    "image_generation_error": {
+      "message": "Mistral AI could not generate an image."
+    },
+    "image_response_invalid": {
+      "message": "Mistral AI returned an invalid or unsupported image."
+    },
+    "image_response_not_found": {
+      "message": "Mistral AI did not return a generated image."
+    },
+    "image_response_too_large": {
+      "message": "The generated image exceeds the supported maximum of 20 MB."
     },
     "invalid_repair_data": {
       "message": "The model repair does not contain a valid account, configured entity, and replacement."

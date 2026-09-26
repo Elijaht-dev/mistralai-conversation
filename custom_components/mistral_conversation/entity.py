@@ -393,6 +393,8 @@ def _attachment_kind(path: Path, mime_type: str | None) -> str | None:
 async def async_prepare_attachments(
     hass: HomeAssistant,
     attachments: list[tuple[Path, str | None]],
+    *,
+    images_only: bool = False,
 ) -> list[MistralAttachmentChunk]:
     """Validate and encode image and PDF attachments for Mistral."""
     if len(attachments) > MAX_ATTACHMENTS:
@@ -415,6 +417,11 @@ async def async_prepare_attachments(
 
             mime_type = _normalize_mime_type(file_path, supplied_mime_type)
             kind = _attachment_kind(file_path, mime_type)
+            if images_only and kind != "image":
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="image_attachment_unsupported",
+                )
             if kind is None or mime_type is None:
                 raise HomeAssistantError(
                     translation_domain=DOMAIN,
@@ -436,7 +443,18 @@ async def async_prepare_attachments(
                     },
                 )
 
-            encoded = base64.b64encode(file_path.read_bytes()).decode("ascii")
+            with file_path.open("rb") as attachment_file:
+                content = attachment_file.read(MAX_ATTACHMENT_BYTES + 1)
+            if len(content) > MAX_ATTACHMENT_BYTES:
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="attachment_too_large",
+                    translation_placeholders={
+                        "filename": file_path.name,
+                        "maximum_mb": str(MAX_ATTACHMENT_BYTES // 1024 // 1024),
+                    },
+                )
+            encoded = base64.b64encode(content).decode("ascii")
             data_url = f"data:{mime_type};base64,{encoded}"
             if kind == "image":
                 prepared.append(ImageURLChunk(image_url=data_url))
@@ -451,6 +469,20 @@ async def async_prepare_attachments(
         return prepared
 
     return await hass.async_add_executor_job(prepare)
+
+
+async def async_prepare_image_attachments(
+    hass: HomeAssistant,
+    attachments: list[tuple[Path, str | None]],
+) -> list[str]:
+    """Return image-only data URLs while keeping SDK types at this boundary."""
+    chunks = await async_prepare_attachments(hass, attachments, images_only=True)
+    # The encoder above constructs every image_url directly from a string.
+    return [
+        cast(str, chunk.image_url)
+        for chunk in chunks
+        if isinstance(chunk, ImageURLChunk)
+    ]
 
 
 def _has_meaningful_content(contents: Sequence[conversation.Content]) -> bool:

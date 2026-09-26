@@ -7,6 +7,38 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-26
+
+### Added
+
+- Add `ai_task.generate_image` to existing AI Task entities with an independent
+  image model, defaulting to `mistral-medium-latest`, and optional image references.
+  Home Assistant stores and exposes the result through its native media response.
+- Bound generated image downloads to 20 MiB and generation/download to 300 seconds.
+  Attempt cleanup of returned Mistral-generated files within a separate ten-second
+  deadline, without discarding a retrieved image if cleanup fails.
+
+### Changed
+
+- Default new STT entities to `voxtral-mini-transcribe-realtime-2602` for streamed
+  Assist transcription. I kept existing selections, implicit legacy batch
+  defaults, and migration-created legacy entities unchanged. Batch transcription
+  remains selectable.
+
+### Validation
+
+- I tested text-only generation, an image reference, native media downloads, and
+  the existing Conversation, Assist tool, structured AI Task, batch STT, and TTS
+  paths on Home Assistant 2026.9.3 on 2026-09-26. I also verified that a new STT
+  form selects Realtime by default, then tested Realtime transcription,
+  cancellation, and recovery. Existing settings were preserved.
+- I confirmed deletion of a generated file through Mistral's live API and checked
+  that it could no longer be downloaded. Exact image-editing fidelity and zero
+  provider retention are not guaranteed.
+- The local gate passes 374 tests with 94.03% total coverage and 88.23% branch
+  coverage, Ruff, strict mypy, and HACS structure validation. Official HACS and
+  Hassfest checks are also required before publication.
+
 ## [0.4.0] - 2026-09-24
 
 ### Added
@@ -266,7 +298,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - English and French translations.
 - Ruff, strict mypy, pytest coverage, HACS, Hassfest, and Dependabot automation.
 
-[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.2.3...v0.3.0

@@ -20,6 +20,7 @@ endorsed by Home Assistant or Mistral AI.
 - UI configuration, API-key validation, and reauthentication
 - Multiple independently configured conversation agents per Mistral account
 - Home Assistant AI Task data generation with native Mistral JSON-schema output
+- Home Assistant AI Task image generation from instructions and optional image references
 - AI Task image and PDF attachments on compatible multimodal models
 - Voxtral batch and Realtime speech-to-text for Home Assistant Assist voice pipelines
 - Streaming Voxtral text-to-speech with preset and saved custom Mistral voices
@@ -147,20 +148,62 @@ The default AI Task entity uses the same chat-model controls as Conversation,
 without a conversation prompt or a fixed Home Assistant tool selection. It
 supports unstructured text and schema-constrained data through Mistral's native
 JSON-schema response format. Compatible models can also receive Home Assistant
-image and PDF attachments. Mistral image generation is not currently exposed.
+image and PDF attachments.
+
+The same entity also supports `ai_task.generate_image`. **Image generation
+model** is independent of the data model and defaults to `mistral-medium-latest`.
+It accepts a discovered or custom model ID. Existing entities use this default
+without changing their saved data settings. The other AI Task controls apply to
+data generation; image requests use provider defaults and a 2,048-token text
+output limit.
+
+```yaml
+action: ai_task.generate_image
+data:
+  entity_id: ai_task.mistral_ai_task
+  task_name: landscape
+  instructions: "Generate an illustration of a mountain lake at sunrise."
+response_variable: generated_image
+```
+
+Home Assistant stores the image in its AI Task media directory and returns its
+standard result, including `media_source_id` and a signed `url`. Home Assistant
+must have a media directory configured. Its media storage and access behavior
+are managed by Home Assistant, not by this integration.
+
+The action also accepts Home Assistant image attachments as visual context.
+Reference images require a vision-capable model when its capabilities are known.
+PNG, JPEG, GIF, and WebP references retain the ten-file and 20 MiB-per-file
+limits; PDF references are not accepted for image generation. Reference context
+does not guarantee faithful image editing or preservation of the original.
+
+Image generation uses Mistral's Conversations API with only the `image_generation`
+tool enabled. It does not create a saved Mistral agent. One action returns the
+first generated image; an answer containing only text is an error and is not
+automatically retried. Generated images are limited to 20 MiB and checked locally
+before being returned. Generation and download share a 300-second deadline.
+
+After the request, the integration attempts to delete the generated Mistral files
+whose identifiers it received, including unused additional images. Cleanup has a
+separate ten-second deadline. A cleanup failure produces a warning and does not
+discard an image already retrieved. I verified deletion of a generated image
+against Mistral's live API on 2026-09-26: deletion was confirmed and a subsequent
+download was rejected. This does not establish zero provider retention.
+Deleting the provider file does not delete Home Assistant's local media copy:
+that copy remains available through the returned `media_source_id` and can be
+kept locally or copied to another local folder.
 
 ### Speech-to-text
 
-Speech-to-text defaults to `voxtral-mini-latest`. It accepts the conservative
-Assist format of mono, 16-bit, 16 kHz PCM audio, adds the WAV container expected
-by the batch transcription API, and forwards the pipeline language to Mistral.
-The input is bounded locally before upload.
+New speech-to-text entities default to `voxtral-mini-transcribe-realtime-2602`.
+It transcribes audio as Assist receives it through Mistral's WebSocket API, using
+mono, 16-bit, 16 kHz PCM without buffering the complete recording. Audio starts
+leaving Home Assistant during the STT stage. Existing entities keep their model,
+including older configurations that used the implicit batch default.
 
-Select `voxtral-mini-transcribe-realtime-2602` to transcribe audio as Assist
-receives it. This option uses Mistral's WebSocket API with the same PCM format,
-without buffering the complete recording. Audio starts leaving Home Assistant
-during the STT stage. The default model and existing configurations stay unchanged;
-other custom model IDs continue to use the batch transcription API.
+Select `voxtral-mini-latest` for batch transcription. It adds the WAV container
+expected by the batch API and forwards the pipeline language to Mistral. Other
+custom model IDs continue to use the batch API. Both paths bound audio input.
 
 Realtime uses automatic language detection and the provider's default streaming
 delay. Assist still determines when the utterance ends and receives one final
@@ -223,6 +266,13 @@ Assistant's TTS cache. API use may incur charges. API keys are stored in Home
 Assistant's config-entry storage and are redacted from diagnostics. The
 integration does not log prompt, attachment, recording, transcript, or generated
 audio content in its request trace.
+
+Image-generation instructions and reference images also leave Home Assistant
+for Mistral. Image requests explicitly use `store=False` for conversation history;
+this is not a guarantee of zero provider retention. Generated files may remain
+at Mistral if deletion fails or a timeout/cancellation prevents their identifiers
+from reaching Home Assistant. The integration does not log generated image
+content or file identifiers. Home Assistant retains its own generated image files.
 
 When a Home Assistant API is selected, the model can call its exposed tools.
 Review the entities exposed to the voice assistant before enabling control,

@@ -6,11 +6,12 @@ import asyncio
 import io
 import wave
 from collections.abc import AsyncIterable
-from types import SimpleNamespace
+from types import MappingProxyType, SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from homeassistant.components import stt
+from homeassistant.config_entries import ConfigSubentry
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -18,7 +19,9 @@ from custom_components.mistral_conversation.const import (
     DEFAULT_STT_MODEL,
     REALTIME_STT_MODEL,
     REQUEST_TIMEOUT_MS,
+    SUBENTRY_TYPE_STT,
 )
+from custom_components.mistral_conversation.stt import MistralSTTEntity
 
 from .helpers import mistral_error
 from .test_realtime import Socket, connection
@@ -61,6 +64,21 @@ async def test_stt_properties(
     assert entity.supported_bit_rates == [stt.AudioBitRates.BITRATE_16]
     assert entity.supported_sample_rates == [stt.AudioSampleRates.SAMPLERATE_16000]
     assert entity.supported_channels == [stt.AudioChannels.CHANNEL_MONO]
+
+
+async def test_legacy_stt_without_model_keeps_batch_fallback(
+    mock_config_entry: MockConfigEntry,
+    mock_init_component: MagicMock,
+) -> None:
+    """An old saved STT entry without a model still chooses batch transport."""
+    legacy_subentry = ConfigSubentry(
+        data=MappingProxyType({}),
+        subentry_type=SUBENTRY_TYPE_STT,
+        title="Legacy speech-to-text",
+        unique_id=None,
+    )
+    entity = MistralSTTEntity(mock_config_entry, legacy_subentry)
+    assert entity.model == DEFAULT_STT_MODEL
 
 
 async def test_stt_transcribes_wav_with_metadata_language(

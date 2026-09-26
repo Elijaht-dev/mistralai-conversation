@@ -8,7 +8,18 @@ import pytest
 
 
 @pytest.mark.parametrize(
-    "endpoint", ["models", "chat", "voices", "stt", "tts", "realtime"]
+    "endpoint",
+    [
+        "models",
+        "chat",
+        "voices",
+        "stt",
+        "tts",
+        "realtime",
+        "image_start",
+        "image_download",
+        "image_delete",
+    ],
 )
 @pytest.mark.parametrize("status", [200, 422])
 async def test_first_sdk_request_does_not_block(endpoint: str, status: int) -> None:

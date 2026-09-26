@@ -1,4 +1,4 @@
-hassil==3.12.0
+hassil==3.12.1
 ha-ffmpeg==3.2.2
 gazetteer-matcher==1.2.0
 home-assistant-intents==2026.8.28

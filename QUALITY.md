@@ -101,6 +101,8 @@ drift.
 - Existing AI Task entities also expose image generation. An optional image-model
   setting defaults to `mistral-medium-latest` without rewriting saved data or
   changing data-generation settings. No new config subentry or migration is needed.
+  This selects the Mistral model calling the image tool, not the underlying
+  image generator managed by the provider.
 - Image requests use the pinned SDK's asynchronous Conversations and Files APIs
   through Home Assistant's shared HTTP client. No saved agent is created and
   `store=False` is explicit. Only the image-generation tool is enabled, with a
@@ -135,10 +137,16 @@ drift.
   and reap subprocesses. Local failures are translated without changing
   provider availability or silently returning unprocessed audio.
 - Compatibility is declared from Home Assistant 2026.7.4. Automated tests use
-  the newer Home Assistant 2026.9.2 development baseline without raising the
+  the newer Home Assistant 2026.9.3 development baseline without raising the
   user-facing minimum.
 
 ## Release gate
+
+Version `0.5.1` clarifies the image-tool model setting and updates test dependencies.
+I validated it locally with 376 passing tests, 94.04% total coverage and 88.23%
+branch coverage, Ruff, strict mypy, and HACS structure validation. I skipped the
+real-instance smoke test for this maintenance release. The Mistral SDK and runtime
+request behavior are unchanged; public HACS and Hassfest checks remain release gates.
 
 Before releasing image generation, I must check text-only generation, image
 references, the native Home Assistant media result, and remote file deletion on

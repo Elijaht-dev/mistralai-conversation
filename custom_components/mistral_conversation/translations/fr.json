@@ -55,7 +55,7 @@
       "step": {
         "init": {
           "data": {
-            "image_model": "Modèle pour la génération d’images",
+            "image_model": "Modèle pilotant l’outil de génération d’images",
             "max_tokens": "Nombre maximal de jetons de réponse",
             "model": "Modèle pour la génération de données",
             "name": "Nom",
@@ -64,7 +64,7 @@
             "temperature": "Température"
           },
           "data_description": {
-            "image_model": "Choisissez un modèle pour générer des images ou saisissez un identifiant personnalisé. Ce réglage est indépendant du modèle de génération de données.",
+            "image_model": "Choisissez le modèle Mistral qui interprète vos instructions et références, puis appelle l’outil de génération d’images. Ce réglage ne sélectionne pas le moteur qui produit l’image. Il est indépendant du modèle de génération de données et accepte les identifiants personnalisés.",
             "max_tokens": "Nombre maximal de jetons que Mistral peut générer pour les tâches de données. L'entrée et la sortie doivent tenir ensemble dans la fenêtre de contexte du modèle.",
             "model": "Choisissez un modèle pour générer des données ou saisissez l'identifiant d'un modèle personnalisé ou affiné.",
             "name": "Nom affiché pour cette entité de tâche IA dans Home Assistant.",

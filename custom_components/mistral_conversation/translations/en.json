@@ -55,7 +55,7 @@
       "step": {
         "init": {
           "data": {
-            "image_model": "Model for image generation",
+            "image_model": "Model for the image-generation tool",
             "max_tokens": "Maximum response tokens",
             "model": "Model for data generation",
             "name": "Name",
@@ -64,7 +64,7 @@
             "temperature": "Temperature"
           },
           "data_description": {
-            "image_model": "Choose a model for image generation or enter a custom model ID. This setting is independent of the data-generation model.",
+            "image_model": "Choose the Mistral model that interprets your instructions and references, then calls the image-generation tool. This does not select the underlying image generator. The setting is independent of the data-generation model and accepts custom model IDs.",
             "max_tokens": "Maximum tokens Mistral may generate for data tasks. Input and output together must fit within the model's context window.",
             "model": "Choose a model for data generation or enter a custom or fine-tuned model ID.",
             "name": "Name shown for this AI Task entity in Home Assistant.",

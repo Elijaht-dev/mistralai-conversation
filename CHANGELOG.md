@@ -7,6 +7,24 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-09-26
+
+### Changed
+
+- Clarify in English and French that the image setting selects the Mistral model
+  calling the generation tool, not the underlying image generator.
+- Update the test environment to Home Assistant 2026.9.3 with its matching
+  pytest fixtures 0.13.366, Hassil 3.12.1, intents 2026.9.17, and Ruff 0.16.8.
+- Group Home Assistant and its pytest fixtures in Dependabot so their exact
+  version constraints are updated together.
+
+### Validation
+
+- I validated this maintenance release locally with 376 passing tests, 94.04%
+  total coverage, 88.23% branch coverage, Ruff, strict mypy, and HACS structure
+  validation. I skipped the real-instance smoke test. Runtime requests, Mistral
+  SDK 2.10.1, and the Home Assistant 2026.7.4 minimum are unchanged.
+
 ## [0.5.0] - 2026-09-26
 
 ### Added
@@ -298,7 +316,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - English and French translations.
 - Ruff, strict mypy, pytest coverage, HACS, Hassfest, and Dependabot automation.
 
-[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.3.0...v0.3.1

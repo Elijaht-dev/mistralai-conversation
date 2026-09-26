@@ -150,9 +150,12 @@ supports unstructured text and schema-constrained data through Mistral's native
 JSON-schema response format. Compatible models can also receive Home Assistant
 image and PDF attachments.
 
-The same entity also supports `ai_task.generate_image`. **Image generation
-model** is independent of the data model and defaults to `mistral-medium-latest`.
-It accepts a discovered or custom model ID. Existing entities use this default
+The same entity also supports `ai_task.generate_image`. **Model for the
+image-generation tool** defaults to `mistral-medium-latest`. It selects the
+Mistral model that interprets your instructions and reference images and calls
+the `image_generation` tool. The underlying image generator is managed by Mistral
+and is not selected by this setting. The setting is independent of the data model
+and accepts a discovered or custom model ID. Existing entities use this default
 without changing their saved data settings. The other AI Task controls apply to
 data generation; image requests use provider defaults and a 2,048-token text
 output limit.

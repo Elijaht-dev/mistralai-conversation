@@ -5,6 +5,11 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      home-assistant-test-baseline:
+        patterns:
+          - homeassistant
+          - pytest-homeassistant-custom-component
   - package-ecosystem: github-actions
     directory: /
     schedule:

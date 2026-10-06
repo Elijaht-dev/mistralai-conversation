@@ -137,10 +137,19 @@ drift.
   and reap subprocesses. Local failures are translated without changing
   provider availability or silently returning unprocessed audio.
 - Compatibility is declared from Home Assistant 2026.7.4. Automated tests use
-  the newer Home Assistant 2026.9.3 development baseline without raising the
+  the newer Home Assistant 2026.9.4 development baseline without raising the
   user-facing minimum.
 
 ## Release gate
+
+Version `0.5.2` updates the combined test environment to Home Assistant 2026.9.4,
+pytest fixtures 0.13.367, intents 2026.9.30, and Ruff 0.16.9. I validated it
+locally with 376 passing tests, 94.04% total coverage, 88.23% branch coverage,
+`pip check`, Ruff, strict mypy, and HACS structure validation. I skipped the
+real-instance smoke test for this maintenance release. Runtime requests,
+Mistral SDK 2.10.1, and the Home Assistant 2026.7.4 minimum are unchanged.
+Mistral SDK 3 is deferred until Home Assistant provides a compatible shared
+HTTPX2 client. Public HACS and Hassfest checks remain release gates.
 
 Version `0.5.1` clarifies the image-tool model setting and updates test dependencies.
 I validated it locally with 376 passing tests, 94.04% total coverage and 88.23%

@@ -7,6 +7,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-10-06
+
+### Changed
+
+- Update the test environment to Home Assistant 2026.9.4 with its matching
+  pytest fixtures 0.13.367, intents 2026.9.30, and Ruff 0.16.9.
+- Defer Mistral SDK 3 until Home Assistant provides a compatible shared HTTPX2
+  client. Runtime requests continue to use Mistral SDK 2.10.1.
+
+### Validation
+
+- I validated the combined test environment locally with 376 passing tests,
+  94.04% total coverage, 88.23% branch coverage, `pip check`, Ruff, strict mypy,
+  and HACS structure validation. I skipped the real-instance smoke test for
+  this maintenance release. Runtime requests, Mistral SDK 2.10.1, and the
+  Home Assistant 2026.7.4 minimum are unchanged.
+
 ## [0.5.1] - 2026-09-26
 
 ### Changed
@@ -316,7 +333,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - English and French translations.
 - Ruff, strict mypy, pytest coverage, HACS, Hassfest, and Dependabot automation.
 
-[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.3.1...v0.4.0

@@ -7,6 +7,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-10-08
+
+### Fixed
+
+- Preserve valid Mistral message history after locally handled Assist commands
+  when **Prefer handling commands locally** is enabled. External tool results
+  are omitted with their tool calls while retaining the command and spoken reply,
+  preventing the `Unexpected role 'tool' after role 'user'` error in issue #77.
+
+### Validation
+
+- I validated the fix with 384 passing tests, 94.15% total coverage, 88.50%
+  branch coverage, Ruff, strict mypy, and offline HACS structure validation.
+- On Home Assistant 2026.10.0, fresh Mistral conversations and follow-ups after
+  one and two locally handled time queries succeeded with the same conversation
+  ID. Home Assistant's original history, a read-only tool round trip, and
+  structured AI Task output were also verified.
+- Synthetic speech-to-text input and text-to-speech generation without playback
+  also succeeded on that instance.
+
 ## [0.5.2] - 2026-10-06
 
 ### Changed

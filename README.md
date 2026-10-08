@@ -116,6 +116,11 @@ the HACS dashboard:
 
 The default model is `mistral-small-latest`, with the built-in Assist API enabled.
 
+With **Prefer handling commands locally** enabled in an Assist pipeline, locally
+handled commands and Home Assistant's spoken replies remain in the conversation
+history. Their internal tool-call/result pairs are omitted from requests to
+Mistral, so a later Mistral turn can continue the same conversation.
+
 During creation, **Reasoning** always offers Automatic, Disabled, and Enabled.
 On reconfiguration, the control reflects the saved model:
 

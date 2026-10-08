@@ -265,6 +265,29 @@ def _convert_content_to_message(
     )
 
 
+def _convert_chat_log_to_messages(
+    contents: Sequence[conversation.Content],
+) -> list[MistralMessage]:
+    """Exclude external tool pairs while preserving conversation content."""
+    external_tool_call_ids = {
+        tool_call.id
+        for content in contents
+        if isinstance(content, conversation.AssistantContent)
+        for tool_call in content.tool_calls or []
+        if tool_call.external
+    }
+    messages: list[MistralMessage] = []
+    for content in contents:
+        if (
+            isinstance(content, conversation.ToolResultContent)
+            and content.tool_call_id in external_tool_call_ids
+        ):
+            continue
+        if (message := _convert_content_to_message(content)) is not None:
+            messages.append(message)
+    return messages
+
+
 def _thinking_text(chunk: ThinkChunk) -> Iterator[str]:
     """Yield user-visible text from a reasoning chunk."""
     for item in chunk.thinking:
@@ -602,11 +625,7 @@ class MistralBaseEntity(CoordinatorEntity[MistralCoordinator]):
             else DEFAULT_CONVERSATION_OPTIONS
         )
         options = default_options | dict(self.subentry.data)
-        messages = [
-            message
-            for content in chat_log.content
-            if (message := _convert_content_to_message(content)) is not None
-        ]
+        messages = _convert_chat_log_to_messages(chat_log.content)
 
         last_content = chat_log.content[-1]
         attachments: list[tuple[Path, str | None]] = []
@@ -812,11 +831,7 @@ class MistralBaseEntity(CoordinatorEntity[MistralCoordinator]):
                     translation_key="empty_response",
                 )
 
-            request.messages.extend(
-                message
-                for content in new_contents
-                if (message := _convert_content_to_message(content)) is not None
-            )
+            request.messages.extend(_convert_chat_log_to_messages(new_contents))
 
             if not chat_log.unresponded_tool_results:
                 self.coordinator.async_set_updated_data(self.coordinator.data or [])

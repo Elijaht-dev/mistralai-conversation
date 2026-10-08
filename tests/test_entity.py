@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -39,6 +40,7 @@ from custom_components.mistral_conversation.conversation import (
 from custom_components.mistral_conversation.entity import (
     MistralNativeContent,
     MistralStreamState,
+    _convert_chat_log_to_messages,
     _convert_content_to_message,
     _format_tool,
     _transform_stream,
@@ -128,6 +130,161 @@ def test_convert_empty_and_external_content() -> None:
         )
         is None
     )
+
+
+@pytest.mark.parametrize("tool_name", ["HassGetCurrentTime", "trigger_sentence"])
+@pytest.mark.parametrize("assistant_text", [None, "Local context"])
+def test_convert_external_tool_history(
+    tool_name: str,
+    assistant_text: str | None,
+) -> None:
+    """External pairs are omitted without losing text or changing HA history."""
+    contents = [
+        conversation.SystemContent(content="System"),
+        conversation.UserContent(content="Local request"),
+        conversation.AssistantContent(
+            agent_id="homeassistant",
+            content=assistant_text,
+            tool_calls=[
+                llm.ToolInput(
+                    id="external-call",
+                    tool_name=tool_name,
+                    tool_args={},
+                    external=True,
+                )
+            ],
+        ),
+        conversation.ToolResultContent(
+            agent_id="homeassistant",
+            tool_call_id="external-call",
+            tool_name=tool_name,
+            tool_result={"response": "Local reply"},
+        ),
+        conversation.AssistantContent(agent_id="homeassistant", content="Local reply"),
+        conversation.UserContent(content="Follow-up"),
+    ]
+    original = deepcopy(contents)
+
+    messages = _convert_chat_log_to_messages(contents)
+
+    assert contents == original
+    assert [message.role for message in messages] == [
+        "system",
+        "user",
+        *(["assistant"] if assistant_text is not None else []),
+        "assistant",
+        "user",
+    ]
+    assert messages[1].content == "Local request"
+    assert messages[-2].content == "Local reply"
+    assert messages[-1].content == "Follow-up"
+    if assistant_text is not None:
+        assert messages[2].content == assistant_text
+    assert all(
+        not message.tool_calls
+        for message in messages
+        if isinstance(message, AssistantMessage)
+    )
+
+
+def test_convert_mixed_parallel_tool_history() -> None:
+    """Ordinary parallel calls, their results, and native reasoning survive."""
+    native = MistralNativeContent()
+    native.add_chunk(
+        ThinkChunk(
+            thinking=[TextChunk(text="Reasoning")],
+            signature="test-signature",
+            closed=True,
+        )
+    )
+    assistant = conversation.AssistantContent(
+        agent_id="agent",
+        content="Assistant text",
+        native=native,
+        tool_calls=[
+            llm.ToolInput(
+                id="external-call",
+                tool_name="LocalTool",
+                tool_args={},
+                external=True,
+            ),
+            llm.ToolInput(id="native001", tool_name="ReadFirst", tool_args={"item": 1}),
+            llm.ToolInput(
+                id="native002", tool_name="ReadSecond", tool_args={"item": 2}
+            ),
+        ],
+    )
+    contents = [
+        assistant,
+        conversation.ToolResultContent(
+            agent_id="agent",
+            tool_call_id="native002",
+            tool_name="ReadSecond",
+            tool_result={"value": 2},
+        ),
+        conversation.ToolResultContent(
+            agent_id="agent",
+            tool_call_id="external-call",
+            tool_name="LocalTool",
+            tool_result={"value": "local"},
+        ),
+        conversation.ToolResultContent(
+            agent_id="agent",
+            tool_call_id="native001",
+            tool_name="ReadFirst",
+            tool_result={"value": 1},
+        ),
+    ]
+    original = deepcopy(contents)
+
+    messages = _convert_chat_log_to_messages(contents)
+
+    assert contents == original
+    assert [message.role for message in messages] == ["assistant", "tool", "tool"]
+    assert [call.id for call in messages[0].tool_calls] == ["native001", "native002"]
+    assert [call.function.arguments for call in messages[0].tool_calls] == [
+        '{"item":1}',
+        '{"item":2}',
+    ]
+    assert messages[0].content[0] == native.as_content_chunk()
+    assert messages[0].content[1] == TextChunk(text="Assistant text")
+    assert [message.tool_call_id for message in messages[1:]] == [
+        "native002",
+        "native001",
+    ]
+    assert [message.content for message in messages[1:]] == [
+        '{"value":2}',
+        '{"value":1}',
+    ]
+
+
+def test_convert_history_preserves_unmatched_tool_results() -> None:
+    """Only results with a matching external call ID are filtered."""
+    contents = [
+        conversation.AssistantContent(
+            agent_id="agent",
+            tool_calls=[
+                llm.ToolInput(
+                    id="external-call",
+                    tool_name="SameName",
+                    tool_args={},
+                    external=True,
+                )
+            ],
+        ),
+        conversation.ToolResultContent(
+            agent_id="agent",
+            tool_call_id="unmatched",
+            tool_name="SameName",
+            tool_result={"error": "unmatched result"},
+        ),
+    ]
+
+    messages = _convert_chat_log_to_messages(contents)
+
+    assert len(messages) == 1
+    assert isinstance(messages[0], ToolMessage)
+    assert messages[0].tool_call_id == "unmatched"
 
 
 def test_reasoning_is_replayed_with_signature() -> None:
@@ -449,6 +606,67 @@ async def test_conversation_success_and_request_parameters(
     assert call.kwargs["prompt_cache_key"] == result.conversation_id
     assert isinstance(call.kwargs["messages"][0], SystemMessage)
     assert isinstance(call.kwargs["messages"][1], UserMessage)
+
+
+@pytest.mark.parametrize("local_turns", [1, 2])
+async def test_conversation_after_local_time_intents(
+    hass: HomeAssistant,
+    mock_init_component: MagicMock,
+    local_turns: int,
+) -> None:
+    """Local intent replies survive replay without their external tool pairs."""
+    conversation_id = None
+    local_replies = []
+    for _ in range(local_turns):
+        local_result = await conversation.async_converse(
+            hass,
+            "what time is it",
+            conversation_id,
+            Context(),
+            language="en",
+            agent_id=conversation.HOME_ASSISTANT_AGENT,
+        )
+        assert (
+            local_result.response.response_type is not intent.IntentResponseType.ERROR
+        )
+        local_replies.append(local_result.response.speech["plain"]["speech"])
+        conversation_id = local_result.conversation_id
+
+    mock_init_component.chat.stream_async.assert_not_awaited()
+    messages = []
+
+    async def capture_request(**kwargs):
+        messages.extend(kwargs["messages"])
+        return event_stream(
+            [completion_event(content="Hello from Mistral", finish_reason="stop")]
+        )
+
+    mock_init_component.chat.stream_async.side_effect = capture_request
+    with patch(
+        "homeassistant.components.llm.async_get_tools",
+        new_callable=AsyncMock,
+        return_value=LLMTools(tools=[]),
+    ):
+        result = await conversation.async_converse(
+            hass,
+            "Hello",
+            conversation_id,
+            Context(),
+            language="en",
+            agent_id="conversation.mistral_conversation",
+        )
+
+    assert result.conversation_id == conversation_id
+    assert result.response.speech["plain"]["speech"] == "Hello from Mistral"
+    mock_init_component.chat.stream_async.assert_awaited_once()
+    assert [message.role for message in messages] == [
+        "system",
+        *[role for _ in range(local_turns) for role in ("user", "assistant")],
+        "user",
+    ]
+    for index, reply in enumerate(local_replies):
+        assert messages[1 + index * 2].content == "what time is it"
+        assert messages[2 + index * 2].content == reply
 
 
 async def test_conversation_function_call_round_trip(

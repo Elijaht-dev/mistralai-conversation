@@ -48,6 +48,11 @@ drift.
 
 ## Deliberate boundaries
 
+- Conversation replay omits external tool calls and results matched to those
+  calls, including locally handled Assist intents and sentence triggers. User
+  messages, assistant replies, provider-native reasoning, and ordinary tool
+  calls/results are preserved without modifying Home Assistant's chat log.
+  Unmatched tool results are not silently discarded.
 - SDK construction and synchronous cleanup run in Home Assistant's executor.
   Services are prepared before use. For the pinned SDK 2.10.1, selected lazy
   model exports and the utility/error exports are resolved and cached during
@@ -141,6 +146,18 @@ drift.
   user-facing minimum.
 
 ## Release gate
+
+I validated the `0.5.3` local-intent history fix with 384 passing tests,
+94.15% total coverage, 88.50% branch coverage, Ruff, strict mypy, and offline
+HACS structure validation. On Home Assistant 2026.10.0 on 2026-10-08, after
+backing up the installed integration and configuration, I checked a fresh
+Mistral conversation and Mistral follow-ups after one and two locally handled
+time queries using the same conversation ID. All succeeded, and Home Assistant's
+original local-turn history remained intact. A read-only date/time tool round
+trip and a structured AI Task also succeeded. The observed post-install logs
+contained no Mistral errors or blocking-call warnings. Synthetic speech-to-text
+input and text-to-speech generation without playback also succeeded on that
+instance. Satellite playback was not tested.
 
 Version `0.5.2` updates the combined test environment to Home Assistant 2026.9.4,
 pytest fixtures 0.13.367, intents 2026.9.30, and Ruff 0.16.9. I validated it

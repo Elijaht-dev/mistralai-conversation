@@ -5,6 +5,9 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator, Iterable
 
 import httpx
+from homeassistant.components import conversation
+from homeassistant.helpers import llm
+from homeassistant.util.json import JsonObjectType
 from mistralai.client.errors import MistralError
 from mistralai.client.models import (
     CompletionChunk,
@@ -14,6 +17,29 @@ from mistralai.client.models import (
     ToolCall,
     UsageInfo,
 )
+
+
+def tool_result_content(
+    *,
+    agent_id: str,
+    tool_call_id: str,
+    tool_name: str,
+    tool_result: JsonObjectType,
+) -> conversation.ToolResultContent:
+    """Build native chat-log results for the installed Home Assistant version."""
+    if hasattr(llm, "ToolResult"):
+        return conversation.ToolResultContent(
+            agent_id=agent_id,
+            tool_call_id=tool_call_id,
+            tool_name=tool_name,
+            result=llm.ToolResult(data=tool_result),
+        )
+    return conversation.ToolResultContent(
+        agent_id=agent_id,
+        tool_call_id=tool_call_id,
+        tool_name=tool_name,
+        tool_result=tool_result,
+    )
 
 
 def completion_event(

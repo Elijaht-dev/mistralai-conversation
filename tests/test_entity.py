@@ -47,7 +47,7 @@ from custom_components.mistral_conversation.entity import (
     async_prepare_attachments,
 )
 
-from .helpers import completion_event, event_stream, mistral_error
+from .helpers import completion_event, event_stream, mistral_error, tool_result_content
 
 
 def _chat_log(hass: HomeAssistant) -> conversation.ChatLog:
@@ -89,7 +89,7 @@ def test_convert_all_chat_log_roles() -> None:
         )
     )
     tool = _convert_content_to_message(
-        conversation.ToolResultContent(
+        tool_result_content(
             agent_id="agent",
             tool_call_id="call-id",
             tool_name="GetState",
@@ -154,7 +154,7 @@ def test_convert_external_tool_history(
                 )
             ],
         ),
-        conversation.ToolResultContent(
+        tool_result_content(
             agent_id="homeassistant",
             tool_call_id="external-call",
             tool_name=tool_name,
@@ -216,19 +216,19 @@ def test_convert_mixed_parallel_tool_history() -> None:
     )
     contents = [
         assistant,
-        conversation.ToolResultContent(
+        tool_result_content(
             agent_id="agent",
             tool_call_id="native002",
             tool_name="ReadSecond",
             tool_result={"value": 2},
         ),
-        conversation.ToolResultContent(
+        tool_result_content(
             agent_id="agent",
             tool_call_id="external-call",
             tool_name="LocalTool",
             tool_result={"value": "local"},
         ),
-        conversation.ToolResultContent(
+        tool_result_content(
             agent_id="agent",
             tool_call_id="native001",
             tool_name="ReadFirst",
@@ -272,7 +272,7 @@ def test_convert_history_preserves_unmatched_tool_results() -> None:
                 )
             ],
         ),
-        conversation.ToolResultContent(
+        tool_result_content(
             agent_id="agent",
             tool_call_id="unmatched",
             tool_name="SameName",
@@ -669,10 +669,12 @@ async def test_conversation_after_local_time_intents(
         assert messages[2 + index * 2].content == reply
 
 
+@pytest.mark.parametrize("tool_error", [False, True])
 async def test_conversation_function_call_round_trip(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
     mock_init_component: MagicMock,
+    tool_error: bool,
 ) -> None:
     """HA tools execute and their typed result is sent in a follow-up request."""
     mock_tool = AsyncMock()
@@ -681,7 +683,12 @@ async def test_conversation_function_call_round_trip(
     mock_tool.parameters = vol.Schema(
         {vol.Required("name", description="Entity name"): str}
     )
-    mock_tool.async_call.return_value = {"state": "on"}
+    tool_data = {"error": "unavailable"} if tool_error else {"state": "on"}
+    mock_tool.async_call.return_value = (
+        llm.ToolResult(data=tool_data, error=tool_error)
+        if hasattr(llm, "ToolResult")
+        else tool_data
+    )
 
     mock_init_component.chat.stream_async.side_effect = [
         event_stream(
@@ -734,7 +741,9 @@ async def test_conversation_function_call_round_trip(
         message for message in second_messages if isinstance(message, ToolMessage)
     )
     assert tool_message.tool_call_id == "call-id"
-    assert tool_message.content == '{"state":"on"}'
+    assert tool_message.content == (
+        '{"error":"unavailable"}' if tool_error else '{"state":"on"}'
+    )
     mock_tool.async_call.assert_awaited_once()
 
 

@@ -13,10 +13,9 @@ from collections.abc import (
 )
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Never, cast
+from typing import TYPE_CHECKING, Any, Never, cast
 
 import httpx
-import voluptuous as vol
 from homeassistant.components import conversation
 from homeassistant.config_entries import ConfigSubentry
 from homeassistant.const import CONF_MODEL
@@ -89,6 +88,12 @@ from .coordinator import MistralConfigEntry, MistralCoordinator
 from .errors import api_error_message, classify_api_error
 from .reasoning import reasoning_error
 from .tool_calls import ToolCallAccumulator, ToolCallDecodeError
+
+if TYPE_CHECKING:
+    import probatio as vol
+else:
+    # Keep schema annotations compatible with Home Assistant's runtime alias.
+    import voluptuous as vol
 
 type MistralMessage = ChatCompletionStreamRequestMessage
 type MistralTool = ChatCompletionStreamRequestTool
@@ -241,10 +246,14 @@ def _convert_content_to_message(
 ) -> MistralMessage | None:
     """Convert a Home Assistant chat-log item to a typed Mistral message."""
     if isinstance(content, conversation.ToolResultContent):
+        # Newer Home Assistant exposes native results; older logs use a mapping.
+        tool_result = (
+            content.result.data if hasattr(content, "result") else content.tool_result
+        )
         return ToolMessage(
             tool_call_id=content.tool_call_id,
             name=content.tool_name,
-            content=json_dumps(content.tool_result),
+            content=json_dumps(tool_result),
         )
 
     if isinstance(content, conversation.SystemContent):

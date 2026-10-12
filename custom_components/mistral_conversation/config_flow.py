@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable
-from typing import Any, cast, override
+from typing import TYPE_CHECKING, Any, cast, override
 
 import httpx
-import voluptuous as vol
 from homeassistant.config_entries import (
     SOURCE_USER,
     ConfigEntry,
@@ -87,6 +86,12 @@ from .const import (
 from .coordinator import MistralConfigEntry
 from .errors import api_error_message, classify_api_error
 from .reasoning import fixed_reasoning_setting, reasoning_error, reasoning_options
+
+if TYPE_CHECKING:
+    import probatio as vol
+else:
+    # Home Assistant aliases voluptuous to probatio from 2026.9 onward.
+    import voluptuous as vol
 
 _LOGGER = logging.getLogger(__name__)
 

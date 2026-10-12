@@ -7,6 +7,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- Update the test environment to Home Assistant 2026.10.1 with its matching
+  pytest fixtures 0.13.372, intents 2026.10.6, mypy 2.4.0, and Ruff 0.16.10.
+- Keep Mistral SDK 2.10.1 until a supported Home Assistant release provides
+  the shared HTTPX2 transport. The core migration is merged, but HTTPX2 is
+  absent from stable Home Assistant 2026.10.1.
+
+### Fixed
+
+- Read native Home Assistant tool results without deprecated access, while
+  preserving support for legacy conversation history.
+- Align schema typing with Home Assistant's Probatio runtime alias while
+  retaining compatibility with older Home Assistant releases.
+
 ## [0.5.3] - 2026-10-08
 
 ### Fixed

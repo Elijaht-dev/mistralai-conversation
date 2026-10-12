@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
-import voluptuous as vol
 from homeassistant.components.repairs import RepairsFlow, RepairsFlowResult
 from homeassistant.config_entries import ConfigEntryState, ConfigSubentry
 from homeassistant.const import CONF_MODEL
@@ -18,6 +17,12 @@ from homeassistant.helpers.selector import (
 
 from .const import DOMAIN
 from .coordinator import MistralConfigEntry
+
+if TYPE_CHECKING:
+    import probatio as vol
+else:
+    # Home Assistant keeps this alias compatible with older releases.
+    import voluptuous as vol
 
 _DEPRECATION_ISSUE_PREFIX = "model_deprecated_"
 

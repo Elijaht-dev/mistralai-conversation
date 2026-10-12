@@ -142,8 +142,14 @@ drift.
   and reap subprocesses. Local failures are translated without changing
   provider availability or silently returning unprocessed audio.
 - Compatibility is declared from Home Assistant 2026.7.4. Automated tests use
-  the newer Home Assistant 2026.9.4 development baseline without raising the
+  the newer Home Assistant 2026.10.1 development baseline without raising the
   user-facing minimum.
+
+Mistral SDK 3 remains deferred. Home Assistant's HTTPX2 migration was merged
+in core PR #183371 on 2026-10-06, but the stable 2026.10.1 release still provides
+the shared HTTPX client. Revisit the SDK migration when a supported Home
+Assistant release provides the compatible shared transport, and validate
+typing, streaming, downloads, cleanup, Realtime, and cold-start imports.
 
 ## Release gate
 

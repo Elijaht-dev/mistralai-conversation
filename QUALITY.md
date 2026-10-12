@@ -153,6 +153,24 @@ typing, streaming, downloads, cleanup, Realtime, and cold-start imports.
 
 ## Release gate
 
+Version `0.5.4` updates the test baseline to Home Assistant 2026.10.1 and
+supports its native tool-result container while preserving older history.
+The existing Probatio/OpenAPI conversion is retained; schema annotations now
+match Home Assistant's runtime alias. The full suite passed 385 tests on both
+Home Assistant 2026.10.1 and 2026.9.4, with 94.07% total coverage and 88.34%
+branch coverage on the newer baseline, Ruff, strict mypy, dependency checks,
+and offline HACS validation.
+
+I checked this candidate on Home Assistant 2026.10.1 on 2026-10-12 after a
+protected integration/configuration backup, candidate hash verification,
+configuration validation, and full restart. Fresh Conversation, follow-ups
+after one and two locally handled time queries, a read-only tool round trip,
+structured AI Task, synthetic STT, and TTS generation without playback passed.
+Configuration and pipelines were preserved. The observed logs contained no
+Mistral errors or blocking-call warnings. Physical microphone and speaker
+behavior was not tested. Publication also requires successful public CI on
+the release commit.
+
 I validated the `0.5.3` local-intent history fix with 384 passing tests,
 94.15% total coverage, 88.50% branch coverage, Ruff, strict mypy, and offline
 HACS structure validation. On Home Assistant 2026.10.0 on 2026-10-08, after

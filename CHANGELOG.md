@@ -7,6 +7,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-10-12
+
 ### Changed
 
 - Update the test environment to Home Assistant 2026.10.1 with its matching
@@ -21,6 +23,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   preserving support for legacy conversation history.
 - Align schema typing with Home Assistant's Probatio runtime alias while
   retaining compatibility with older Home Assistant releases.
+
+### Validation
+
+- 385 tests passed on both Home Assistant 2026.10.1 and 2026.9.4. The newer
+  baseline reached 94.07% total coverage and 88.34% branch coverage locally,
+  with Ruff, strict mypy, dependency checks, and offline HACS validation passing.
+- On Home Assistant 2026.10.1, after a protected backup, configuration check,
+  and full restart, fresh Conversation, follow-ups after one and two local
+  intents, a read-only tool round trip, structured AI Task, synthetic STT,
+  and TTS generation without playback passed. Configuration and pipelines
+  were preserved, with no Mistral errors or blocking warnings in the observed logs.
 
 ## [0.5.3] - 2026-10-08
 
@@ -368,7 +381,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - English and French translations.
 - Ruff, strict mypy, pytest coverage, HACS, Hassfest, and Dependabot automation.
 
-[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.4...HEAD
+[0.5.4]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.3...v0.5.4
+[0.5.3]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.4.0...v0.5.0

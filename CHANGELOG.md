@@ -7,6 +7,27 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-11-01
+
+### Changed
+
+- Update the test environment to Home Assistant 2026.10.4 with its matching
+  pytest fixtures 0.13.375, intents 2026.10.27, and Ruff 0.17.3.
+- Keep Mistral SDK 2.10.1 until a supported stable Home Assistant release
+  provides the shared HTTPX2 transport. Home Assistant 2026.10.4 still uses HTTPX.
+- Keep PyTurboJPEG 1.8.3; its major-version update is outside this maintenance.
+
+### Validation
+
+- 385 tests passed on Home Assistant 2026.10.4, with 94.07% total coverage and
+  88.34% branch coverage. Ruff, strict mypy, dependency checks, and offline HACS
+  validation passed.
+- Runtime code, Mistral SDK 2.10.1, and the Home Assistant 2026.7.4 minimum are
+  unchanged. Real-instance Conversation, local-intent follow-ups, read-only
+  tools, and structured AI Task passed on the identical installed runtime.
+  Audio smoke checks did not pass with the existing instance configuration;
+  see `QUALITY.md` for the validation boundary.
+
 ## [0.5.4] - 2026-10-12
 
 ### Changed
@@ -381,7 +402,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - English and French translations.
 - Ruff, strict mypy, pytest coverage, HACS, Hassfest, and Dependabot automation.
 
-[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.4...HEAD
+[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.5...HEAD
+[0.5.5]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.1...v0.5.2

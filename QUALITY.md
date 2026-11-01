@@ -146,12 +146,26 @@ drift.
   user-facing minimum.
 
 Mistral SDK 3 remains deferred. Home Assistant's HTTPX2 migration was merged
-in core PR #183371 on 2026-10-06, but the stable 2026.10.1 release still provides
+in core PR #183371 on 2026-10-06, but the stable 2026.10.4 release still provides
 the shared HTTPX client. Revisit the SDK migration when a supported Home
 Assistant release provides the compatible shared transport, and validate
 typing, streaming, downloads, cleanup, Realtime, and cold-start imports.
 
 ## Release gate
+
+Version `0.5.5` updates only the test environment, documentation, and integration
+version. The full suite passed 385 tests on Home Assistant 2026.10.4 with
+94.07% total coverage and 88.34% branch coverage. Ruff, strict mypy, dependency
+checks, and offline HACS validation passed. Mistral SDK 2.10.1 and the Home
+Assistant 2026.7.4 minimum are unchanged.
+
+On Home Assistant 2026.10.4, the installed 0.5.4 runtime matched all 23 candidate
+files other than the versioned manifest. Fresh Conversation, follow-ups after
+one and two locally handled time queries, a read-only tool round trip, and
+structured AI Task passed with configuration and pipelines preserved. The audio
+smoke checks did not pass: Mistral rejected the configured STT model, and TTS
+audio retrieval returned HTTP 500. No runtime, voice, or configuration changes
+were made on the instance. A complete real-instance audio check remains pending.
 
 Version `0.5.4` updates the test baseline to Home Assistant 2026.10.1 and
 supports its native tool-result container while preserving older history.

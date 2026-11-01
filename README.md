@@ -57,7 +57,7 @@ support for Realtime transcription.
 The SDK 3 migration is deferred until a supported Home Assistant release
 provides the compatible shared HTTPX2 client. The
 [core migration](https://github.com/home-assistant/core/pull/183371) is merged,
-but Home Assistant 2026.10.1 still uses HTTPX.
+but the current stable Home Assistant 2026.10.4 still uses HTTPX.
 
 Version `0.2.3` addresses blocking SDK initialization and lazy imports reported
 at startup in issue [#51](https://github.com/Elijaht-dev/mistralai-conversation/issues/51).

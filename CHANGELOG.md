@@ -24,8 +24,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   validation passed.
 - Runtime code, Mistral SDK 2.10.1, and the Home Assistant 2026.7.4 minimum are
   unchanged. Real-instance Conversation, local-intent follow-ups, read-only
-  tools, and structured AI Task passed on the identical installed runtime.
-  Audio smoke checks did not pass with the existing instance configuration;
+  tools, structured AI Task, synthetic STT, and TTS generation without playback
+  passed on the identical installed runtime. Audio validation used available
+  Voxtral 3 model IDs with the existing voice and normalization settings;
   see `QUALITY.md` for the validation boundary.
 
 ## [0.5.4] - 2026-10-12

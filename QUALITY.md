@@ -162,10 +162,17 @@ Assistant 2026.7.4 minimum are unchanged.
 On Home Assistant 2026.10.4, the installed 0.5.4 runtime matched all 23 candidate
 files other than the versioned manifest. Fresh Conversation, follow-ups after
 one and two locally handled time queries, a read-only tool round trip, and
-structured AI Task passed with configuration and pipelines preserved. The audio
-smoke checks did not pass: Mistral rejected the configured STT model, and TTS
-audio retrieval returned HTTP 500. No runtime, voice, or configuration changes
-were made on the instance. A complete real-instance audio check remains pending.
+structured AI Task passed. Initial audio checks failed because both configured
+model IDs were rejected by Mistral, and the saved voice required Voxtral 3.
+After a protected backup, I reconfigured only those two model IDs to
+`voxtral-mini-transcribe-3-0` for batch STT and `voxtral-mini-tts-3-0` for TTS,
+preserving the saved voice, normalization settings, and pipelines. Synthetic
+STT and TTS generation with audio retrieval and no playback then passed through
+Home Assistant's public APIs using SDK 2.10.1. Conversation, local-intent
+follow-ups, read-only tools, and structured AI Task also passed again. The
+observed validation logs contained no Mistral warnings, errors, or blocking
+warnings after correction. No integration runtime was installed or changed on
+the instance; physical microphone and speaker behavior was not tested.
 
 Version `0.5.4` updates the test baseline to Home Assistant 2026.10.1 and
 supports its native tool-result container while preserving older history.

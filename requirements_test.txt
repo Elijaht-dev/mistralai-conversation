@@ -1,12 +1,12 @@
 hassil==3.12.1
 ha-ffmpeg==3.2.2
 gazetteer-matcher==1.2.0
-home-assistant-intents==2026.10.6
-homeassistant==2026.10.1
+home-assistant-intents==2026.10.27
+homeassistant==2026.10.4
 mistralai[realtime]==2.10.1
 mypy==2.4.0
 mutagen==1.47.0
 pytest-cov==7.1.0
-pytest-homeassistant-custom-component==0.13.372
+pytest-homeassistant-custom-component==0.13.375
 PyTurboJPEG==1.8.3
-ruff==0.16.10
+ruff==0.17.3

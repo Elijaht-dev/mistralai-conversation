@@ -8,5 +8,5 @@ mypy==2.4.0
 mutagen==1.47.0
 pytest-cov==7.1.0
 pytest-homeassistant-custom-component==0.13.375
-PyTurboJPEG==1.8.3
+PyTurboJPEG==2.6.1
 ruff==0.17.3

@@ -333,6 +333,10 @@ guidance.
   supported image or PDF.
 - **Speech-to-text unavailable:** confirm the account can use Voxtral
   transcription and that the Assist pipeline uses the advertised PCM format.
+- **Audio model rejected:** select an available model for the corresponding
+  audio endpoint. I checked `voxtral-mini-transcribe-3-0` for batch STT and
+  `voxtral-mini-tts-3-0` for TTS on Home Assistant 2026.10.4 with SDK 2.10.1.
+  A Voxtral 3 voice requires a compatible TTS model.
 - **No text-to-speech entity:** add one from the integration page and select a
   preset or saved voice.
 - **Voice missing from the list:** enter its saved Mistral voice ID manually, or

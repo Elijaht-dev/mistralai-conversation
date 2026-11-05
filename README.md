@@ -119,8 +119,8 @@ returns its standard media result, including `media_source_id` and a signed
 guaranteed. PDF references are not supported for image generation.
 
 A response without an image is an error and is not automatically retried.
-Live image validation of the SDK 3 development version remains incomplete;
-see the [recorded validation](QUALITY.md#recorded-validation).
+The image action currently requires a Mistral file ID; URL-only responses are
+not yet supported. See the [recorded validation](QUALITY.md#recorded-validation).
 
 ### Speech-to-text
 

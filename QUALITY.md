@@ -153,6 +153,7 @@ model choices, voice/audio settings and pipelines.
 | Synthetic batch STT | Passed |
 | Realtime 3 transcription, cancellation and recovery | Passed |
 | TTS generation and audio retrieval without playback | Passed |
+| Direct Large 4 image request and signed-URL download | Passed |
 | Image generation, references and provider-file deletion | Not validated |
 
 Temporary entities and the Realtime pipeline were removed. Installed runtime
@@ -160,10 +161,14 @@ files matched the candidate. No Mistral warning/error or blocking-call lines
 appeared in the observed logs. Physical microphone and speaker behavior was
 not tested.
 
-Image requests with Large 4, Small and the previous Medium alias returned no
-generated-file chunks in the SDK 3.7.0 checks. The cause is not established;
-this does not prove that Large 4 is inaccessible. Missing images are rejected,
-and the original image configuration was preserved.
+Image diagnostics on 2026-11-05 confirmed that the same API key can use Large 4
+and retrieve a valid generated image. The live Conversations responses supplied
+a signed URL in the image tool's result instead of a generated-file chunk or
+Files API ID. URL-only output also occurred with SDK 2.10.1 and direct HTTP;
+it is present in the raw response, rather than lost during SDK decoding.
+The integration currently requires file IDs and rejects these responses.
+The returned URL grants read access only, so provider-file deletion remains
+unverified. Production configuration was not changed by these diagnostics.
 
 ## Publication gate
 

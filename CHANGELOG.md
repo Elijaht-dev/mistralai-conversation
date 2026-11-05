@@ -24,8 +24,10 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Validation
 
 437 tests pass on each HA baseline. Live voice, Conversation and structured
-AI Task checks passed; image generation remains unvalidated. Details and
-publication requirements are in [QUALITY.md](QUALITY.md#recorded-validation).
+AI Task checks passed. Direct Large 4 image generation and download succeeded;
+the HA image action remains blocked by URL-only provider responses, reproduced
+with SDK 2 and direct HTTP. Details and publication requirements are in
+[QUALITY.md](QUALITY.md#recorded-validation).
 
 ## [0.5.5] - 2026-11-01
 

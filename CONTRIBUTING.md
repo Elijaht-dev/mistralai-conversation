@@ -22,14 +22,18 @@ manages its own runtime image libraries.
 
 Use separate virtual environments for the compatibility suites:
 
-| Home Assistant | Requirements |
-| --- | --- |
-| 2026.11.0 | `requirements_test.txt` |
-| 2026.10.4 | `requirements_test_2026_10.txt` |
-| 2026.7.4 | `requirements_test_2026_7.txt` |
+| Home Assistant | HTTPX2 | Requirements |
+| --- | --- | --- |
+| 2026.11.0 | 2.14.0 | `requirements_test.txt` |
+| 2026.10.4 | 2.14.0 | `requirements_test_2026_10.txt` |
+| 2026.7.4 | 2.14.0 | `requirements_test_2026_7.txt` |
+| 2026.10.4 | 2.16.0 | `requirements_test_2026_10_httpx2_2_16.txt` |
+| 2026.7.4 | 2.16.0 | `requirements_test_2026_7_httpx2_2_16.txt` |
 
 Shared pins live in `requirements_test_base.txt`. Keep each HA version paired
 with its matching fixtures.
+The 2.16.0 variants cover fresh installations on HA versions without a core
+HTTPX2 pin.
 
 ## Validation
 
@@ -46,7 +50,9 @@ git diff --check
 ```
 
 CI also enforces at least 85% branch coverage and runs Hassfest/public HACS
-validation. Live-provider checks are separate and require owner authorization;
+validation. It runs on pull requests, pushes to `main`, weekly and on manual
+dispatch; feature-branch pushes do not duplicate PR checks.
+Live-provider checks are separate and require owner authorization;
 normal tests use mocked provider behavior.
 
 For documentation-only changes, review accuracy and links and run

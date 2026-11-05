@@ -21,18 +21,21 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- Use Mistral SDK 3.7.0 and HTTPX2 2.14.0, with HA's shared transport on 2026.11
-  and an owned verified transport on older supported versions.
+- Use Mistral SDK 3.7.0 and HTTPX2, validated with 2.14.0. HA 2026.11 supplies
+  the shared transport; older versions install HTTPX2 through the SDK and use
+  an owned verified transport.
 - Default new audio entities to Voxtral 3 and new image-tool settings to Large 4.
   Migration 1.5 preserves existing explicit and implicit choices.
 - Use discovered chat/audio capabilities and cursor-paginated voice discovery.
 - Test HA 2026.11.0, 2026.10.4 and the unchanged 2026.7.4 minimum.
+- Cover HTTPX2 2.14.0 and fresh legacy-HA installations with 2.16.0. Run CI on
+  pull requests and `main` pushes without duplicate feature-branch push runs.
 - Update test-only PyTurboJPEG to 2.6.1 with a verified libjpeg-turbo 3.2.1 backend.
 - Reorganize the user, contributor and quality guides and condense release history.
 
 ### Validation
 
-501 tests pass on each HA baseline. Live voice, Conversation, structured AI Task
+502 tests pass on each HA baseline. Live voice, Conversation, structured AI Task
 and Large 4 image/reference generation with HA retrieval passed. Files API
 download and deletion were verified with a private synthetic PNG; URL-only
 images have no Files API deletion support. Details and publication requirements

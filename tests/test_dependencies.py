@@ -1,7 +1,23 @@
-"""Exercise the native JPEG backend required by the pinned test environment."""
+"""Verify transitive transport availability and the real native JPEG backend."""
+
+from importlib.metadata import requires, version
 
 import numpy as np
+from packaging.requirements import Requirement
 from turbojpeg import TurboJPEG
+
+
+def test_sdk_supplies_httpx2_on_older_home_assistant() -> None:
+    """The SDK must install the transport even when HA does not provide it."""
+    dependencies = [Requirement(value) for value in requires("mistralai") or []]
+    transports = [
+        requirement
+        for requirement in dependencies
+        if requirement.name == "httpx2"
+        and (requirement.marker is None or requirement.marker.evaluate())
+    ]
+    assert transports
+    assert all(version("httpx2") in requirement.specifier for requirement in transports)
 
 
 def test_jpeg_codec_encodes_and_decodes_synthetic_pixels() -> None:

@@ -19,7 +19,9 @@ release requirements. User configuration is covered in [README.md](README.md).
 ### Lifecycle and compatibility
 
 Home Assistant 2026.7.4 is the supported minimum. The runtime pins Mistral SDK
-3.7.0 and HTTPX2 2.14.0.
+3.7.0. HA supplies HTTPX2 on 2026.11; older versions install it through the SDK's
+dependency. Test environments pin HTTPX2 2.14.0 and also cover 2.16.0 on older HA
+versions, matching their current fresh-install resolution.
 
 HA 2026.11 supplies the shared HTTPX2 client. Older supported versions use an
 owned HTTPX2 client per account with HA's verified TLS context. Setup failures,
@@ -125,7 +127,7 @@ HACS validation and Hassfest. Public repositories also run the official HACS
 validator. Strict mypy runs on the primary HA baseline. Branch coverage must
 remain at or above 85%.
 
-The three HA versions below use separate pinned environments. The primary one
+The HA/HTTPX2 combinations below use separate pinned environments. The primary one
 uses the official HA fixtures at the release source commit; older baselines use
 their matching fixture packages. Fresh-process tests enable HA's blocking-call
 detector and exercise the real SDK with mocked HTTP and local TLS transports.
@@ -140,11 +142,13 @@ checksum-verified libjpeg-turbo 3.2.1. Setup and commands are in
 Validation for 0.6.0, including SDK 3 and image URL support, was performed on
 2026-11-05 under Python 3.14:
 
-| Home Assistant | Tests passed | Total coverage | Branch coverage |
-| --- | --- | --- | --- |
-| 2026.11.0 | 501 | 94.45% | 89.43% |
-| 2026.10.4 | 501 | 94.45% | 89.43% |
-| 2026.7.4 | 501 | 94.59% | 89.57% |
+| Home Assistant | HTTPX2 | Tests passed | Total coverage | Branch coverage |
+| --- | --- | --- | --- | --- |
+| 2026.11.0 | 2.14.0 | 502 | 94.45% | 89.43% |
+| 2026.10.4 | 2.14.0 | 502 | 94.45% | 89.43% |
+| 2026.7.4 | 2.14.0 | 502 | 94.59% | 89.57% |
+| 2026.10.4 | 2.16.0 | 502 | 94.45% | 89.43% |
+| 2026.7.4 | 2.16.0 | 502 | 94.59% | 89.57% |
 
 Ruff, strict mypy on the primary baseline, dependency checks, English/French
 translation parity and offline HACS validation passed. Public CI remains
@@ -178,6 +182,8 @@ independently verified with an owned private synthetic PNG: download, deletion
 and failed retrieval after deletion all passed. URL-only images provide no file
 ID for deletion. Original configuration and pipelines were preserved, temporary
 entities removed, and installed files verified against the candidate.
+An additional image/reference check was rate-limited by the provider (HTTP 429);
+the earlier successful reference test used identical runtime code.
 
 ## Publication gate
 

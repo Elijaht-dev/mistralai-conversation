@@ -1,3 +1,4 @@
 -r requirements_test_base.txt
 homeassistant==2026.10.4
+httpx2==2.14.0
 pytest-homeassistant-custom-component==0.13.375

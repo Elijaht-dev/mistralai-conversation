@@ -2,6 +2,8 @@ name: Validate
 
 on:
   push:
+    branches:
+      - main
   pull_request:
   schedule:
     - cron: "0 4 * * 1"
@@ -16,7 +18,7 @@ concurrency:
 
 jobs:
   quality:
-    name: Python quality and tests (${{ matrix.ha }})
+    name: Python quality and tests (HA ${{ matrix.ha }}, HTTPX2 ${{ matrix.httpx2 }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -24,11 +26,20 @@ jobs:
       matrix:
         include:
           - ha: "2026.11.0"
+            httpx2: "2.14.0"
             requirements: requirements_test.txt
           - ha: "2026.10.4"
+            httpx2: "2.14.0"
             requirements: requirements_test_2026_10.txt
           - ha: "2026.7.4"
+            httpx2: "2.14.0"
             requirements: requirements_test_2026_7.txt
+          - ha: "2026.10.4"
+            httpx2: "2.16.0"
+            requirements: requirements_test_2026_10_httpx2_2_16.txt
+          - ha: "2026.7.4"
+            httpx2: "2.16.0"
+            requirements: requirements_test_2026_7_httpx2_2_16.txt
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -91,7 +102,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: coverage-${{ matrix.ha }}
+          name: coverage-${{ matrix.ha }}-${{ matrix.httpx2 }}
           path: coverage.xml
           if-no-files-found: ignore
 

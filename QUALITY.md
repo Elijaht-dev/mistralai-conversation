@@ -176,6 +176,29 @@ The test environment uses PyTurboJPEG 2.6.1 with the checksum-verified native
 libjpeg-turbo 3.2.1 backend; a real synthetic JPEG encode/decode test passes on
 each HA baseline.
 
+On 2026-11-04/05, after a verified integration/configuration backup, candidate
+hash checks, configuration validation and a full restart on HA 2026.11.0,
+the running integration reported SDK 3.7.0. Migration 1.5 preserved the original
+models, saved voice, audio options and pipelines. Fresh Conversation, follow-ups
+after one and two locally handled time queries, a read-only tool round trip,
+structured AI Task, synthetic batch STT, and TTS generation with audio retrieval
+and no playback passed through HA's public APIs. A temporary Realtime 3 STT
+entity and isolated pipeline passed transcription, cancellation and recovery;
+both were removed. The installed runtime still matched the validated candidate,
+and the observed logs contained no Mistral warning/error or blocking-call lines.
+Physical microphone and speaker behavior was not tested.
+
+Live image generation is not validated for this candidate. The temporary
+Large 4 entity's image action failed without a generated image file. Isolated
+SDK 3.7.0 probes with Large 4, Small and the previous Medium alias likewise
+returned no generated-file chunks. These observations do not establish the cause
+or prove that Large 4 itself is inaccessible. The integration rejects missing
+images without a silent retry or model fallback; original image settings were
+preserved and the temporary entity was removed. Real image generation, reference
+images and provider-file deletion still need a successful live validation before
+publishing this feature/dependency release. The candidate remains installed on
+the test instance with its original configuration and a recorded rollback.
+
 Version `0.5.5` updates only the test environment, documentation, and integration
 version. The full suite passed 385 tests on Home Assistant 2026.10.4 with
 94.07% total coverage and 88.34% branch coverage. Ruff, strict mypy, dependency

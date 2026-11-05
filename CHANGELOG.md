@@ -28,6 +28,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   coverage is at least 94.18%, with at least 88.84% branch coverage. Formatting,
   lint, strict typing, dependency checks, translation parity, and offline HACS
   validation passed. Public CI remains required before publication.
+- The candidate passed real HA 2026.11.0 Conversation, local-intent follow-ups,
+  read-only tools, structured AI Task, synthetic batch STT, Realtime 3 with
+  cancellation/recovery, and TTS audio retrieval without playback. Configuration
+  and pipelines were preserved, temporary voice entities were removed, and the
+  observed Mistral logs had no warnings, errors or blocking-call lines.
+- Live image generation remains unvalidated: Large 4, Small and the previous
+  Medium alias returned no generated-file chunks in these SDK 3.7.0 probes.
+  The cause is not established; successful image/reference/cleanup validation
+  remains a publication gate. See `QUALITY.md` for the assurance boundary.
 
 ## [0.5.5] - 2026-11-01
 

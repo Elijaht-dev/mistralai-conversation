@@ -25,6 +25,7 @@ from .const import (
 )
 from .coordinator import MistralConfigEntry
 from .entity import MistralBaseEntity, async_prepare_image_attachments
+from .errors import ImageDownloadError
 from .image import ImageGenerationError, async_generate_image
 
 PARALLEL_UPDATES = 0
@@ -133,7 +134,13 @@ class MistralAITaskEntity(ai_task.AITaskEntity, MistralBaseEntity):
                 translation_domain=DOMAIN,
                 translation_key=err.translation_key,
             ) from None
-        except (MistralError, NoResponseError, httpx2.HTTPError, TimeoutError) as err:
+        except (
+            MistralError,
+            NoResponseError,
+            ImageDownloadError,
+            httpx2.HTTPError,
+            TimeoutError,
+        ) as err:
             translation_key, _ = await self._async_process_api_error(err)
             # SDK errors can echo the prompt or a generated file identifier.
             raise HomeAssistantError(

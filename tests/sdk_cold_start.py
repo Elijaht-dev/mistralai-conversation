@@ -62,11 +62,31 @@ async def exercise(api, client, endpoint: str) -> None:
         async with result:
             chunks = [chunk async for chunk in result]
         assert chunks[0].data.audio_data == "dGVzdA=="
-    elif endpoint == "image_start":
-        file_ids = await api.async_start_image_generation(
+    elif endpoint.startswith("image_"):
+        await exercise_image(api, client, endpoint)
+    else:
+        raise AssertionError(endpoint)
+
+
+async def exercise_image(api, client, endpoint: str) -> None:
+    """Exercise each image surface as the first request in its process."""
+    if endpoint == "image_start":
+        sources = await api.async_start_image_generation(
             client, "test-model", "Draw a lighthouse", []
         )
-        assert file_ids == ("test-file",)
+        assert sources.file_ids == ("test-file",)
+        assert sources.urls == ("https://files.mistral.ai/generated/test.png",)
+    elif endpoint == "image_url":
+        response = await api.async_download_image_url(
+            client, "https://files.mistral.ai/generated/test.png"
+        )
+        try:
+            if response.status_code == 200:
+                assert await response.aread() == b"test-image"
+            else:
+                assert response.status_code == 422
+        finally:
+            await response.aclose()
     elif endpoint == "image_download":
         response = await api.async_download_image_file(client, "test-file")
         try:
@@ -88,6 +108,16 @@ def image_response(httpx2, endpoint: str):
                 "conversation_id": "test-conversation",
                 "outputs": [
                     {
+                        "type": "tool.execution",
+                        "name": "image_generation",
+                        "arguments": "{}",
+                        "info": {
+                            "result": json.dumps(
+                                {"url": "https://files.mistral.ai/generated/test.png"}
+                            )
+                        },
+                    },
+                    {
                         "type": "message.output",
                         "content": [
                             {
@@ -96,12 +126,12 @@ def image_response(httpx2, endpoint: str):
                                 "file_id": "test-file",
                             }
                         ],
-                    }
+                    },
                 ],
                 "usage": {},
             },
         )
-    if endpoint == "image_download":
+    if endpoint in ("image_download", "image_url"):
         return httpx2.Response(200, content=b"test-image")
     if endpoint == "image_delete":
         return httpx2.Response(
@@ -123,6 +153,10 @@ def assert_image_request(endpoint: str, request) -> None:
         assert request.url.path == "/v1/files/test-file/content"
     elif endpoint == "image_delete":
         assert request.url.path == "/v1/files/test-file"
+    elif endpoint == "image_url":
+        assert request.url.host == "files.mistral.ai"
+        assert request.url.path == "/generated/test.png"
+        assert "authorization" not in request.headers
 
 
 async def main() -> None:
@@ -239,7 +273,7 @@ async def main() -> None:
         except api.errors.MistralError:
             assert status != 200
         else:
-            assert status == 200 or endpoint == "realtime"
+            assert status == 200 or endpoint in ("realtime", "image_url")
         finally:
             await api.async_close_client(hass, resources)
         assert sync_transport.is_closed

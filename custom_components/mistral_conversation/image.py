@@ -16,6 +16,7 @@ from PIL import Image, UnidentifiedImageError
 from .api import (
     async_delete_generated_file,
     async_download_image_file,
+    async_download_image_url,
     async_start_image_generation,
 )
 from .const import (
@@ -23,7 +24,9 @@ from .const import (
     LOGGER,
     MAX_GENERATED_IMAGE_BYTES,
     REQUEST_TIMEOUT_MS,
+    ApiErrorKind,
 )
+from .errors import ImageDownloadError
 
 if TYPE_CHECKING:
     from mistralai.client import Mistral
@@ -66,8 +69,22 @@ async def _await_shielded(task: asyncio.Task[None]) -> None:
         raise asyncio.CancelledError
 
 
+def _check_image_status(status: int) -> None:
+    """Storage authentication errors must not invalidate the Mistral key."""
+    if status != 200:
+        kind = ApiErrorKind.API
+        if status == 429:
+            kind = ApiErrorKind.RATE_LIMIT
+        elif status in (408, 504):
+            kind = ApiErrorKind.TIMEOUT
+        elif status >= 500:
+            kind = ApiErrorKind.CONNECTION
+        raise ImageDownloadError(kind)
+
+
 async def _read_bounded_image(response: httpx2.Response) -> bytes:
     """Read raw identity-encoded bytes; cleanup owns response closure."""
+    _check_image_status(response.status_code)
     if response.headers.get("content-encoding", "identity").casefold() != "identity":
         raise ImageGenerationError("image_response_invalid")
     content_length = response.headers.get("content-length")
@@ -84,10 +101,15 @@ async def _read_bounded_image(response: httpx2.Response) -> bytes:
     # that closure marks the response closed before its stream has closed, so
     # use the public stream interface and close it in our bounded finalizer.
     stream = cast(httpx2.AsyncByteStream, response.stream)
-    async for chunk in stream:
-        if len(output) + len(chunk) > MAX_GENERATED_IMAGE_BYTES:
-            raise ImageGenerationError("image_response_too_large")
-        output.extend(chunk)
+    try:
+        async for chunk in stream:
+            if len(output) + len(chunk) > MAX_GENERATED_IMAGE_BYTES:
+                raise ImageGenerationError("image_response_too_large")
+            output.extend(chunk)
+    except httpx2.TimeoutException:
+        raise ImageDownloadError(ApiErrorKind.TIMEOUT) from None
+    except httpx2.RequestError:
+        raise ImageDownloadError(ApiErrorKind.CONNECTION) from None
     if not output:
         raise ImageGenerationError("image_response_invalid")
     return bytes(output)
@@ -163,12 +185,16 @@ async def async_generate_image(
     response: httpx2.Response | None = None
     try:
         async with asyncio.timeout(REQUEST_TIMEOUT_MS / 1000):
-            file_ids = await async_start_image_generation(
+            sources = await async_start_image_generation(
                 client, model, prompt, attachments
             )
-            if not file_ids:
+            file_ids = sources.file_ids
+            if file_ids:
+                response = await async_download_image_file(client, file_ids[0])
+            elif sources.urls:
+                response = await async_download_image_url(client, sources.urls[0])
+            else:
                 raise ImageGenerationError("image_response_not_found")
-            response = await async_download_image_file(client, file_ids[0])
             data = await _read_bounded_image(response)
             mime_type = await hass.async_add_executor_job(_verified_mime_type, data)
             return GeneratedImage(data=data, mime_type=mime_type)

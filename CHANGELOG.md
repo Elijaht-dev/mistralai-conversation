@@ -5,6 +5,13 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Accept signed image URLs from the image tool while preserving Files API
+  downloads/deletion and compatibility with older Home Assistant versions.
+- Reject unapproved storage URLs and redirects; keep storage credentials out
+  of download errors and account credentials out of storage requests.
+
 ### Added
 
 - Curated model menus with custom IDs and Automatic, Batch and Realtime STT modes.
@@ -23,11 +30,11 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Validation
 
-437 tests pass on each HA baseline. Live voice, Conversation and structured
-AI Task checks passed. Direct Large 4 image generation and download succeeded;
-the HA image action remains blocked by URL-only provider responses, reproduced
-with SDK 2 and direct HTTP. Details and publication requirements are in
-[QUALITY.md](QUALITY.md#recorded-validation).
+501 tests pass on each HA baseline. Live voice, Conversation, structured AI Task
+and Large 4 image/reference generation with HA retrieval passed. Files API
+download and deletion were verified with a private synthetic PNG; URL-only
+images have no Files API deletion support. Details and publication requirements
+are in [QUALITY.md](QUALITY.md#recorded-validation).
 
 ## [0.5.5] - 2026-11-01
 

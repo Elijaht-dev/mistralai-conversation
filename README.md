@@ -119,8 +119,8 @@ returns its standard media result, including `media_source_id` and a signed
 guaranteed. PDF references are not supported for image generation.
 
 A response without an image is an error and is not automatically retried.
-The image action currently requires a Mistral file ID; URL-only responses are
-not yet supported. See the [recorded validation](QUALITY.md#recorded-validation).
+The action accepts Mistral file IDs and signed storage URLs returned by the image
+tool. File IDs take priority when both are present.
 
 ### Speech-to-text
 
@@ -180,6 +180,8 @@ Request traces exclude prompts, attachments, recordings, transcripts and audio.
 Home Assistant can retain generated images and cached speech. The integration
 attempts to delete generated Mistral image files whose IDs it receives;
 this does not guarantee zero provider retention or delete HA's local media.
+URL-only image results have no Files API ID and cannot be deleted through that
+API. Expiration of their signed link does not establish provider retention.
 
 Voice creation and retention are managed by Mistral. Use a cloned voice only
 with the speaker's informed consent.
@@ -205,7 +207,7 @@ See [SECURITY.md](SECURITY.md) for deployment and vulnerability-reporting guidan
 | STT unavailable | Check endpoint access, transcription mode and PCM format |
 | Voice missing | Confirm account access or enter the saved voice ID |
 | Normalization fails | Confirm FFmpeg is available, or disable normalization |
-| Image request returns no file | Review the image model and current validation status in QUALITY |
+| Image generation fails | Check model access, provider availability and HA media storage |
 
 Authentication, connection, rate-limit, timeout and provider failures have
 distinct handling. Connection failures mark entities unavailable until model
@@ -219,7 +221,8 @@ logger:
     custom_components.mistral_conversation: debug
 ```
 
-Avoid verbose SDK logging in normal operation and redact logs before sharing.
+Avoid verbose SDK or HTTP transport logging in normal operation and redact logs
+before sharing.
 
 ## Development
 

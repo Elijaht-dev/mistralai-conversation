@@ -22,10 +22,19 @@ class RealtimeError(Exception):
         self.kind = kind
 
 
+class ImageDownloadError(Exception):
+    """A storage failure without its signed URL or provider response body."""
+
+    def __init__(self, kind: ApiErrorKind = ApiErrorKind.API) -> None:
+        """Keep storage credentials out of Home Assistant errors and logs."""
+        super().__init__("Generated image download failed")
+        self.kind = kind
+
+
 def classify_api_error(err: BaseException) -> ApiErrorKind:
     """Classify an exception raised while communicating with Mistral."""
     error_kind = ApiErrorKind.API
-    if isinstance(err, RealtimeError):
+    if isinstance(err, RealtimeError | ImageDownloadError):
         return err.kind
     if isinstance(err, MistralError):
         if err.status_code in (401, 403):

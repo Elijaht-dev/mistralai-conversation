@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from collections.abc import AsyncGenerator, AsyncIterable
 from contextlib import asynccontextmanager, suppress
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from types import TracebackType
 from typing import Protocol, cast
-from urllib.parse import urlencode, urlparse, urlunparse
+from urllib.parse import parse_qs, urlencode, urlparse, urlsplit, urlunparse
 
 import httpcore2  # noqa: F401 -- HTTPX2 loads its transport lazily.
 import httpx2
@@ -48,7 +49,7 @@ from .const import (
     MistralModel,
     MistralVoice,
 )
-from .errors import RealtimeError
+from .errors import ImageDownloadError, RealtimeError
 
 # SDK 3.7.0's lazy exports do not cache resolved attributes. Merely importing
 # their modules still calls import_module (with relative names) on every access.
@@ -96,6 +97,7 @@ for _name in (
     "ImageURLChunk",
     "ImageGenerationTool",
     "ToolFileChunk",
+    "ToolExecutionEntry",
     "DeleteFileResponse",
     "ConversationInputs",
     "ConversationRequest",
@@ -137,6 +139,14 @@ class MistralClientResources:
 
     client: Mistral
     owned_http_client: httpx2.AsyncClient | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ImageGenerationSources:
+    """Generated Files API IDs and storage URLs, excluded from representations."""
+
+    file_ids: tuple[str, ...] = field(default=(), repr=False)
+    urls: tuple[str, ...] = field(default=(), repr=False)
 
 
 def _create_client(api_key: str, http_client: httpx2.AsyncClient) -> Mistral:
@@ -475,8 +485,8 @@ async def async_get_voices(client: Mistral) -> list[MistralVoice]:
 
 async def async_start_image_generation(
     client: Mistral, model: str, prompt: str, image_urls: list[str]
-) -> tuple[str, ...]:
-    """Start one image-tool conversation and return its unique generated files."""
+) -> ImageGenerationSources:
+    """Return only generated files and structured image-tool result URLs."""
     content: list[models.MessageInputContentChunks] = [models.TextChunk(text=prompt)]
     content.extend(models.ImageURLChunk(image_url=url) for url in image_urls)
     inputs: list[models.InputEntries] = [
@@ -498,7 +508,13 @@ async def async_start_image_generation(
 
     file_ids: list[str] = []
     seen: set[str] = set()
+    urls: dict[str, None] = {}
     for output in response.outputs:
+        if isinstance(output, models.ToolExecutionEntry):
+            url = _image_tool_result_url(output)
+            if url is not None:
+                urls[url] = None
+            continue
         if not isinstance(output, models.MessageOutputEntry) or not isinstance(
             output.content, list
         ):
@@ -512,7 +528,72 @@ async def async_start_image_generation(
             ):
                 seen.add(chunk.file_id)
                 file_ids.append(chunk.file_id)
-    return tuple(file_ids)
+    return ImageGenerationSources(file_ids=tuple(file_ids), urls=tuple(urls))
+
+
+def _image_tool_result_url(output: models.ToolExecutionEntry) -> str | None:
+    """Ignore assistant links, other tools and malformed result metadata."""
+    if output.name != "image_generation" or not output.info:
+        return None
+    result = output.info.get("result")
+    if isinstance(result, str):
+        try:
+            result = json.loads(result)
+        except ValueError:
+            return None
+    if isinstance(result, dict):
+        url = result.get("url")
+        if isinstance(url, str) and url:
+            return url
+    return None
+
+
+def _image_download_url(value: str) -> httpx2.URL:
+    """Restrict tool URLs to HTTPS provider storage with no embedded identity."""
+    if any(char.isspace() or ord(char) < 32 for char in value) or "\\" in value:
+        raise ImageDownloadError
+    try:
+        parsed = urlsplit(value)
+        if (
+            parsed.scheme != "https"
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.port not in (None, 443)
+            or parsed.fragment
+            or not parsed.path.startswith("/")
+        ):
+            raise ImageDownloadError
+        host = parsed.hostname or ""
+        azure_blob = re.fullmatch(r"[a-z0-9]{3,24}\.blob\.core\.windows\.net", host)
+        if host != "files.mistral.ai" and not (
+            azure_blob and parse_qs(parsed.query).get("sig")
+        ):
+            raise ImageDownloadError
+        return httpx2.URL(value)
+    except ValueError, httpx2.InvalidURL:
+        raise ImageDownloadError from None
+
+
+async def async_download_image_url(client: Mistral, url: str) -> httpx2.Response:
+    """Stream approved storage without SDK auth, default headers or cookies."""
+    request = httpx2.Request(
+        "GET",
+        _image_download_url(url),
+        headers={"Accept-Encoding": "identity"},
+        extensions={"timeout": httpx2.Timeout(REQUEST_TIMEOUT_MS / 1000).as_dict()},
+    )
+    # Every integration client uses HA's HTTPX2 transport or the account-owned
+    # compatibility transport. A standalone Request avoids merging credentials
+    # and cookies; auth=None also disables client-level authentication.
+    transport = cast(httpx2.AsyncClient, client.sdk_configuration.async_client)
+    try:
+        return await transport.send(
+            request, stream=True, auth=None, follow_redirects=False
+        )
+    except httpx2.TimeoutException:
+        raise ImageDownloadError(ApiErrorKind.TIMEOUT) from None
+    except httpx2.RequestError:
+        raise ImageDownloadError(ApiErrorKind.CONNECTION) from None
 
 
 async def async_download_image_file(client: Mistral, file_id: str) -> httpx2.Response:

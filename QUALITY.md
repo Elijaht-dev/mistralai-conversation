@@ -67,15 +67,22 @@ amplified. Audio stays in process pipes. Timeout, cancellation and unload reap
 subprocesses. Normalization failure does not return unprocessed audio or mark
 the provider unavailable. Resampling and lossy encoding can shift decoded peaks.
 
-Image generation uses Mistral's Conversations and Files APIs with only the
-image-generation tool and `store=False`. It creates no saved agent. Known models
-must advertise vision for references, which use supported image formats.
+Image generation uses Mistral's Conversations API with only the image-generation
+tool and `store=False`. It creates no saved agent. Known models must advertise
+vision for references, which use supported image formats.
 The first valid image is returned through HA's native media result; a text-only
 answer is an error.
 
+Files API IDs take priority over URLs. URL-only results must come from the
+image tool's structured result, never assistant text. Only HTTPS Mistral file
+hosting and signed Azure Blob storage URLs are accepted. Downloads reuse the
+account transport without forwarding authentication, default headers or cookies;
+redirects are rejected. Both formats share the byte, decoding and timeout bounds.
+
 Cleanup attempts deletion of deduplicated generated file IDs returned by the
 request. A cleanup failure does not discard an image already retrieved.
-Neither this deletion nor `store=False` guarantees zero provider retention.
+URL-only results cannot be deleted through the Files API. Neither deletion,
+signed-link expiration nor `store=False` guarantees zero provider retention.
 Home Assistant owns its local media copy.
 
 ### Failures and privacy
@@ -87,9 +94,10 @@ account offline.
 
 Empty streams, explicit stream errors, unsupported content, malformed media and
 exceeded limits fail closed. Diagnostics redact credentials, prompts and voice
-IDs. Request traces exclude prompt, attachment and audio content. Provider error
-text is bounded and normalized. See [SECURITY.md](SECURITY.md) for deployment
-guidance and private vulnerability reporting.
+IDs. Integration traces exclude prompt, attachment and audio content and signed
+storage URLs. Provider error text is bounded and normalized. See
+[SECURITY.md](SECURITY.md) for deployment guidance and private vulnerability
+reporting.
 
 ## Limits
 
@@ -129,13 +137,14 @@ checksum-verified libjpeg-turbo 3.2.1. Setup and commands are in
 
 ## Recorded validation
 
-The unreleased SDK 3 candidate was checked on 2026-11-04/05 under Python 3.14:
+The unreleased SDK 3 candidate with image URL support was checked on 2026-11-05
+under Python 3.14:
 
 | Home Assistant | Tests passed | Total coverage | Branch coverage |
 | --- | --- | --- | --- |
-| 2026.11.0 | 437 | 94.18% | 88.84% |
-| 2026.10.4 | 437 | 94.18% | 88.84% |
-| 2026.7.4 | 437 | 94.32% | 88.99% |
+| 2026.11.0 | 501 | 94.45% | 89.43% |
+| 2026.10.4 | 501 | 94.45% | 89.43% |
+| 2026.7.4 | 501 | 94.59% | 89.57% |
 
 Ruff, strict mypy on the primary baseline, dependency checks, English/French
 translation parity and offline HACS validation passed. Public CI remains
@@ -153,22 +162,22 @@ model choices, voice/audio settings and pipelines.
 | Synthetic batch STT | Passed |
 | Realtime 3 transcription, cancellation and recovery | Passed |
 | TTS generation and audio retrieval without playback | Passed |
-| Direct Large 4 image request and signed-URL download | Passed |
-| Image generation, references and provider-file deletion | Not validated |
+| Large 4 image generation, reference image and HA retrieval | Passed |
+| Files API download/deletion with a private synthetic PNG | Passed |
+| Files API deletion of URL-only images | Unavailable: no file ID |
 
 Temporary entities and the Realtime pipeline were removed. Installed runtime
 files matched the candidate. No Mistral warning/error or blocking-call lines
 appeared in the observed logs. Physical microphone and speaker behavior was
 not tested.
 
-Image diagnostics on 2026-11-05 confirmed that the same API key can use Large 4
-and retrieve a valid generated image. The live Conversations responses supplied
-a signed URL in the image tool's result instead of a generated-file chunk or
-Files API ID. URL-only output also occurred with SDK 2.10.1 and direct HTTP;
-it is present in the raw response, rather than lost during SDK decoding.
-The integration currently requires file IDs and rejects these responses.
-The returned URL grants read access only, so provider-file deletion remains
-unverified. Production configuration was not changed by these diagnostics.
+Live image requests returned signed URLs, also observed with SDK 2.10.1 and
+direct HTTP. After installing the fix and restarting HA, text-only and reference
+requests both produced valid native HA media. The original Files API path was
+independently verified with an owned private synthetic PNG: download, deletion
+and failed retrieval after deletion all passed. URL-only images provide no file
+ID for deletion. Original configuration and pipelines were preserved, temporary
+entities removed, and installed files verified against the candidate.
 
 ## Publication gate
 
@@ -179,8 +188,10 @@ Before a feature or SDK release:
    perform a full restart.
 3. Verify Conversation, local-intent follow-ups, a read-only tool round trip,
    structured AI Task, batch STT, Realtime cancellation/recovery and TTS retrieval.
-4. For image generation, verify a text request, a reference image, HA media
-   retrieval, provider deletion confirmation and failed retrieval after deletion.
+4. For image generation, verify a text request, a reference image and HA media
+   retrieval. For Files API results, confirm provider deletion and failed
+   retrieval after deletion. For URL-only results, verify the approved storage
+   download and record the absence of provider deletion support.
 5. Confirm preserved configuration, removed test entities and clean observed
    integration logs. Record untested paths and limitations.
 

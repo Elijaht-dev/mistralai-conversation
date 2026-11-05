@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Iterable
 
-import httpx
+import httpx2
 from homeassistant.components import conversation
 from homeassistant.helpers import llm
 from homeassistant.util.json import JsonObjectType
@@ -82,8 +82,8 @@ async def event_stream(
 
 def mistral_error(status_code: int, message: str = "provider error") -> MistralError:
     """Construct a real SDK error with an HTTP status."""
-    response = httpx.Response(
+    response = httpx2.Response(
         status_code,
-        request=httpx.Request("POST", "https://api.mistral.ai/v1/chat/completions"),
+        request=httpx2.Request("POST", "https://api.mistral.ai/v1/chat/completions"),
     )
     return MistralError(message, response)

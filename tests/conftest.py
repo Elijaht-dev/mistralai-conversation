@@ -4,14 +4,15 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Generator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from homeassistant.const import CONF_API_KEY
 from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.mistral_conversation.api import MistralClientResources
 from custom_components.mistral_conversation.const import (
     DEFAULT_AI_TASK_NAME,
     DEFAULT_AI_TASK_OPTIONS,
@@ -25,11 +26,18 @@ from custom_components.mistral_conversation.const import (
     SUBENTRY_TYPE_STT,
     MistralModel,
 )
+from tests.ha import MockConfigEntry
 
 
 @pytest.fixture(autouse=True)
 def _enable_custom_integrations(enable_custom_integrations: None) -> None:
     """Enable loading integrations from custom_components."""
+
+
+@pytest.fixture
+def hass_config_dir(tmp_path: Path) -> str:
+    """Give each HA instance an existing writable directory, including its TTS cache."""
+    return str(tmp_path)
 
 
 @pytest.fixture(autouse=True)
@@ -110,7 +118,7 @@ def mock_mistral_client() -> MagicMock:
     client.audio.transcriptions = MagicMock()
     client.audio.transcriptions.complete_async = AsyncMock()
     client.audio.voices = MagicMock()
-    client.audio.voices.list_async = AsyncMock()
+    client.audio.voices.search_async = AsyncMock(return_value=None)
     client.__aexit__ = AsyncMock(return_value=None)
     return client
 
@@ -124,7 +132,7 @@ def mock_provider(
     with (
         patch(
             "custom_components.mistral_conversation.coordinator.async_create_client",
-            return_value=mock_mistral_client,
+            return_value=MistralClientResources(mock_mistral_client),
         ),
         patch(
             "custom_components.mistral_conversation.coordinator.async_get_models",

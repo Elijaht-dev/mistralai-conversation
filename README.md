@@ -2,7 +2,7 @@
 
 [![Validate](https://github.com/Elijaht-dev/mistralai-conversation/actions/workflows/validate.yml/badge.svg)](https://github.com/Elijaht-dev/mistralai-conversation/actions/workflows/validate.yml)
 [![Home Assistant 2026.7.4+](https://img.shields.io/badge/Home%20Assistant-2026.7.4%2B-41BDF5.svg)](https://www.home-assistant.io/)
-[![Mistral SDK 2.10.1](https://img.shields.io/badge/mistralai-2.10.1-FA520F.svg)](https://pypi.org/project/mistralai/)
+[![Mistral SDK 3.7.0](https://img.shields.io/badge/mistralai-3.7.0-FA520F.svg)](https://pypi.org/project/mistralai/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 [![Open your Home Assistant instance and add this repository to HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Elijaht-dev&repository=mistralai-conversation&category=integration)
@@ -51,13 +51,11 @@ configurable because their capabilities may not be present in model discovery.
 Text-to-speech additionally requires a preset or saved voice available to the
 Mistral account.
 
-The integration pins `mistralai[realtime]==2.10.1`, including the SDK's WebSocket
-support for Realtime transcription.
-
-The SDK 3 migration is deferred until a supported Home Assistant release
-provides the compatible shared HTTPX2 client. The
-[core migration](https://github.com/home-assistant/core/pull/183371) is merged,
-but the current stable Home Assistant 2026.10.4 still uses HTTPX.
+The integration pins `mistralai[realtime]==3.7.0` and `httpx2==2.14.0`, including
+the SDK's WebSocket support for Realtime transcription. Home Assistant 2026.11
+provides the shared HTTPX2 client. On supported older releases, the integration
+creates and closes its own account-scoped HTTPX2 transport with Home Assistant's
+verified TLS context. The declared minimum remains Home Assistant 2026.7.4.
 
 Version `0.2.3` addresses blocking SDK initialization and lazy imports reported
 at startup in issue [#51](https://github.com/Elijaht-dev/mistralai-conversation/issues/51).

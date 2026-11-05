@@ -25,12 +25,12 @@ from homeassistant.helpers import (
     issue_registry as ir,
 )
 from homeassistant.setup import async_setup_component
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.mistral_conversation import (
     async_migrate_entry,
     async_remove_entry,
 )
+from custom_components.mistral_conversation.api import MistralClientResources
 from custom_components.mistral_conversation.const import (
     CONF_MAX_TOKENS,
     CONF_NORMALIZE_AUDIO,
@@ -51,6 +51,7 @@ from custom_components.mistral_conversation.const import (
     SUBENTRY_TYPE_TTS,
     MistralModel,
 )
+from tests.ha import MockConfigEntry
 
 from .helpers import mistral_error
 
@@ -74,8 +75,14 @@ async def test_setup_creates_entity_and_service_device(
     assert entity.config_subentry_id == subentry.subentry_id
     assert entity.translation_key == "conversation"
 
-    device = device_registry.async_get_device_by_identifier(
-        (DOMAIN, subentry.subentry_id), mock_config_entry.entry_id
+    device = (
+        device_registry.async_get_device_by_identifier(
+            (DOMAIN, subentry.subentry_id), mock_config_entry.entry_id
+        )
+        if hasattr(device_registry, "async_get_device_by_identifier")
+        else device_registry.async_get_device(
+            identifiers={(DOMAIN, subentry.subentry_id)}
+        )
     )
     assert device is not None
     assert device.name == "Mistral conversation"
@@ -111,7 +118,7 @@ async def test_setup_auth_failure_closes_client(
     with (
         patch(
             "custom_components.mistral_conversation.coordinator.async_create_client",
-            return_value=mock_mistral_client,
+            return_value=MistralClientResources(mock_mistral_client),
         ),
         patch(
             "custom_components.mistral_conversation.coordinator.async_get_models",
@@ -136,7 +143,7 @@ async def test_setup_connection_failure_enters_retry(
     with (
         patch(
             "custom_components.mistral_conversation.coordinator.async_create_client",
-            return_value=mock_mistral_client,
+            return_value=MistralClientResources(mock_mistral_client),
         ),
         patch(
             "custom_components.mistral_conversation.coordinator.async_get_models",
@@ -392,3 +399,19 @@ async def test_migration_keeps_existing_tts_audio_unchanged(
     assert await async_migrate_entry(hass, entry)
     assert entry.minor_version == 4
     assert len(entry.subentries) == 1
+
+
+async def test_platform_setup_failure_closes_client(
+    hass, mock_config_entry, mock_provider
+):
+    """Failure after discovery still releases SDK and compatibility resources."""
+    with patch.object(
+        hass.config_entries,
+        "async_forward_entry_setups",
+        side_effect=RuntimeError("platform setup"),
+    ):
+        assert await async_setup_component(hass, DOMAIN, {})
+        await hass.async_block_till_done()
+    assert mock_config_entry.state is ConfigEntryState.SETUP_ERROR
+    mock_provider.__exit__.assert_called_once()
+    mock_provider.__aexit__.assert_awaited_once()

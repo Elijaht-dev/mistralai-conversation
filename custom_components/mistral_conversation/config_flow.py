@@ -6,7 +6,7 @@ import logging
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any, cast, override
 
-import httpx
+import httpx2
 from homeassistant.config_entries import (
     SOURCE_USER,
     ConfigEntry,
@@ -237,7 +237,7 @@ class MistralConfigFlow(ConfigFlow, domain=DOMAIN):
             except (
                 MistralError,
                 NoResponseError,
-                httpx.HTTPError,
+                httpx2.HTTPError,
                 TimeoutError,
             ) as err:
                 errors["base"] = _connection_error_key(err)
@@ -296,7 +296,7 @@ class MistralConfigFlow(ConfigFlow, domain=DOMAIN):
             except (
                 MistralError,
                 NoResponseError,
-                httpx.HTTPError,
+                httpx2.HTTPError,
                 TimeoutError,
             ) as err:
                 errors["base"] = _connection_error_key(err)
@@ -634,7 +634,7 @@ class TTSSubentryFlowHandler(ConfigSubentryFlow):
         except (
             MistralError,
             NoResponseError,
-            httpx.HTTPError,
+            httpx2.HTTPError,
             TimeoutError,
         ) as err:
             _LOGGER.warning(

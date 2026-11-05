@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from io import BytesIO
 from typing import TYPE_CHECKING, cast
 
-import httpx
+import httpx2
 from homeassistant.core import HomeAssistant
 from PIL import Image, UnidentifiedImageError
 
@@ -66,7 +66,7 @@ async def _await_shielded(task: asyncio.Task[None]) -> None:
         raise asyncio.CancelledError
 
 
-async def _read_bounded_image(response: httpx.Response) -> bytes:
+async def _read_bounded_image(response: httpx2.Response) -> bytes:
     """Read raw identity-encoded bytes; cleanup owns response closure."""
     if response.headers.get("content-encoding", "identity").casefold() != "identity":
         raise ImageGenerationError("image_response_invalid")
@@ -83,7 +83,7 @@ async def _read_bounded_image(response: httpx.Response) -> bytes:
     # Response.aiter_bytes() implicitly closes at EOF. A cancellation during
     # that closure marks the response closed before its stream has closed, so
     # use the public stream interface and close it in our bounded finalizer.
-    stream = cast(httpx.AsyncByteStream, response.stream)
+    stream = cast(httpx2.AsyncByteStream, response.stream)
     async for chunk in stream:
         if len(output) + len(chunk) > MAX_GENERATED_IMAGE_BYTES:
             raise ImageGenerationError("image_response_too_large")
@@ -117,7 +117,7 @@ def _verified_mime_type(data: bytes) -> str:
 
 
 async def _cleanup_resources(
-    client: Mistral, file_ids: tuple[str, ...], response: httpx.Response | None
+    client: Mistral, file_ids: tuple[str, ...], response: httpx2.Response | None
 ) -> None:
     """Close the response and delete all known files within ten seconds total."""
     closed = response is None
@@ -160,7 +160,7 @@ async def async_generate_image(
 ) -> GeneratedImage:
     """Generate, download, validate, and best-effort delete one image."""
     file_ids: tuple[str, ...] = ()
-    response: httpx.Response | None = None
+    response: httpx2.Response | None = None
     try:
         async with asyncio.timeout(REQUEST_TIMEOUT_MS / 1000):
             file_ids = await async_start_image_generation(

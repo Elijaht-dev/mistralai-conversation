@@ -13,7 +13,6 @@ import pytest
 from homeassistant.components import stt
 from homeassistant.config_entries import ConfigSubentry
 from homeassistant.core import HomeAssistant
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.mistral_conversation.const import (
     DEFAULT_STT_MODEL,
@@ -22,6 +21,7 @@ from custom_components.mistral_conversation.const import (
     SUBENTRY_TYPE_STT,
 )
 from custom_components.mistral_conversation.stt import MistralSTTEntity
+from tests.ha import MockConfigEntry
 
 from .helpers import mistral_error
 from .test_realtime import Socket, connection

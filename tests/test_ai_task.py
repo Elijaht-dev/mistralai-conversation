@@ -11,9 +11,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 from mistralai.client.models import ResponseFormat
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.mistral_conversation.const import SUBENTRY_TYPE_AI_TASK
+from tests.ha import MockConfigEntry
 
 from .helpers import completion_event, event_stream
 

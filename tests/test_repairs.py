@@ -9,9 +9,9 @@ from homeassistant.const import CONF_MODEL
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.exceptions import HomeAssistantError
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.mistral_conversation.repairs import async_create_fix_flow
+from tests.ha import MockConfigEntry
 
 
 async def test_deprecated_model_repair(

@@ -4,19 +4,20 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx
+import httpx2
 import pytest
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import UpdateFailed
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.mistral_conversation.api import MistralClientResources
 from custom_components.mistral_conversation.const import MistralModel
 from custom_components.mistral_conversation.coordinator import (
     UPDATE_INTERVAL_CONNECTED,
     UPDATE_INTERVAL_DISCONNECTED,
     MistralCoordinator,
 )
+from tests.ha import MockConfigEntry
 
 from .helpers import mistral_error
 
@@ -32,7 +33,7 @@ async def test_setup_and_refresh_create_client_and_load_models(
     with (
         patch(
             "custom_components.mistral_conversation.coordinator.async_create_client",
-            return_value=mock_mistral_client,
+            return_value=MistralClientResources(mock_mistral_client),
         ) as create_client,
         patch(
             "custom_components.mistral_conversation.coordinator.async_get_models",
@@ -60,7 +61,7 @@ async def test_authentication_failure(
 ) -> None:
     """Rejected credentials become Home Assistant auth failures."""
     coordinator = MistralCoordinator(hass, mock_config_entry)
-    coordinator._client = mock_mistral_client
+    coordinator._resources = MistralClientResources(mock_mistral_client)
     with (
         patch(
             "custom_components.mistral_conversation.coordinator.async_get_models",
@@ -78,9 +79,9 @@ async def test_authentication_failure(
     "error",
     [
         TimeoutError("slow"),
-        httpx.ReadTimeout(
+        httpx2.ReadTimeout(
             "slow",
-            request=httpx.Request("GET", "https://api.mistral.ai"),
+            request=httpx2.Request("GET", "https://api.mistral.ai"),
         ),
     ],
 )
@@ -92,7 +93,7 @@ async def test_timeout_failure(
 ) -> None:
     """Timeout failures retain timeout semantics for coordinator retry handling."""
     coordinator = MistralCoordinator(hass, mock_config_entry)
-    coordinator._client = mock_mistral_client
+    coordinator._resources = MistralClientResources(mock_mistral_client)
     with (
         patch(
             "custom_components.mistral_conversation.coordinator.async_get_models",
@@ -109,9 +110,9 @@ async def test_timeout_failure(
     [
         mistral_error(400, "bad request"),
         mistral_error(500, "server unavailable"),
-        httpx.ConnectError(
+        httpx2.ConnectError(
             "offline",
-            request=httpx.Request("GET", "https://api.mistral.ai"),
+            request=httpx2.Request("GET", "https://api.mistral.ai"),
         ),
     ],
 )
@@ -123,7 +124,7 @@ async def test_update_failure(
 ) -> None:
     """Other expected provider failures become translated update failures."""
     coordinator = MistralCoordinator(hass, mock_config_entry)
-    coordinator._client = mock_mistral_client
+    coordinator._resources = MistralClientResources(mock_mistral_client)
     with (
         patch(
             "custom_components.mistral_conversation.coordinator.async_get_models",
@@ -201,7 +202,7 @@ async def test_close_delegates_to_api_helper(
 ) -> None:
     """Coordinator shutdown releases the SDK client."""
     coordinator = MistralCoordinator(hass, mock_config_entry)
-    coordinator._client = mock_mistral_client
+    coordinator._resources = MistralClientResources(mock_mistral_client)
 
     with patch(
         "custom_components.mistral_conversation.coordinator.async_close_client",
@@ -209,4 +210,6 @@ async def test_close_delegates_to_api_helper(
     ) as close_client:
         await coordinator.async_close()
 
-    close_client.assert_awaited_once_with(hass, mock_mistral_client)
+    close_client.assert_awaited_once_with(
+        hass, MistralClientResources(mock_mistral_client)
+    )

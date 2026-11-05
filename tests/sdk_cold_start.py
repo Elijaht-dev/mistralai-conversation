@@ -79,10 +79,10 @@ async def exercise(api, client, endpoint: str) -> None:
         raise AssertionError(endpoint)
 
 
-def image_response(httpx, endpoint: str):
+def image_response(httpx2, endpoint: str):
     """Return one mocked SDK response for the image endpoints."""
     if endpoint == "image_start":
-        return httpx.Response(
+        return httpx2.Response(
             200,
             json={
                 "conversation_id": "test-conversation",
@@ -102,9 +102,9 @@ def image_response(httpx, endpoint: str):
             },
         )
     if endpoint == "image_download":
-        return httpx.Response(200, content=b"test-image")
+        return httpx2.Response(200, content=b"test-image")
     if endpoint == "image_delete":
-        return httpx.Response(
+        return httpx2.Response(
             200,
             json={"id": "test-file", "object": "file", "deleted": True},
         )
@@ -139,7 +139,7 @@ async def main() -> None:
     api = await hass.async_add_executor_job(
         importlib.import_module, "custom_components.mistral_conversation.api"
     )
-    httpx = await hass.async_add_executor_job(importlib.import_module, "httpx")
+    httpx2 = await hass.async_add_executor_job(importlib.import_module, "httpx2")
 
     endpoint, status = sys.argv[1], int(sys.argv[2])
     requests = []
@@ -152,7 +152,7 @@ async def main() -> None:
                     {"loc": ["body"], "msg": "test error", "type": "value_error"}
                 ]
             }
-            return httpx.Response(status, json=body)
+            return httpx2.Response(status, json=body)
         if endpoint == "chat":
             chunk = {
                 "id": "test-completion",
@@ -167,13 +167,13 @@ async def main() -> None:
                     }
                 ],
             }
-            return httpx.Response(
+            return httpx2.Response(
                 200,
                 headers={"content-type": "text/event-stream"},
                 text=f"data: {json.dumps(chunk)}\n\ndata: [DONE]\n\n",
             )
         if endpoint == "stt":
-            return httpx.Response(
+            return httpx2.Response(
                 200,
                 json={
                     "text": "Hello",
@@ -183,7 +183,7 @@ async def main() -> None:
                 },
             )
         if endpoint == "tts":
-            return httpx.Response(
+            return httpx2.Response(
                 200,
                 headers={"content-type": "text/event-stream"},
                 text=(
@@ -193,10 +193,10 @@ async def main() -> None:
                 ),
             )
         if endpoint == "voices":
-            return httpx.Response(
+            return httpx2.Response(
                 200,
                 json={
-                    "items": [
+                    "data": [
                         {
                             "id": "test-preset",
                             "name": "Preset",
@@ -214,21 +214,19 @@ async def main() -> None:
                             "languages": ["fr"],
                         },
                     ],
-                    "total": 2,
-                    "page": 0,
-                    "page_size": 100,
-                    "total_pages": 1,
+                    "next_page_token": None,
                 },
             )
         return (
-            image_response(httpx, endpoint)
+            image_response(httpx2, endpoint)
             if endpoint.startswith("image_")
-            else httpx.Response(200, json={"object": "list", "data": []})
+            else httpx2.Response(200, json={"object": "list", "data": []})
         )
 
-    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as transport:
+    async with httpx2.AsyncClient(transport=httpx2.MockTransport(respond)) as transport:
         api.get_async_client = lambda hass: transport
-        client = await api.async_create_client(hass, "test-api-key")
+        resources = await api.async_create_client(hass, "test-api-key")
+        client = resources.client
         sync_transport = client.sdk_configuration.client
         try:
             if endpoint == "realtime":
@@ -243,7 +241,7 @@ async def main() -> None:
         else:
             assert status == 200 or endpoint == "realtime"
         finally:
-            await api.async_close_client(hass, client)
+            await api.async_close_client(hass, resources)
         assert sync_transport.is_closed
         assert not transport.is_closed
         assert len(requests) == (0 if endpoint == "realtime" else 1)

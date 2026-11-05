@@ -8,7 +8,7 @@ import wave
 from collections.abc import AsyncIterable
 from typing import override
 
-import httpx
+import httpx2
 from homeassistant.components import stt
 from homeassistant.config_entries import ConfigSubentry
 from homeassistant.core import HomeAssistant
@@ -181,7 +181,7 @@ class MistralSTTEntity(stt.SpeechToTextEntity, MistralBaseEntity):
         except (
             MistralError,
             NoResponseError,
-            httpx.HTTPError,
+            httpx2.HTTPError,
             TimeoutError,
         ) as err:
             translation_key, message = await self._async_process_api_error(err)

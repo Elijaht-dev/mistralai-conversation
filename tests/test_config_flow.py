@@ -17,8 +17,6 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import config_validation as cv
 from mistralai.client.errors import NoResponseError
-from probatio import to_field_list
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.mistral_conversation.const import (
     CONF_IMAGE_MODEL,
@@ -48,6 +46,7 @@ from custom_components.mistral_conversation.const import (
     MistralModel,
     MistralVoice,
 )
+from tests.ha import MockConfigEntry, to_field_list
 
 from .helpers import mistral_error
 

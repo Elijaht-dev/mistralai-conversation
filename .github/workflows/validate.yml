@@ -16,9 +16,19 @@ concurrency:
 
 jobs:
   quality:
-    name: Python quality and tests
+    name: Python quality and tests (${{ matrix.ha }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - ha: "2026.11.0"
+            requirements: requirements_test.txt
+          - ha: "2026.10.4"
+            requirements: requirements_test_2026_10.txt
+          - ha: "2026.7.4"
+            requirements: requirements_test_2026_7.txt
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -28,10 +38,13 @@ jobs:
         with:
           python-version: "3.14"
           cache: pip
-          cache-dependency-path: requirements_test.txt
+          cache-dependency-path: requirements_test*.txt
 
       - name: Install test dependencies
-        run: python -m pip install --requirement requirements_test.txt
+        run: python -m pip install --requirement ${{ matrix.requirements }}
+
+      - name: Check dependency compatibility
+        run: python -m pip check
 
       - name: Install FFmpeg for speech normalization tests
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
@@ -43,6 +56,7 @@ jobs:
         run: ruff check .
 
       - name: Type check
+        if: matrix.ha == '2026.11.0'
         run: mypy
 
       - name: Run Home Assistant-native tests
@@ -52,12 +66,19 @@ jobs:
           --cov=custom_components.mistral_conversation
           --cov-report=term-missing
           --cov-report=xml
+          --cov-report=json
+
+      - name: Enforce branch coverage
+        run: >-
+          python -c "import json; t = json.load(open('coverage.json'))['totals'];
+          assert t['covered_branches'] / t['num_branches'] >= 0.85,
+          f'Branch coverage is below 85%: {t}'"
 
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: coverage
+          name: coverage-${{ matrix.ha }}
           path: coverage.xml
           if-no-files-found: ignore
 

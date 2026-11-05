@@ -10,14 +10,13 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx
+import httpx2
 import pytest
 from homeassistant.components import ai_task, conversation
 from homeassistant.const import CONF_MODEL
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from PIL import Image
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.mistral_conversation.const import (
     CONF_IMAGE_MODEL,
@@ -32,6 +31,7 @@ from custom_components.mistral_conversation.image import (
     GeneratedImage,
     ImageGenerationError,
 )
+from tests.ha import MockConfigEntry
 
 from .helpers import mistral_error
 
@@ -389,9 +389,9 @@ async def test_image_result_errors_are_translated(
             True,
             False,
         ),
-        (httpx.ReadTimeout("secret prompt and file ID"), "api_timeout", True, False),
+        (httpx2.ReadTimeout("secret prompt and file ID"), "api_timeout", True, False),
         (
-            httpx.ConnectError("secret prompt and file ID"),
+            httpx2.ConnectError("secret prompt and file ID"),
             "api_connection_error",
             True,
             False,

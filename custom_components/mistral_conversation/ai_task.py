@@ -7,7 +7,7 @@ from json import JSONDecodeError
 from pathlib import Path
 from typing import override
 
-import httpx
+import httpx2
 from homeassistant.components import ai_task, conversation
 from homeassistant.config_entries import ConfigSubentry
 from homeassistant.core import HomeAssistant
@@ -127,7 +127,7 @@ class MistralAITaskEntity(ai_task.AITaskEntity, MistralBaseEntity):
                 translation_domain=DOMAIN,
                 translation_key=err.translation_key,
             ) from None
-        except (MistralError, NoResponseError, httpx.HTTPError, TimeoutError) as err:
+        except (MistralError, NoResponseError, httpx2.HTTPError, TimeoutError) as err:
             translation_key, _ = await self._async_process_api_error(err)
             # SDK errors can echo the prompt or a generated file identifier.
             raise HomeAssistantError(

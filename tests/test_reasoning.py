@@ -3,19 +3,17 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
-import httpx
+import httpx2
 import pytest
 from homeassistant.components import ai_task, conversation
-from homeassistant.components.llm import LLMTools
 from homeassistant.const import CONF_MODEL
 from homeassistant.core import Context, HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import intent
 from homeassistant.setup import async_setup_component
 from mistralai.client import Mistral
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.mistral_conversation.const import (
     CONF_REASONING_EFFORT,
@@ -24,6 +22,7 @@ from custom_components.mistral_conversation.const import (
     SUBENTRY_TYPE_CONVERSATION,
     MistralModel,
 )
+from tests.ha import MockConfigEntry, mock_llm_tools
 
 from .helpers import completion_event
 
@@ -128,7 +127,7 @@ async def test_reasoning_request_body(
 
     bodies: list[dict[str, object]] = []
 
-    async def respond(request: httpx.Request) -> httpx.Response:
+    async def respond(request: httpx2.Request) -> httpx2.Response:
         body = json.loads(request.content)
         bodies.append(body)
         if expected_effort is None:
@@ -136,14 +135,14 @@ async def test_reasoning_request_body(
         else:
             assert body["reasoning_effort"] == expected_effort
         chunk = completion_event(content="Hello", finish_reason="stop").data
-        return httpx.Response(
+        return httpx2.Response(
             200,
             headers={"content-type": "text/event-stream"},
             text=f"data: {chunk.model_dump_json()}\n\ndata: [DONE]\n\n",
         )
 
     async with (
-        httpx.AsyncClient(transport=httpx.MockTransport(respond)) as http_client,
+        httpx2.AsyncClient(transport=httpx2.MockTransport(respond)) as http_client,
         Mistral(api_key="test-api-key", async_client=http_client) as client,
     ):
         mock_provider.chat.stream_async.side_effect = client.chat.stream_async
@@ -166,11 +165,7 @@ async def test_reasoning_request_body(
                 )
                 assert task_result.data == "Hello"
         else:
-            with patch(
-                "homeassistant.components.llm.async_get_tools",
-                new_callable=AsyncMock,
-                return_value=LLMTools(tools=[]),
-            ):
+            with mock_llm_tools([]):
                 result = await conversation.async_converse(
                     hass,
                     "Say hello",

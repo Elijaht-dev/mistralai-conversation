@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Never, cast
 
-import httpx
+import httpx2
 from homeassistant.components import conversation
 from homeassistant.config_entries import ConfigSubentry
 from homeassistant.const import CONF_MODEL
@@ -829,7 +829,7 @@ class MistralBaseEntity(CoordinatorEntity[MistralCoordinator]):
             except (
                 MistralError,
                 NoResponseError,
-                httpx.HTTPError,
+                httpx2.HTTPError,
                 TimeoutError,
             ) as err:
                 await self._async_handle_api_error(err)

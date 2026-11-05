@@ -6,13 +6,13 @@ from unittest.mock import MagicMock
 
 from homeassistant.const import CONF_API_KEY, CONF_PROMPT
 from homeassistant.core import HomeAssistant
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.mistral_conversation.const import CONF_VOICE_ID
 from custom_components.mistral_conversation.diagnostics import (
     TO_REDACT,
     async_get_config_entry_diagnostics,
 )
+from tests.ha import MockConfigEntry
 
 
 async def test_entry_diagnostics_are_complete_and_redacted(

@@ -14,7 +14,6 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.setup import async_setup_component
 from mistralai.client.models import SpeechStreamAudioDelta, SpeechStreamEvents
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.mistral_conversation.audio import AudioProcessingError
 from custom_components.mistral_conversation.const import (
@@ -29,6 +28,7 @@ from custom_components.mistral_conversation.const import (
     SUBENTRY_TYPE_TTS,
     MistralVoice,
 )
+from tests.ha import MockConfigEntry
 
 from .helpers import mistral_error
 

@@ -7,7 +7,7 @@ from io import BytesIO
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
-import httpx
+import httpx2
 import pytest
 from homeassistant.core import HomeAssistant
 from mistralai.client import models
@@ -43,7 +43,7 @@ def _client(*chunks: models.MessageOutputContentChunks) -> MagicMock:
         )
     )
     client.files.download_async = AsyncMock(
-        return_value=httpx.Response(200, stream=httpx.ByteStream(_png()))
+        return_value=httpx2.Response(200, stream=httpx2.ByteStream(_png()))
     )
     return client
 
@@ -126,10 +126,10 @@ async def test_verified_supported_image_mime(
 ) -> None:
     """The MIME follows decoded image content instead of HTTP metadata."""
     client = _client(_image_chunk("file-1"))
-    client.files.download_async.return_value = httpx.Response(
+    client.files.download_async.return_value = httpx2.Response(
         200,
         headers={"content-type": "image/png"},
-        stream=httpx.ByteStream(_image(format_name)),
+        stream=httpx2.ByteStream(_image(format_name)),
     )
 
     result = await async_generate_image(hass, client, "model", "Draw", [])
@@ -171,10 +171,10 @@ async def test_non_identity_transfer_encoding_is_rejected_and_closed(
 ) -> None:
     """Raw stream reads cannot silently pass compressed transfer bytes."""
     client = _client(_image_chunk("file-1"))
-    response = httpx.Response(
+    response = httpx2.Response(
         200,
         headers={"content-encoding": "gzip"},
-        stream=httpx.ByteStream(_png()),
+        stream=httpx2.ByteStream(_png()),
     )
     client.files.download_async.return_value = response
 
@@ -206,7 +206,7 @@ async def test_invalid_or_oversized_download_is_rejected_and_deleted(
 ) -> None:
     """Untrusted output cannot bypass the byte and format checks."""
     client = _client(_image_chunk("file-1"))
-    response = httpx.Response(200, headers=headers, stream=httpx.ByteStream(payload))
+    response = httpx2.Response(200, headers=headers, stream=httpx2.ByteStream(payload))
     client.files.download_async.return_value = response
 
     with pytest.raises(ImageGenerationError) as caught:
@@ -223,9 +223,9 @@ async def test_download_failure_still_deletes_all_generated_files(
 ) -> None:
     """A failed download does not leave known extra provider files behind."""
     client = _client(_image_chunk("file-1"), _image_chunk("file-2"))
-    client.files.download_async.side_effect = httpx.ConnectError("offline")
+    client.files.download_async.side_effect = httpx2.ConnectError("offline")
 
-    with pytest.raises(httpx.ConnectError):
+    with pytest.raises(httpx2.ConnectError):
         await async_generate_image(hass, client, "model", "Draw", [])
 
     assert client.files.delete_async.await_count == 2
@@ -289,7 +289,7 @@ async def test_generation_deadline_is_not_extended_by_provider(
     client.files.delete_async.assert_not_awaited()
 
 
-class _WaitingStream(httpx.AsyncByteStream):
+class _WaitingStream(httpx2.AsyncByteStream):
     def __init__(self, entered: asyncio.Event) -> None:
         self.entered = entered
         self.closed = False
@@ -320,7 +320,7 @@ class _WaitingCloseStream(_WaitingStream):
         await super().aclose()
 
 
-class _SlowCloseImageStream(httpx.AsyncByteStream):
+class _SlowCloseImageStream(httpx2.AsyncByteStream):
     def __init__(self, closing: asyncio.Event) -> None:
         self.closing = closing
 
@@ -340,7 +340,7 @@ async def test_download_timeout_closes_response_and_deletes_file(
     entered = asyncio.Event()
     stream = _WaitingStream(entered)
     client = _client(_image_chunk("file-1"))
-    client.files.download_async.return_value = httpx.Response(200, stream=stream)
+    client.files.download_async.return_value = httpx2.Response(200, stream=stream)
     monkeypatch.setattr(image_module, "REQUEST_TIMEOUT_MS", 10)
 
     with pytest.raises(TimeoutError):
@@ -360,7 +360,7 @@ async def test_unload_cancellation_while_closing_response_still_closes_it(
     release = asyncio.Event()
     stream = _WaitingCloseStream(entered, closing, release)
     client = _client(_image_chunk("file-1"))
-    client.files.download_async.return_value = httpx.Response(200, stream=stream)
+    client.files.download_async.return_value = httpx2.Response(200, stream=stream)
     request = asyncio.create_task(
         async_generate_image(hass, client, "model", "Draw", [])
     )
@@ -383,7 +383,7 @@ async def test_response_close_and_file_delete_share_cleanup_deadline(
     """Slow HTTP closure cannot consume a second, independent deletion budget."""
     closing = asyncio.Event()
     client = _client(_image_chunk("file-1"), _image_chunk("file-2"))
-    client.files.download_async.return_value = httpx.Response(
+    client.files.download_async.return_value = httpx2.Response(
         200, stream=_SlowCloseImageStream(closing)
     )
 
@@ -412,7 +412,7 @@ async def test_repeated_cancellation_closes_download_and_completes_cleanup(
     release = asyncio.Event()
     stream = _WaitingStream(entered)
     client = _client(_image_chunk("file-1"))
-    client.files.download_async.return_value = httpx.Response(200, stream=stream)
+    client.files.download_async.return_value = httpx2.Response(200, stream=stream)
 
     async def delete(**_kwargs: object) -> SimpleNamespace:
         deleting.set()

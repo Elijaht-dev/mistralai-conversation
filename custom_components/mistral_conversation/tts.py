@@ -7,7 +7,7 @@ import binascii
 from collections.abc import Mapping, Sequence
 from typing import Any, override
 
-import httpx
+import httpx2
 from homeassistant.components.ffmpeg import get_ffmpeg_manager
 from homeassistant.components.tts import (
     ATTR_PREFERRED_FORMAT,
@@ -133,7 +133,7 @@ async def async_setup_entry(
     except (
         MistralError,
         NoResponseError,
-        httpx.HTTPError,
+        httpx2.HTTPError,
         TimeoutError,
     ) as err:
         LOGGER.warning(
@@ -284,7 +284,7 @@ class MistralTTSEntity(TextToSpeechEntity, MistralBaseEntity):
         except (
             MistralError,
             NoResponseError,
-            httpx.HTTPError,
+            httpx2.HTTPError,
             TimeoutError,
         ) as err:
             await self._async_handle_api_error(err)

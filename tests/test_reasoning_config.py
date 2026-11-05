@@ -9,7 +9,6 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers.translation import async_get_translations
 from homeassistant.setup import async_setup_component
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.mistral_conversation.const import (
     CONF_REASONING_EFFORT,
@@ -19,6 +18,7 @@ from custom_components.mistral_conversation.const import (
     SUBENTRY_TYPE_CONVERSATION,
     MistralModel,
 )
+from tests.ha import MockConfigEntry
 
 
 @pytest.mark.parametrize(

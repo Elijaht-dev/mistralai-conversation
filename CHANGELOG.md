@@ -7,6 +7,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- Migrate to Mistral SDK 3.7.0 and HTTPX2 2.14.0, sharing HA 2026.11 transport
+  and closing an owned verified transport on older supported releases.
+- Use cursor-paginated voice discovery, acknowledge Realtime session settings,
+  and preload SDK types without suppressing HA blocking-call detection.
+- Test with matching native fixtures on HA 2026.11.0, 2026.10.4, and 2026.7.4.
+
 ## [0.5.5] - 2026-11-01
 
 ### Changed

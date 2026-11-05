@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-import httpx
+import httpx2
 from mistralai.client.errors import MistralError, NoResponseError
 
 from .const import ApiErrorKind
@@ -36,9 +36,9 @@ def classify_api_error(err: BaseException) -> ApiErrorKind:
             error_kind = ApiErrorKind.TIMEOUT
         elif err.status_code is not None and err.status_code >= 500:
             error_kind = ApiErrorKind.CONNECTION
-    elif isinstance(err, TimeoutError | httpx.TimeoutException):
+    elif isinstance(err, TimeoutError | httpx2.TimeoutException):
         error_kind = ApiErrorKind.TIMEOUT
-    elif isinstance(err, NoResponseError | httpx.RequestError):
+    elif isinstance(err, NoResponseError | httpx2.RequestError):
         error_kind = ApiErrorKind.CONNECTION
     return error_kind
 

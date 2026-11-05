@@ -19,10 +19,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   turn events and wait for the final transcript after all audio is sent.
 - Use cursor-paginated voice discovery and update SDK cold-start preloading.
 - Test with HA 2026.11.0, 2026.10.4, and the unchanged 2026.7.4 minimum.
+- Update the test-only PyTurboJPEG dependency to 2.6.1 and verify JPEG encoding
+  and decoding with an isolated, checksum-verified libjpeg-turbo 3.2.1 backend.
 
 ### Validation
 
-- 436 tests passed on each of HA 2026.11.0, 2026.10.4, and 2026.7.4. Total
+- 437 tests passed on each of HA 2026.11.0, 2026.10.4, and 2026.7.4. Total
   coverage is at least 94.18%, with at least 88.84% branch coverage. Formatting,
   lint, strict typing, dependency checks, translation parity, and offline HACS
   validation passed. Public CI remains required before publication.

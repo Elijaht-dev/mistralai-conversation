@@ -392,6 +392,11 @@ pytest --cov=custom_components.mistral_conversation --cov-report=term-missing
 See [QUALITY.md](QUALITY.md) for the design comparison and assurance boundaries,
 and [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow.
 
+The development environment pins PyTurboJPEG 2.6.1 and verifies JPEG encoding
+and decoding against libjpeg-turbo 3+. See the contribution guide for native
+library setup. This is a test dependency; Home Assistant manages its own runtime
+image libraries.
+
 ## License
 
 MIT

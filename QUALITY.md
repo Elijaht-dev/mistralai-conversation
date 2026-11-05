@@ -166,12 +166,15 @@ and provider responses are mocked; normal CI never makes a live Mistral request.
 
 ## Release gate
 
-The unreleased HTTPX2 / SDK 3 candidate passed 436 tests on each of Home
+The unreleased HTTPX2 / SDK 3 candidate passed 437 tests on each of Home
 Assistant 2026.11.0, 2026.10.4, and 2026.7.4 under Python 3.14. Total coverage
 was 94.18%, 94.18%, and 94.32%; branch coverage was 88.84%, 88.84%, and 88.99%,
 respectively. Ruff, strict mypy on the 2026.11 baseline, dependency checks in all
 three environments, matching English/French translation keys and placeholders,
 and offline HACS validation passed. Public HACS and Hassfest remain CI gates.
+The test environment uses PyTurboJPEG 2.6.1 with the checksum-verified native
+libjpeg-turbo 3.2.1 backend; a real synthetic JPEG encode/decode test passes on
+each HA baseline.
 
 Version `0.5.5` updates only the test environment, documentation, and integration
 version. The full suite passed 385 tests on Home Assistant 2026.10.4 with

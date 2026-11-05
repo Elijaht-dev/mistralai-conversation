@@ -49,6 +49,19 @@ jobs:
       - name: Install FFmpeg for speech normalization tests
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
 
+      - name: Prepare isolated libjpeg-turbo 3 for JPEG tests
+        run: |
+          task_turbo="$RUNNER_TEMP/libjpeg-turbo-3.2.1"
+          mkdir -p "$task_turbo"
+          curl --fail --location --silent --show-error \
+            https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/3.2.1/libjpeg-turbo-official_3.2.1_amd64.deb \
+            --output "$task_turbo/package.deb"
+          printf '%s  %s\n' \
+            21c7af6e505386dda0fa05e9eab5a8d288947f2e09ade8d7a48ff393ed08182d \
+            "$task_turbo/package.deb" | sha256sum --check -
+          dpkg-deb --extract "$task_turbo/package.deb" "$task_turbo"
+          echo "LD_LIBRARY_PATH=$task_turbo/opt/libjpeg-turbo/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
+
       - name: Check formatting
         run: ruff format --check .
 

@@ -15,6 +15,18 @@ python -m pip install --requirement requirements_test.txt
 Install FFmpeg on your test machine and make `ffmpeg` available on `PATH` for
 the speech-normalization tests. CI installs it explicitly.
 
+The pinned PyTurboJPEG 2.6.1 also requires a native libjpeg-turbo 3.0 or newer.
+Install a compatible library from the
+[official libjpeg-turbo releases](https://github.com/libjpeg-turbo/libjpeg-turbo/releases).
+The JPEG test encodes and decodes synthetic pixels to verify the native backend.
+CI extracts the official 3.2.1 package into an isolated temporary directory,
+verifies its SHA-256 digest, and selects it with `LD_LIBRARY_PATH`.
+On Linux, keep that directory on the library path for local test runs too.
+
+Use `requirements_test_2026_10.txt` or `requirements_test_2026_7.txt` in separate
+virtual environments to run the compatibility suites. The primary environment
+uses the official HA 2026.11 fixtures pinned to the release source commit.
+
 Run the complete local quality gate before opening a pull request:
 
 ```bash

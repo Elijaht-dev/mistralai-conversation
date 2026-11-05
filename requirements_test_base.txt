@@ -7,5 +7,5 @@ mistralai[realtime]==3.7.0
 mypy==2.4.0
 mutagen==1.47.0
 pytest-cov==7.1.0
-PyTurboJPEG==1.8.3
+PyTurboJPEG==2.6.1
 ruff==0.17.3

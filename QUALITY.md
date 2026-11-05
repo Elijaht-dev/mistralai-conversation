@@ -137,8 +137,8 @@ checksum-verified libjpeg-turbo 3.2.1. Setup and commands are in
 
 ## Recorded validation
 
-The unreleased SDK 3 candidate with image URL support was checked on 2026-11-05
-under Python 3.14:
+Validation for 0.6.0, including SDK 3 and image URL support, was performed on
+2026-11-05 under Python 3.14:
 
 | Home Assistant | Tests passed | Total coverage | Branch coverage |
 | --- | --- | --- | --- |

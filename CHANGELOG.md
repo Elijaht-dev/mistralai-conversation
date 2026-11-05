@@ -5,6 +5,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-05
+
 ### Fixed
 
 - Accept signed image URLs from the image tool while preserving Files API
@@ -304,7 +306,8 @@ The beta was checked on HA 2026.8.6 and 2026.9.0 before the stable release.
 - Capability checks, model repairs, reauthentication, diagnostics and migrations.
 - English/French translations and automated quality, HACS and Hassfest checks.
 
-[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.5...HEAD
+[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.5...v0.6.0
 [0.5.5]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.2...v0.5.3

@@ -11,8 +11,8 @@ SDK. It provides Conversation, AI Task, speech-to-text and text-to-speech
 entities, with English and French configuration interfaces.
 
 This is an independent project, not developed, reviewed or endorsed by Home
-Assistant or Mistral AI. This README describes the development branch;
-[CHANGELOG.md](CHANGELOG.md) lists released and unreleased changes.
+Assistant or Mistral AI. [CHANGELOG.md](CHANGELOG.md) lists released and
+unreleased changes.
 
 ## Requirements
 
@@ -28,8 +28,10 @@ Current versions and compatibility details are in [QUALITY.md](QUALITY.md).
 
 ### HACS
 
-Find **Mistral AI Conversation** in HACS, download it and restart Home Assistant.
-The HACS button above opens the repository in your instance.
+Use the HACS button above to add this repository, or add
+[the repository](https://github.com/Elijaht-dev/mistralai-conversation) manually as
+a custom **Integration** repository. Download **Mistral AI Conversation** in HACS
+and restart Home Assistant.
 
 ### Manual installation
 

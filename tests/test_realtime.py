@@ -128,6 +128,28 @@ async def test_streams_audio_before_input_finishes() -> None:
     assert socket.closed
 
 
+async def test_turn_end_does_not_discard_trailing_transcription():
+    """Turn boundaries are advisory; only the final full transcript completes STT."""
+    socket = Socket(
+        [
+            {"type": "turn.start", "time_s": 0.0},
+            {"type": "transcription.text.delta", "text": "Hello"},
+            {"type": "turn.eager_end", "time_s": 0.2},
+            {"type": "turn.resume", "time_s": 0.3},
+            {"type": "turn.end", "time_s": 0.5, "end_reason": "threshold"},
+            {"type": "transcription.text.delta", "text": " world"},
+            _done("Hello world"),
+        ]
+    )
+    assert (
+        await async_transcribe_realtime(
+            client_for(socket), REALTIME_STT_MODEL, audio(b"ab")
+        )
+        == "Hello world"
+    )
+    assert socket.closed
+
+
 @pytest.mark.parametrize(
     "events",
     [

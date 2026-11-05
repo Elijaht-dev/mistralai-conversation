@@ -68,6 +68,19 @@ async def exercise_realtime(hass, api, client, status):
         async for raw in socket:
             message = json.loads(raw)
             messages.append(message["type"])
+            if message["type"] == "session.update":
+                await socket.send(
+                    json.dumps(
+                        {
+                            "type": "session.updated",
+                            "session": {
+                                "request_id": "test-request",
+                                "model": "test-model",
+                                "audio_format": message["session"]["audio_format"],
+                            },
+                        }
+                    )
+                )
             if message["type"] == "input_audio.end":
                 event = (
                     {

@@ -2,6 +2,8 @@ name: Validate
 
 on:
   push:
+    branches:
+      - main
   pull_request:
   schedule:
     - cron: "0 4 * * 1"
@@ -16,9 +18,28 @@ concurrency:
 
 jobs:
   quality:
-    name: Python quality and tests
+    name: Python quality and tests (HA ${{ matrix.ha }}, HTTPX2 ${{ matrix.httpx2 }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - ha: "2026.11.0"
+            httpx2: "2.14.0"
+            requirements: requirements_test.txt
+          - ha: "2026.10.4"
+            httpx2: "2.14.0"
+            requirements: requirements_test_2026_10.txt
+          - ha: "2026.7.4"
+            httpx2: "2.14.0"
+            requirements: requirements_test_2026_7.txt
+          - ha: "2026.10.4"
+            httpx2: "2.16.0"
+            requirements: requirements_test_2026_10_httpx2_2_16.txt
+          - ha: "2026.7.4"
+            httpx2: "2.16.0"
+            requirements: requirements_test_2026_7_httpx2_2_16.txt
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -28,13 +49,29 @@ jobs:
         with:
           python-version: "3.14"
           cache: pip
-          cache-dependency-path: requirements_test.txt
+          cache-dependency-path: requirements_test*.txt
 
       - name: Install test dependencies
-        run: python -m pip install --requirement requirements_test.txt
+        run: python -m pip install --requirement ${{ matrix.requirements }}
+
+      - name: Check dependency compatibility
+        run: python -m pip check
 
       - name: Install FFmpeg for speech normalization tests
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Prepare isolated libjpeg-turbo 3 for JPEG tests
+        run: |
+          task_turbo="$RUNNER_TEMP/libjpeg-turbo-3.2.1"
+          mkdir -p "$task_turbo"
+          curl --fail --location --silent --show-error \
+            https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/3.2.1/libjpeg-turbo-official_3.2.1_amd64.deb \
+            --output "$task_turbo/package.deb"
+          printf '%s  %s\n' \
+            21c7af6e505386dda0fa05e9eab5a8d288947f2e09ade8d7a48ff393ed08182d \
+            "$task_turbo/package.deb" | sha256sum --check -
+          dpkg-deb --extract "$task_turbo/package.deb" "$task_turbo"
+          echo "LD_LIBRARY_PATH=$task_turbo/opt/libjpeg-turbo/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
 
       - name: Check formatting
         run: ruff format --check .
@@ -43,6 +80,7 @@ jobs:
         run: ruff check .
 
       - name: Type check
+        if: matrix.ha == '2026.11.0'
         run: mypy
 
       - name: Run Home Assistant-native tests
@@ -52,12 +90,19 @@ jobs:
           --cov=custom_components.mistral_conversation
           --cov-report=term-missing
           --cov-report=xml
+          --cov-report=json
+
+      - name: Enforce branch coverage
+        run: >-
+          python -c "import json; t = json.load(open('coverage.json'))['totals'];
+          assert t['covered_branches'] / t['num_branches'] >= 0.85,
+          f'Branch coverage is below 85%: {t}'"
 
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: coverage
+          name: coverage-${{ matrix.ha }}-${{ matrix.httpx2 }}
           path: coverage.xml
           if-no-files-found: ignore
 

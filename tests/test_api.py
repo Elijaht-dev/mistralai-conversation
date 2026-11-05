@@ -8,11 +8,13 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
+import httpx2
 import pytest
 from homeassistant.core import HomeAssistant
 from mistralai.client.models import BaseModelCard, FTModelCard, ModelCapabilities
 
 from custom_components.mistral_conversation.api import (
+    MistralClientResources,
     async_close_client,
     async_create_client,
     async_get_models,
@@ -81,8 +83,9 @@ async def test_get_models_parses_metadata_and_sorts() -> None:
 
     models = await async_get_models(client)
 
-    assert [model.id for model in models] == ["a-model", "z-model"]
-    model = models[1]
+    assert [model.id for model in models] == ["a-model", "not-chat", "z-model"]
+    assert not models[1].completion_chat
+    model = models[2]
     assert model.name == "Zed"
     assert model.description == "A capable model"
     assert model.aliases == ("z-latest",)
@@ -129,57 +132,66 @@ async def test_get_models_filters_archived_fine_tunes() -> None:
 async def test_get_voices_pages_filters_and_sorts() -> None:
     """Preset and custom voices are returned as stable account metadata."""
     client = MagicMock()
-    client.audio.voices.list_async = AsyncMock(
+    client.audio.voices.search_async = AsyncMock(
         side_effect=[
             SimpleNamespace(
-                items=[
+                data=[
                     SimpleNamespace(id="voice-z", name="Zulu", languages=["en"]),
                     SimpleNamespace(id="", name="Ignored", languages=[]),
                 ],
-                total=3,
+                next_page_token="second-page",
             ),
             SimpleNamespace(
-                items=[
+                data=[
                     SimpleNamespace(
                         id="voice-a",
                         name="Alpha",
                         languages=["fr", "en"],
                     )
                 ],
-                total=3,
+                next_page_token=None,
             ),
         ]
     )
 
+    pages = client.audio.voices.search_async.side_effect
+    client.audio.voices.search_async.side_effect = [
+        SimpleNamespace(result=page) for page in pages
+    ]
     voices = await async_get_voices(client)
 
     assert [voice.id for voice in voices] == ["voice-a", "voice-z"]
     assert voices[0].languages == ("fr", "en")
-    assert client.audio.voices.list_async.await_args_list[0].kwargs == {
-        "limit": VOICE_LIST_PAGE_SIZE,
-        "offset": 0,
+    assert client.audio.voices.search_async.await_args_list[0].kwargs == {
+        "page_size": VOICE_LIST_PAGE_SIZE,
+        "page_token": None,
         "type_": "all",
         "timeout_ms": SETUP_TIMEOUT_MS,
     }
-    assert client.audio.voices.list_async.await_args_list[1].kwargs["offset"] == 2
+    assert (
+        client.audio.voices.search_async.await_args_list[1].kwargs["page_token"]
+        == "second-page"
+    )
 
 
 async def test_get_voices_stops_on_empty_page() -> None:
     """An empty provider page terminates pagination without retries."""
     client = MagicMock()
-    client.audio.voices.list_async = AsyncMock(
-        return_value=SimpleNamespace(items=[], total=20)
+    client.audio.voices.search_async = AsyncMock(
+        return_value=SimpleNamespace(
+            result=SimpleNamespace(data=[], next_page_token="unused")
+        )
     )
 
     assert await async_get_voices(client) == []
-    client.audio.voices.list_async.assert_awaited_once()
+    client.audio.voices.search_async.assert_awaited_once()
 
 
 async def test_create_client_uses_home_assistant_http_client(
     hass: HomeAssistant,
 ) -> None:
     """The SDK shares Home Assistant's managed asynchronous transport."""
-    shared_client = object()
+    shared_client = MagicMock(spec=httpx2.AsyncClient)
     sdk_client = MagicMock()
     loop_thread = threading.get_ident()
 
@@ -203,15 +215,20 @@ async def test_create_client_uses_home_assistant_http_client(
     ):
         result = await async_create_client(hass, "test-api-key")
 
-    assert result is sdk_client
+    assert result.client is sdk_client
+    assert result.owned_http_client is None
     mistral.assert_called_once_with(
         api_key="test-api-key",
         async_client=shared_client,
     )
 
 
+@pytest.mark.parametrize("legacy", [False, True])
+@pytest.mark.parametrize("cleanup_failure", [False, True])
 async def test_create_client_closes_on_service_initialization_failure(
     hass: HomeAssistant,
+    legacy: bool,
+    cleanup_failure: bool,
 ) -> None:
     """A failed lazy service initialization releases SDK-owned resources."""
     client = MagicMock()
@@ -221,7 +238,18 @@ async def test_create_client_closes_on_service_initialization_failure(
         assert threading.get_ident() != loop_thread
 
     client.__exit__.side_effect = close
+    transport = MagicMock(spec=httpx2.AsyncClient)
+    if cleanup_failure:
+        transport.aclose.side_effect = RuntimeError("cleanup failure")
     with (
+        patch(
+            "custom_components.mistral_conversation.api.get_async_client",
+            return_value=object() if legacy else transport,
+        ),
+        patch(
+            "custom_components.mistral_conversation.api._create_http_client",
+            return_value=transport,
+        ),
         patch(
             "custom_components.mistral_conversation.api.Mistral", return_value=client
         ),
@@ -233,9 +261,13 @@ async def test_create_client_closes_on_service_initialization_failure(
         audio.side_effect = RuntimeError("service initialization")
         await async_create_client(hass, "test-api-key")
     client.__exit__.assert_called_once_with(None, None, None)
+    assert transport.aclose.await_count == int(legacy)
 
 
-async def test_create_client_closes_after_cancellation(hass: HomeAssistant) -> None:
+@pytest.mark.parametrize("legacy", [False, True])
+async def test_create_client_closes_after_cancellation(
+    hass: HomeAssistant, legacy: bool
+) -> None:
     """Cancellation during worker construction cannot leak the resulting client."""
     started = asyncio.Event()
     release = threading.Event()
@@ -248,8 +280,19 @@ async def test_create_client_closes_after_cancellation(hass: HomeAssistant) -> N
         assert release.wait(timeout=10)
         return client
 
-    with patch(
-        "custom_components.mistral_conversation.api.Mistral", side_effect=construct
+    transport = MagicMock(spec=httpx2.AsyncClient)
+    with (
+        patch(
+            "custom_components.mistral_conversation.api.get_async_client",
+            return_value=object() if legacy else transport,
+        ),
+        patch(
+            "custom_components.mistral_conversation.api._create_http_client",
+            return_value=transport,
+        ),
+        patch(
+            "custom_components.mistral_conversation.api.Mistral", side_effect=construct
+        ),
     ):
         task = asyncio.create_task(async_create_client(hass, "test-api-key"))
         try:
@@ -261,6 +304,87 @@ async def test_create_client_closes_after_cancellation(hass: HomeAssistant) -> N
             await task
     client.__exit__.assert_called_once_with(None, None, None)
     client.__aexit__.assert_awaited_once_with(None, None, None)
+    assert transport.aclose.await_count == int(legacy)
+
+
+async def test_legacy_client_uses_verified_owned_httpx2_transport(hass):
+    """The real compatibility transport is verified and closed deterministically."""
+    with patch(
+        "custom_components.mistral_conversation.api.get_async_client",
+        return_value=object(),
+    ):
+        resources = await async_create_client(hass, "test-api-key")
+    assert isinstance(resources.owned_http_client, httpx2.AsyncClient)
+    assert (
+        resources.client.sdk_configuration.async_client is resources.owned_http_client
+    )
+    assert not resources.owned_http_client.is_closed
+    await async_close_client(hass, resources)
+    assert resources.owned_http_client.is_closed
+
+
+async def test_get_voices_deduplicates_and_bounds_repeated_cursors():
+    """A looping provider cursor cannot cause unbounded requests or duplicate voices."""
+    client = MagicMock()
+    voice = SimpleNamespace(id="voice", name="Preset", languages=[])
+    client.audio.voices.search_async = AsyncMock(
+        return_value=SimpleNamespace(
+            result=SimpleNamespace(data=[voice, voice], next_page_token="same")
+        )
+    )
+    voices = await async_get_voices(client)
+    assert [voice.id for voice in voices] == ["voice"]
+    assert client.audio.voices.search_async.await_count == 2
+
+
+async def test_get_voices_preserves_provider_count_bound(monkeypatch):
+    """Invalid or duplicate rows still consume the pagination budget."""
+    monkeypatch.setattr("custom_components.mistral_conversation.api.MAX_VOICES", 3)
+    client = MagicMock()
+    voice = SimpleNamespace(id="voice", name="Preset", languages=[])
+    client.audio.voices.search_async = AsyncMock(
+        side_effect=[
+            SimpleNamespace(
+                result=SimpleNamespace(data=[voice, voice], next_page_token="next")
+            ),
+            SimpleNamespace(
+                result=SimpleNamespace(
+                    data=[SimpleNamespace(id="other", name="Other", languages=[])],
+                    next_page_token="again",
+                )
+            ),
+        ]
+    )
+    assert len(await async_get_voices(client)) == 2
+    assert client.audio.voices.search_async.await_args_list[1].kwargs["page_size"] == 1
+
+
+async def test_audio_model_discovery_retains_capabilities():
+    client = MagicMock()
+    client.models.list_async = AsyncMock(
+        return_value=SimpleNamespace(
+            data=[
+                BaseModelCard(
+                    id="voice",
+                    aliases=["voice-latest"],
+                    capabilities=ModelCapabilities(
+                        completion_chat=False,
+                        audio_transcription=True,
+                        audio_transcription_realtime=True,
+                        audio_speech=True,
+                    ),
+                )
+            ]
+        )
+    )
+    (model,) = await async_get_models(client)
+    assert not model.completion_chat
+    assert (
+        model.audio_transcription
+        and model.audio_transcription_realtime
+        and model.audio_speech
+    )
+    assert model.matches("voice-latest")
 
 
 async def test_validate_api_key_closes_client(
@@ -272,7 +396,7 @@ async def test_validate_api_key_closes_client(
     with (
         patch(
             "custom_components.mistral_conversation.api.async_create_client",
-            return_value=client,
+            return_value=MistralClientResources(client),
         ),
         patch(
             "custom_components.mistral_conversation.api.async_get_models",
@@ -287,7 +411,7 @@ async def test_validate_api_key_closes_client(
         result = await async_validate_api_key(hass, "secret")
 
     assert result is models
-    close_client.assert_awaited_once_with(hass, client)
+    close_client.assert_awaited_once_with(hass, MistralClientResources(client))
 
 
 async def test_validate_api_key_closes_client_on_error(
@@ -298,7 +422,7 @@ async def test_validate_api_key_closes_client_on_error(
     with (
         patch(
             "custom_components.mistral_conversation.api.async_create_client",
-            return_value=client,
+            return_value=MistralClientResources(client),
         ),
         patch(
             "custom_components.mistral_conversation.api.async_get_models",
@@ -313,7 +437,7 @@ async def test_validate_api_key_closes_client_on_error(
     ):
         await async_validate_api_key(hass, "secret")
 
-    close_client.assert_awaited_once_with(hass, client)
+    close_client.assert_awaited_once_with(hass, MistralClientResources(client))
 
 
 async def test_close_client_suppresses_cleanup_errors(hass: HomeAssistant) -> None:
@@ -322,7 +446,7 @@ async def test_close_client_suppresses_cleanup_errors(hass: HomeAssistant) -> No
     client.__exit__.side_effect = RuntimeError("sync close")
     client.__aexit__ = AsyncMock(side_effect=RuntimeError("async close"))
 
-    await async_close_client(hass, client)
+    await async_close_client(hass, MistralClientResources(client))
 
     client.__exit__.assert_called_once_with(None, None, None)
     client.__aexit__.assert_awaited_once_with(None, None, None)

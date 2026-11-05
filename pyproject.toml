@@ -36,7 +36,9 @@ indent-style = "space"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-addopts = "-ra --strict-config --strict-markers"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-ra --strict-config --strict-markers -p no:respx"
+pythonpath = ["."]
 testpaths = ["tests"]
 
 [tool.coverage.run]

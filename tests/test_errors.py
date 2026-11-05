@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import httpx
+import httpx2
 import pytest
 from mistralai.client.errors import NoResponseError
 
@@ -44,14 +44,14 @@ def test_provider_server_errors(status_code: int) -> None:
 
 def test_request_and_timeout_errors() -> None:
     """HTTP transport failures use connection-aware categories."""
-    request = httpx.Request("GET", "https://api.mistral.ai")
+    request = httpx2.Request("GET", "https://api.mistral.ai")
 
     assert (
-        classify_api_error(httpx.ConnectError("offline", request=request))
+        classify_api_error(httpx2.ConnectError("offline", request=request))
         is ApiErrorKind.CONNECTION
     )
     assert (
-        classify_api_error(httpx.ReadTimeout("slow", request=request))
+        classify_api_error(httpx2.ReadTimeout("slow", request=request))
         is ApiErrorKind.TIMEOUT
     )
     assert classify_api_error(TimeoutError("slow")) is ApiErrorKind.TIMEOUT

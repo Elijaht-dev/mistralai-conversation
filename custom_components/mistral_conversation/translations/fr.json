@@ -46,7 +46,8 @@
         "max_tokens_context": "Le nombre maximal de jetons de réponse ne peut pas dépasser la fenêtre de contexte de {max_context_length} jetons de ce modèle.",
         "model_no_reasoning": "Le modèle sélectionné n'indique pas prendre en charge le raisonnement.",
         "model_reasoning_effort": "Ce modèle ne prend pas en charge ce réglage. Vérifiez le champ Raisonnement avant d’enregistrer.",
-        "model_no_tools": "Le modèle sélectionné n'indique pas prendre en charge les appels de fonction."
+        "model_no_tools": "Le modèle sélectionné n'indique pas prendre en charge les appels de fonction.",
+        "model_no_chat": "Le modèle sélectionné ne prend pas en charge les conversations."
       },
       "initiate_flow": {
         "reconfigure": "Reconfigurer la tâche IA",
@@ -88,7 +89,8 @@
         "max_tokens_context": "Le nombre maximal de jetons de réponse ne peut pas dépasser la fenêtre de contexte de {max_context_length} jetons de ce modèle.",
         "model_no_reasoning": "Le modèle sélectionné n'indique pas prendre en charge le raisonnement.",
         "model_reasoning_effort": "Ce modèle ne prend pas en charge ce réglage. Vérifiez le champ Raisonnement avant d’enregistrer.",
-        "model_no_tools": "Le modèle sélectionné n'indique pas prendre en charge les appels de fonction. Désélectionnez les API Home Assistant ou choisissez un autre modèle."
+        "model_no_tools": "Le modèle sélectionné n'indique pas prendre en charge les appels de fonction. Désélectionnez les API Home Assistant ou choisissez un autre modèle.",
+        "model_no_chat": "Le modèle sélectionné ne prend pas en charge les conversations."
       },
       "initiate_flow": {
         "reconfigure": "Reconfigurer l'agent de conversation",
@@ -136,15 +138,20 @@
         "init": {
           "data": {
             "model": "Modèle de transcription",
-            "name": "Nom"
+            "name": "Nom",
+            "transcription_mode": "Mode de transcription"
           },
           "data_description": {
-            "model": "Les nouvelles entités utilisent voxtral-mini-transcribe-realtime-2602 par défaut pour envoyer l'audio pendant la parole, avec détection automatique de la langue. Choisissez voxtral-mini-latest pour la transcription par lot. Les autres identifiants personnalisés utilisent aussi la transcription par lot.",
-            "name": "Nom affiché pour cette entité de reconnaissance vocale dans Home Assistant."
+            "model": "Choisissez un modèle Voxtral ou saisissez un identifiant personnalisé. Les nouvelles entités utilisent Realtime 3.",
+            "name": "Nom affiché pour cette entité de reconnaissance vocale dans Home Assistant.",
+            "transcription_mode": "Automatique utilise les capacités connues du modèle ; les modèles inconnus utilisent Batch. Choisissez Batch ou Realtime pour un modèle personnalisé."
           },
           "description": "Configurez la transcription Mistral pour Assist. L'audio vocal est envoyé à Mistral AI, pendant la parole avec Realtime. Assist reçoit la transcription finale à la fin de la phrase.",
           "title": "Reconnaissance vocale Mistral"
         }
+      },
+      "error": {
+        "model_no_transcription": "Le modèle sélectionné ne prend pas en charge ce mode de transcription."
       }
     },
     "tts": {
@@ -155,7 +162,8 @@
       },
       "entry_type": "Synthèse vocale",
       "error": {
-        "target_loudness_invalid": "Choisissez une cible entière entre -24 et -12 LUFS."
+        "target_loudness_invalid": "Choisissez une cible entière entre -24 et -12 LUFS.",
+        "model_no_speech": "Le modèle sélectionné ne prend pas en charge la synthèse vocale."
       },
       "initiate_flow": {
         "reconfigure": "Reconfigurer la synthèse vocale",
@@ -320,6 +328,12 @@
     },
     "user_message_not_found": {
       "message": "Les pièces jointes nécessitent un dernier message utilisateur."
+    },
+    "model_no_chat": {
+      "message": "Le modèle {model} ne prend pas en charge cet usage."
+    },
+    "model_no_speech": {
+      "message": "Le modèle {model} ne prend pas en charge cet usage."
     }
   },
   "issues": {
@@ -358,6 +372,13 @@
     "reasoning_always_on": {
       "options": {
         "value": "Raisonnement toujours actif"
+      }
+    },
+    "transcription_mode": {
+      "options": {
+        "auto": "Automatique",
+        "batch": "Batch",
+        "realtime": "Realtime"
       }
     }
   }

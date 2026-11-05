@@ -4,14 +4,17 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from collections.abc import AsyncGenerator, AsyncIterable
 from contextlib import asynccontextmanager, suppress
+from dataclasses import dataclass, field
 from datetime import datetime
 from types import TracebackType
 from typing import Protocol, cast
-from urllib.parse import urlencode, urlparse, urlunparse
+from urllib.parse import parse_qs, urlencode, urlparse, urlsplit, urlunparse
 
-import httpx
+import httpcore2  # noqa: F401 -- HTTPX2 loads its transport lazily.
+import httpx2
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.httpx_client import get_async_client
 from homeassistant.util.ssl import get_default_context
@@ -46,13 +49,13 @@ from .const import (
     MistralModel,
     MistralVoice,
 )
-from .errors import RealtimeError
+from .errors import ImageDownloadError, RealtimeError
 
-# SDK 2.10.1's lazy exports do not cache resolved attributes. Merely importing
+# SDK 3.7.0's lazy exports do not cache resolved attributes. Merely importing
 # their modules still calls import_module (with relative names) on every access.
 # Bind the original public objects once while HA imports this integration in its
 # import executor. No SDK function is replaced and no blocking warning is muted.
-# Limit model loading to the request/response types used by our five endpoints.
+# Limit model loading to the request/response types used by our endpoints.
 for _name in (
     "Security",
     "ListModelsV1ModelsGetRequest",
@@ -71,13 +74,20 @@ for _name in (
     "TimestampGranularity",
     "TranscriptionResponse",
     "SpeechRequest",
+    "IPAPhoneme",
+    "ConversationHistoryUnion",
+    "ConversationHistoryUnionTypedDict",
     "SpeechResponse",
     "SpeechStreamEvents",
-    "ListVoicesV1AudioVoicesGetRequest",
-    "VoiceListResponse",
+    "AudioV2VoicesListRequest",
+    "AudioV2VoicesListResponse",
+    "VoiceListPage",
+    "VoiceGender",
+    "VoiceKind",
     "AudioFormat",
     "RealtimeTranscriptionError",
     "RealtimeTranscriptionSessionCreated",
+    "RealtimeTranscriptionSessionUpdated",
     "TranscriptionStreamDone",
     "CompletionArgs",
     "ConversationResponse",
@@ -87,6 +97,7 @@ for _name in (
     "ImageURLChunk",
     "ImageGenerationTool",
     "ToolFileChunk",
+    "ToolExecutionEntry",
     "DeleteFileResponse",
     "ConversationInputs",
     "ConversationRequest",
@@ -122,7 +133,23 @@ class _ClosableMistralClient(Protocol):
         ...
 
 
-def _create_client(api_key: str, http_client: httpx.AsyncClient) -> Mistral:
+@dataclass(slots=True)
+class MistralClientResources:
+    """Keep ownership of the legacy transport separate from HA's shared one."""
+
+    client: Mistral
+    owned_http_client: httpx2.AsyncClient | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ImageGenerationSources:
+    """Generated Files API IDs and storage URLs, excluded from representations."""
+
+    file_ids: tuple[str, ...] = field(default=(), repr=False)
+    urls: tuple[str, ...] = field(default=(), repr=False)
+
+
+def _create_client(api_key: str, http_client: httpx2.AsyncClient) -> Mistral:
     """Construct and prime the SDK in an executor without making requests."""
     client = Mistral(
         api_key=api_key,
@@ -147,32 +174,62 @@ def _create_client(api_key: str, http_client: httpx.AsyncClient) -> Mistral:
     return client
 
 
-async def async_create_client(hass: HomeAssistant, api_key: str) -> Mistral:
+def _create_http_client() -> httpx2.AsyncClient:
+    """Construct a verified HTTPX2 transport for older HA releases off the loop."""
+    return httpx2.AsyncClient(verify=get_default_context(), follow_redirects=True)
+
+
+async def async_create_client(
+    hass: HomeAssistant, api_key: str
+) -> MistralClientResources:
     """Keep HA transport access on the loop and blocking SDK setup off it."""
-    future = hass.async_add_executor_job(
-        _create_client, api_key, get_async_client(hass)
-    )
+    shared_client = get_async_client(hass)
+
+    async def create() -> MistralClientResources:
+        owned_http_client: httpx2.AsyncClient | None = None
+        if isinstance(shared_client, httpx2.AsyncClient):
+            http_client = shared_client
+        else:
+            owned_http_client = await hass.async_add_executor_job(_create_http_client)
+            http_client = owned_http_client
+        try:
+            client = await hass.async_add_executor_job(
+                _create_client, api_key, http_client
+            )
+        except BaseException:
+            if owned_http_client is not None:
+                with suppress(Exception):
+                    await owned_http_client.aclose()
+            raise
+        return MistralClientResources(client, owned_http_client)
+
+    future = asyncio.create_task(create())
     try:
         return await asyncio.shield(future)
     except asyncio.CancelledError:
         # Cancelling the await cannot stop the worker; reclaim its eventual client.
         with suppress(Exception):
-            client = await future
-            await async_close_client(hass, client)
+            resources = await future
+            await async_close_client(hass, resources)
         raise
 
 
-async def async_close_client(hass: HomeAssistant, client: Mistral) -> None:
+async def async_close_client(
+    hass: HomeAssistant, resources: MistralClientResources
+) -> None:
     """Release resources owned by a Mistral client.
 
-    The asynchronous HTTP transport is supplied by Home Assistant. The SDK
-    detaches from that transport without closing Home Assistant's shared client.
+    The SDK detaches from supplied transports. Close only the compatibility
+    transport owned by this integration, never Home Assistant's shared client.
     """
-    closable_client = cast(_ClosableMistralClient, client)
+    closable_client = cast(_ClosableMistralClient, resources.client)
     with suppress(Exception):
         await hass.async_add_executor_job(closable_client.__exit__, None, None, None)
     with suppress(Exception):
         await closable_client.__aexit__(None, None, None)
+    if resources.owned_http_client is not None:
+        with suppress(Exception):
+            await resources.owned_http_client.aclose()
 
 
 def _realtime_error(err: Exception) -> RealtimeError:
@@ -206,7 +263,7 @@ async def _connect_realtime(
     client: Mistral, model: str
 ) -> AsyncGenerator[RealtimeConnection]:
     """Open a verified HA-safe socket, then use the SDK's protocol objects."""
-    # SDK 2.10.1 connect() cannot accept a prepared SSLContext. Its default
+    # SDK 3.7.0 connect() cannot accept a prepared SSLContext. Its default
     # websockets transport loads certificates on HA's loop. Keep this narrow
     # connection adapter until that public SDK API can receive HA's context;
     # all audio messages and event parsing remain owned by the official SDK.
@@ -242,7 +299,17 @@ async def _connect_realtime(
             await connection.update_session(
                 models.AudioFormat(encoding="pcm_s16le", sample_rate=16000)
             )
-        yield connection
+            updated = parse_realtime_event(json.loads(await websocket.recv()))
+            if (
+                not isinstance(updated, models.RealtimeTranscriptionSessionUpdated)
+                or updated.session.audio_format.encoding != "pcm_s16le"
+                or updated.session.audio_format.sample_rate != 16000
+            ):
+                raise RealtimeError("Invalid Realtime session configuration")
+        try:
+            yield connection
+        finally:
+            await connection.close()
 
 
 async def _send_realtime_audio(
@@ -339,14 +406,16 @@ def _parse_model(model: BaseModelCard | FTModelCard) -> MistralModel | None:
         return None
 
     capabilities = model.capabilities
-    if not capabilities.completion_chat:
-        return None
 
     return MistralModel(
         id=model.id,
         name=_optional_string(model.name),
         description=_optional_string(model.description),
         aliases=tuple(alias for alias in model.aliases or [] if alias),
+        completion_chat=bool(capabilities.completion_chat),
+        audio_transcription=bool(capabilities.audio_transcription),
+        audio_transcription_realtime=bool(capabilities.audio_transcription_realtime),
+        audio_speech=bool(capabilities.audio_speech),
         function_calling=bool(capabilities.function_calling),
         reasoning=bool(capabilities.reasoning),
         vision=bool(capabilities.vision),
@@ -363,7 +432,7 @@ def _parse_model(model: BaseModelCard | FTModelCard) -> MistralModel | None:
 
 
 async def async_get_models(client: Mistral) -> list[MistralModel]:
-    """Return chat-capable, non-archived models available to the account."""
+    """Return non-archived models with their authoritative usage capabilities."""
     response = await client.models.list_async(timeout_ms=SETUP_TIMEOUT_MS)
     models: list[MistralModel] = []
 
@@ -382,40 +451,42 @@ async def async_get_models(client: Mistral) -> list[MistralModel]:
 
 async def async_get_voices(client: Mistral) -> list[MistralVoice]:
     """Return preset and custom TTS voices available to the account."""
-    voices: list[MistralVoice] = []
-    offset = 0
-
-    while offset < MAX_VOICES:
-        page_size = min(VOICE_LIST_PAGE_SIZE, MAX_VOICES - offset)
-        response = await client.audio.voices.list_async(
-            limit=page_size,
-            offset=offset,
+    voices: dict[str, MistralVoice] = {}
+    page_token: str | None = None
+    seen_tokens: set[str] = set()
+    received = 0
+    while received < MAX_VOICES:
+        response = await client.audio.voices.search_async(
+            page_size=min(VOICE_LIST_PAGE_SIZE, MAX_VOICES - received),
+            page_token=page_token,
             type_="all",
             timeout_ms=SETUP_TIMEOUT_MS,
         )
-        if not response.items:
+        if response is None or not response.result.data:
             break
-
-        voices.extend(
-            MistralVoice(
-                id=voice.id,
-                name=voice.name,
-                languages=tuple(voice.languages or []),
-            )
-            for voice in response.items
-            if voice.id and voice.name
-        )
-        offset += len(response.items)
-        if offset >= response.total:
+        for voice in response.result.data[: MAX_VOICES - received]:
+            if voice.id and voice.name:
+                voices.setdefault(
+                    voice.id,
+                    MistralVoice(
+                        id=voice.id,
+                        name=voice.name,
+                        languages=tuple(voice.languages or []),
+                    ),
+                )
+        received += len(response.result.data)
+        page_token = _optional_string(response.result.next_page_token)
+        if page_token is None or page_token in seen_tokens:
             break
+        seen_tokens.add(page_token)
 
-    return sorted(voices, key=lambda voice: (voice.name.casefold(), voice.id))
+    return sorted(voices.values(), key=lambda voice: (voice.name.casefold(), voice.id))
 
 
 async def async_start_image_generation(
     client: Mistral, model: str, prompt: str, image_urls: list[str]
-) -> tuple[str, ...]:
-    """Start one image-tool conversation and return its unique generated files."""
+) -> ImageGenerationSources:
+    """Return only generated files and structured image-tool result URLs."""
     content: list[models.MessageInputContentChunks] = [models.TextChunk(text=prompt)]
     content.extend(models.ImageURLChunk(image_url=url) for url in image_urls)
     inputs: list[models.InputEntries] = [
@@ -437,7 +508,13 @@ async def async_start_image_generation(
 
     file_ids: list[str] = []
     seen: set[str] = set()
+    urls: dict[str, None] = {}
     for output in response.outputs:
+        if isinstance(output, models.ToolExecutionEntry):
+            url = _image_tool_result_url(output)
+            if url is not None:
+                urls[url] = None
+            continue
         if not isinstance(output, models.MessageOutputEntry) or not isinstance(
             output.content, list
         ):
@@ -451,10 +528,75 @@ async def async_start_image_generation(
             ):
                 seen.add(chunk.file_id)
                 file_ids.append(chunk.file_id)
-    return tuple(file_ids)
+    return ImageGenerationSources(file_ids=tuple(file_ids), urls=tuple(urls))
 
 
-async def async_download_image_file(client: Mistral, file_id: str) -> httpx.Response:
+def _image_tool_result_url(output: models.ToolExecutionEntry) -> str | None:
+    """Ignore assistant links, other tools and malformed result metadata."""
+    if output.name != "image_generation" or not output.info:
+        return None
+    result = output.info.get("result")
+    if isinstance(result, str):
+        try:
+            result = json.loads(result)
+        except ValueError:
+            return None
+    if isinstance(result, dict):
+        url = result.get("url")
+        if isinstance(url, str) and url:
+            return url
+    return None
+
+
+def _image_download_url(value: str) -> httpx2.URL:
+    """Restrict tool URLs to HTTPS provider storage with no embedded identity."""
+    if any(char.isspace() or ord(char) < 32 for char in value) or "\\" in value:
+        raise ImageDownloadError
+    try:
+        parsed = urlsplit(value)
+        if (
+            parsed.scheme != "https"
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.port not in (None, 443)
+            or parsed.fragment
+            or not parsed.path.startswith("/")
+        ):
+            raise ImageDownloadError
+        host = parsed.hostname or ""
+        azure_blob = re.fullmatch(r"[a-z0-9]{3,24}\.blob\.core\.windows\.net", host)
+        if host != "files.mistral.ai" and not (
+            azure_blob and parse_qs(parsed.query).get("sig")
+        ):
+            raise ImageDownloadError
+        return httpx2.URL(value)
+    except ValueError, httpx2.InvalidURL:
+        raise ImageDownloadError from None
+
+
+async def async_download_image_url(client: Mistral, url: str) -> httpx2.Response:
+    """Stream approved storage without SDK auth, default headers or cookies."""
+    request = httpx2.Request(
+        "GET",
+        _image_download_url(url),
+        headers={"Accept-Encoding": "identity"},
+        extensions={"timeout": httpx2.Timeout(REQUEST_TIMEOUT_MS / 1000).as_dict()},
+    )
+    # Every integration client uses HA's HTTPX2 transport or the account-owned
+    # compatibility transport. A standalone Request avoids merging credentials
+    # and cookies; auth=None also disables client-level authentication.
+    transport = cast(httpx2.AsyncClient, client.sdk_configuration.async_client)
+    try:
+        return await transport.send(
+            request, stream=True, auth=None, follow_redirects=False
+        )
+    except httpx2.TimeoutException:
+        raise ImageDownloadError(ApiErrorKind.TIMEOUT) from None
+    except httpx2.RequestError:
+        raise ImageDownloadError(ApiErrorKind.CONNECTION) from None
+
+
+async def async_download_image_file(client: Mistral, file_id: str) -> httpx2.Response:
     """Open a streaming response for one generated image file."""
     return await client.files.download_async(
         file_id=file_id,
@@ -474,9 +616,9 @@ async def async_delete_generated_file(client: Mistral, file_id: str) -> bool:
 async def async_validate_api_key(
     hass: HomeAssistant, api_key: str
 ) -> list[MistralModel]:
-    """Validate an API key and return available chat models."""
-    client = await async_create_client(hass, api_key)
+    """Validate an API key and return available model metadata."""
+    resources = await async_create_client(hass, api_key)
     try:
-        return await async_get_models(client)
+        return await async_get_models(resources.client)
     finally:
-        await async_close_client(hass, client)
+        await async_close_client(hass, resources)

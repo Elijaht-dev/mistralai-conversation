@@ -2,30 +2,29 @@
 
 ## Supported versions
 
-Security fixes are applied to the latest released version and the current
-`main` branch.
+Security fixes target the latest released version and the current `main` branch.
 
 ## Reporting a vulnerability
 
-Use GitHub's private vulnerability reporting for this repository when available.
-If that feature is unavailable, contact me privately before
-disclosing details. Do not open a public issue containing an API key, exploit,
-prompt transcript, entity inventory, attachment, or personal data.
+Use this repository's private GitHub vulnerability reporting when available.
+Otherwise, contact the maintainer privately before disclosure. Do not publish
+exploits, credentials or personal data in a public issue.
 
-Please include affected versions, reproduction conditions, impact, and a minimal
-proof of concept. Reports will be acknowledged as soon as practical.
+Include affected versions, reproduction conditions, impact and a minimal proof
+of concept. Reports are acknowledged as soon as practical.
 
-## Deployment guidance
+## Deployment
 
 - Expose only the entities and Home Assistant APIs the assistant needs.
 - Use a dedicated Mistral API key and rotate it after suspected disclosure.
-- Treat conversation history, tool results, and attachments as data sent to a
-  third-party cloud service.
-- Keep Home Assistant, this integration, and the Mistral SDK updated.
-- Do not enable verbose SDK logging in normal operation.
-- Add confirmations or other safeguards around high-impact automations and
-  safety-sensitive devices.
+- Treat prompts, history, tool results, attachments and speech as cloud-bound data.
+- Review retention of generated images and cached audio in Home Assistant.
+- Keep Home Assistant and the integration updated.
+- Avoid verbose SDK logging in normal operation and redact shared diagnostics.
+- Use cloned voices only with the speaker's informed consent.
+- Add safeguards around safety-sensitive devices and high-impact automations.
 
-This project cannot guarantee the behavior of a probabilistic model. Home
-Assistant's tool schemas, exposure controls, permissions, and automation design
-remain part of the security boundary.
+Home Assistant's tool schemas, exposure controls, permissions and automation
+design are part of the security boundary. Model-generated actions remain
+probabilistic. See [README.md](README.md#data-and-control) for data handling and
+[QUALITY.md](QUALITY.md) for runtime limits.

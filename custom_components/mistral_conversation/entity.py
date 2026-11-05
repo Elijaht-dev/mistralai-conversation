@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Never, cast
 
-import httpx
+import httpx2
 from homeassistant.components import conversation
 from homeassistant.config_entries import ConfigSubentry
 from homeassistant.const import CONF_MODEL
@@ -572,6 +572,12 @@ class MistralBaseEntity(CoordinatorEntity[MistralCoordinator]):
         attachments: list[tuple[Path, str | None]],
     ) -> None:
         """Reject requests that contradict known provider capabilities."""
+        if known and not model.completion_chat:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="model_no_chat",
+                translation_placeholders={"model": model.id},
+            )
         tools = chat_log.llm_api.tools if chat_log.llm_api else []
         if len(tools) > MAX_TOOLS:
             raise HomeAssistantError(
@@ -829,7 +835,7 @@ class MistralBaseEntity(CoordinatorEntity[MistralCoordinator]):
             except (
                 MistralError,
                 NoResponseError,
-                httpx.HTTPError,
+                httpx2.HTTPError,
                 TimeoutError,
             ) as err:
                 await self._async_handle_api_error(err)

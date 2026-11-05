@@ -62,11 +62,31 @@ async def exercise(api, client, endpoint: str) -> None:
         async with result:
             chunks = [chunk async for chunk in result]
         assert chunks[0].data.audio_data == "dGVzdA=="
-    elif endpoint == "image_start":
-        file_ids = await api.async_start_image_generation(
+    elif endpoint.startswith("image_"):
+        await exercise_image(api, client, endpoint)
+    else:
+        raise AssertionError(endpoint)
+
+
+async def exercise_image(api, client, endpoint: str) -> None:
+    """Exercise each image surface as the first request in its process."""
+    if endpoint == "image_start":
+        sources = await api.async_start_image_generation(
             client, "test-model", "Draw a lighthouse", []
         )
-        assert file_ids == ("test-file",)
+        assert sources.file_ids == ("test-file",)
+        assert sources.urls == ("https://files.mistral.ai/generated/test.png",)
+    elif endpoint == "image_url":
+        response = await api.async_download_image_url(
+            client, "https://files.mistral.ai/generated/test.png"
+        )
+        try:
+            if response.status_code == 200:
+                assert await response.aread() == b"test-image"
+            else:
+                assert response.status_code == 422
+        finally:
+            await response.aclose()
     elif endpoint == "image_download":
         response = await api.async_download_image_file(client, "test-file")
         try:
@@ -79,14 +99,24 @@ async def exercise(api, client, endpoint: str) -> None:
         raise AssertionError(endpoint)
 
 
-def image_response(httpx, endpoint: str):
+def image_response(httpx2, endpoint: str):
     """Return one mocked SDK response for the image endpoints."""
     if endpoint == "image_start":
-        return httpx.Response(
+        return httpx2.Response(
             200,
             json={
                 "conversation_id": "test-conversation",
                 "outputs": [
+                    {
+                        "type": "tool.execution",
+                        "name": "image_generation",
+                        "arguments": "{}",
+                        "info": {
+                            "result": json.dumps(
+                                {"url": "https://files.mistral.ai/generated/test.png"}
+                            )
+                        },
+                    },
                     {
                         "type": "message.output",
                         "content": [
@@ -96,15 +126,15 @@ def image_response(httpx, endpoint: str):
                                 "file_id": "test-file",
                             }
                         ],
-                    }
+                    },
                 ],
                 "usage": {},
             },
         )
-    if endpoint == "image_download":
-        return httpx.Response(200, content=b"test-image")
+    if endpoint in ("image_download", "image_url"):
+        return httpx2.Response(200, content=b"test-image")
     if endpoint == "image_delete":
-        return httpx.Response(
+        return httpx2.Response(
             200,
             json={"id": "test-file", "object": "file", "deleted": True},
         )
@@ -123,6 +153,10 @@ def assert_image_request(endpoint: str, request) -> None:
         assert request.url.path == "/v1/files/test-file/content"
     elif endpoint == "image_delete":
         assert request.url.path == "/v1/files/test-file"
+    elif endpoint == "image_url":
+        assert request.url.host == "files.mistral.ai"
+        assert request.url.path == "/generated/test.png"
+        assert "authorization" not in request.headers
 
 
 async def main() -> None:
@@ -139,7 +173,7 @@ async def main() -> None:
     api = await hass.async_add_executor_job(
         importlib.import_module, "custom_components.mistral_conversation.api"
     )
-    httpx = await hass.async_add_executor_job(importlib.import_module, "httpx")
+    httpx2 = await hass.async_add_executor_job(importlib.import_module, "httpx2")
 
     endpoint, status = sys.argv[1], int(sys.argv[2])
     requests = []
@@ -152,7 +186,7 @@ async def main() -> None:
                     {"loc": ["body"], "msg": "test error", "type": "value_error"}
                 ]
             }
-            return httpx.Response(status, json=body)
+            return httpx2.Response(status, json=body)
         if endpoint == "chat":
             chunk = {
                 "id": "test-completion",
@@ -167,13 +201,13 @@ async def main() -> None:
                     }
                 ],
             }
-            return httpx.Response(
+            return httpx2.Response(
                 200,
                 headers={"content-type": "text/event-stream"},
                 text=f"data: {json.dumps(chunk)}\n\ndata: [DONE]\n\n",
             )
         if endpoint == "stt":
-            return httpx.Response(
+            return httpx2.Response(
                 200,
                 json={
                     "text": "Hello",
@@ -183,7 +217,7 @@ async def main() -> None:
                 },
             )
         if endpoint == "tts":
-            return httpx.Response(
+            return httpx2.Response(
                 200,
                 headers={"content-type": "text/event-stream"},
                 text=(
@@ -193,10 +227,10 @@ async def main() -> None:
                 ),
             )
         if endpoint == "voices":
-            return httpx.Response(
+            return httpx2.Response(
                 200,
                 json={
-                    "items": [
+                    "data": [
                         {
                             "id": "test-preset",
                             "name": "Preset",
@@ -214,21 +248,19 @@ async def main() -> None:
                             "languages": ["fr"],
                         },
                     ],
-                    "total": 2,
-                    "page": 0,
-                    "page_size": 100,
-                    "total_pages": 1,
+                    "next_page_token": None,
                 },
             )
         return (
-            image_response(httpx, endpoint)
+            image_response(httpx2, endpoint)
             if endpoint.startswith("image_")
-            else httpx.Response(200, json={"object": "list", "data": []})
+            else httpx2.Response(200, json={"object": "list", "data": []})
         )
 
-    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as transport:
+    async with httpx2.AsyncClient(transport=httpx2.MockTransport(respond)) as transport:
         api.get_async_client = lambda hass: transport
-        client = await api.async_create_client(hass, "test-api-key")
+        resources = await api.async_create_client(hass, "test-api-key")
+        client = resources.client
         sync_transport = client.sdk_configuration.client
         try:
             if endpoint == "realtime":
@@ -241,9 +273,9 @@ async def main() -> None:
         except api.errors.MistralError:
             assert status != 200
         else:
-            assert status == 200 or endpoint == "realtime"
+            assert status == 200 or endpoint in ("realtime", "image_url")
         finally:
-            await api.async_close_client(hass, client)
+            await api.async_close_client(hass, resources)
         assert sync_transport.is_closed
         assert not transport.is_closed
         assert len(requests) == (0 if endpoint == "realtime" else 1)

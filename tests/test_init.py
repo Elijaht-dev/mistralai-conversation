@@ -25,22 +25,26 @@ from homeassistant.helpers import (
     issue_registry as ir,
 )
 from homeassistant.setup import async_setup_component
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.mistral_conversation import (
     async_migrate_entry,
     async_remove_entry,
 )
+from custom_components.mistral_conversation.api import MistralClientResources
 from custom_components.mistral_conversation.const import (
+    CONF_IMAGE_MODEL,
     CONF_MAX_TOKENS,
     CONF_NORMALIZE_AUDIO,
     CONF_REASONING_EFFORT,
     CONF_SAFE_PROMPT,
     CONF_TARGET_LOUDNESS,
     CONF_TEMPERATURE,
+    CONF_TRANSCRIPTION_MODE,
     CONF_VOICE_ID,
     DEFAULT_AI_TASK_OPTIONS,
     DEFAULT_CONVERSATION_OPTIONS,
+    DEFAULT_IMAGE_MODEL,
+    DEFAULT_STT_MODEL,
     DEFAULT_STT_OPTIONS,
     DEFAULT_TARGET_LOUDNESS,
     DEFAULT_TTS_MODEL,
@@ -51,6 +55,7 @@ from custom_components.mistral_conversation.const import (
     SUBENTRY_TYPE_TTS,
     MistralModel,
 )
+from tests.ha import MockConfigEntry
 
 from .helpers import mistral_error
 
@@ -74,8 +79,14 @@ async def test_setup_creates_entity_and_service_device(
     assert entity.config_subentry_id == subentry.subentry_id
     assert entity.translation_key == "conversation"
 
-    device = device_registry.async_get_device_by_identifier(
-        (DOMAIN, subentry.subentry_id), mock_config_entry.entry_id
+    device = (
+        device_registry.async_get_device_by_identifier(
+            (DOMAIN, subentry.subentry_id), mock_config_entry.entry_id
+        )
+        if hasattr(device_registry, "async_get_device_by_identifier")
+        else device_registry.async_get_device(
+            identifiers={(DOMAIN, subentry.subentry_id)}
+        )
     )
     assert device is not None
     assert device.name == "Mistral conversation"
@@ -102,6 +113,22 @@ async def test_unload_closes_client(
     mock_init_component.__aexit__.assert_awaited_once_with(None, None, None)
 
 
+async def test_platform_setup_failure_closes_client(
+    hass, mock_config_entry, mock_provider
+):
+    """Failure after discovery still releases SDK and compatibility resources."""
+    with patch.object(
+        hass.config_entries,
+        "async_forward_entry_setups",
+        side_effect=RuntimeError("platform setup"),
+    ):
+        assert await async_setup_component(hass, DOMAIN, {})
+        await hass.async_block_till_done()
+    assert mock_config_entry.state is ConfigEntryState.SETUP_ERROR
+    mock_provider.__exit__.assert_called_once()
+    mock_provider.__aexit__.assert_awaited_once()
+
+
 async def test_setup_auth_failure_closes_client(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
@@ -111,7 +138,7 @@ async def test_setup_auth_failure_closes_client(
     with (
         patch(
             "custom_components.mistral_conversation.coordinator.async_create_client",
-            return_value=mock_mistral_client,
+            return_value=MistralClientResources(mock_mistral_client),
         ),
         patch(
             "custom_components.mistral_conversation.coordinator.async_get_models",
@@ -136,7 +163,7 @@ async def test_setup_connection_failure_enters_retry(
     with (
         patch(
             "custom_components.mistral_conversation.coordinator.async_create_client",
-            return_value=mock_mistral_client,
+            return_value=MistralClientResources(mock_mistral_client),
         ),
         patch(
             "custom_components.mistral_conversation.coordinator.async_get_models",
@@ -269,7 +296,7 @@ async def test_migration_normalizes_preview_data(
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.minor_version == 4
+    assert entry.minor_version == 5
     chat_only, legacy = [
         subentry
         for subentry in entry.subentries.values()
@@ -293,7 +320,10 @@ async def test_migration_normalizes_preview_data(
         for subentry in entry.subentries.values()
         if subentry.subentry_type == SUBENTRY_TYPE_STT
     )
-    assert ai_task_entry.data == DEFAULT_AI_TASK_OPTIONS
+    assert ai_task_entry.data == {
+        **DEFAULT_AI_TASK_OPTIONS,
+        CONF_IMAGE_MODEL: DEFAULT_IMAGE_MODEL,
+    }
     assert stt_entry.data == DEFAULT_STT_OPTIONS
 
 
@@ -332,7 +362,7 @@ async def test_migration_does_not_duplicate_voice_platform_subentries(
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.minor_version == 4
+    assert entry.minor_version == 5
     assert [subentry.subentry_type for subentry in entry.subentries.values()].count(
         SUBENTRY_TYPE_AI_TASK
     ) == 1
@@ -382,7 +412,7 @@ async def test_migration_keeps_existing_tts_audio_unchanged(
     subentry = next(iter(entry.subentries.values()))
 
     assert await async_migrate_entry(hass, entry)
-    assert entry.minor_version == 4
+    assert entry.minor_version == 5
     assert subentry.data == {
         CONF_MODEL: DEFAULT_TTS_MODEL,
         CONF_VOICE_ID: "voice-1",
@@ -390,5 +420,58 @@ async def test_migration_keeps_existing_tts_audio_unchanged(
         CONF_TARGET_LOUDNESS: DEFAULT_TARGET_LOUDNESS,
     }
     assert await async_migrate_entry(hass, entry)
-    assert entry.minor_version == 4
+    assert entry.minor_version == 5
     assert len(entry.subentries) == 1
+
+
+@pytest.mark.parametrize("explicit", [False, True])
+async def test_migration_materializes_old_defaults_and_preserves_settings(
+    hass, explicit
+):
+    """Configuration 1.5 never replaces an existing voice, model or audio option."""
+    original = {
+        SUBENTRY_TYPE_AI_TASK: {CONF_IMAGE_MODEL: "ft:image"} if explicit else {},
+        SUBENTRY_TYPE_STT: {
+            CONF_MODEL: "voxtral-mini-transcribe-realtime-2602",
+            CONF_TRANSCRIPTION_MODE: "realtime",
+        }
+        if explicit
+        else {},
+        SUBENTRY_TYPE_TTS: {
+            CONF_VOICE_ID: "test-voice",
+            CONF_NORMALIZE_AUDIO: False,
+            CONF_TARGET_LOUDNESS: -20,
+            **({CONF_MODEL: "ft:speech"} if explicit else {}),
+        },
+    }
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_API_KEY: "test-api-key"},
+        version=1,
+        minor_version=4,
+        subentries_data=[
+            {"subentry_type": kind, "data": data, "title": kind, "unique_id": None}
+            for kind, data in original.items()
+        ],
+    )
+    entry.add_to_hass(hass)
+    assert await async_migrate_entry(hass, entry)
+    assert entry.minor_version == 5
+    by_type = {
+        subentry.subentry_type: dict(subentry.data)
+        for subentry in entry.subentries.values()
+    }
+    for kind, data in original.items():
+        assert by_type[kind].items() >= data.items()
+    if not explicit:
+        assert by_type[SUBENTRY_TYPE_AI_TASK][CONF_IMAGE_MODEL] == DEFAULT_IMAGE_MODEL
+        assert by_type[SUBENTRY_TYPE_STT] == {
+            CONF_MODEL: DEFAULT_STT_MODEL,
+            CONF_TRANSCRIPTION_MODE: "auto",
+        }
+        assert by_type[SUBENTRY_TYPE_TTS][CONF_MODEL] == DEFAULT_TTS_MODEL
+    assert await async_migrate_entry(hass, entry)
+    assert by_type == {
+        subentry.subentry_type: dict(subentry.data)
+        for subentry in entry.subentries.values()
+    }

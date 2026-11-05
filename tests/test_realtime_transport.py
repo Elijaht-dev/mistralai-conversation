@@ -35,6 +35,10 @@ def transport(monkeypatch):
             }
         )
     )
+    created = socket.recv.return_value
+    updated = json.loads(created)
+    updated["type"] = "session.updated"
+    socket.recv.side_effect = [created, json.dumps(updated)]
     client = MagicMock()
     client.sdk_configuration.get_server_details.return_value = (
         "https://api.mistral.ai",
@@ -83,6 +87,7 @@ async def test_transport_uses_verified_tls_and_sdk_messages(transport):
 )
 async def test_invalid_handshake_closes_socket(transport, handshake):
     client, socket, _ = transport
+    socket.recv.side_effect = None
     socket.recv.return_value = handshake
     with pytest.raises(RealtimeError):
         await async_transcribe_realtime(client, REALTIME_STT_MODEL, audio(b"ab"))
@@ -151,3 +156,50 @@ async def test_opening_and_handshake_share_timeout(transport, monkeypatch):
     assert caught.value.kind is ApiErrorKind.TIMEOUT
     assert socket.closed
     assert not socket.sent
+
+
+@pytest.mark.parametrize(
+    "ack",
+    [
+        {
+            "type": "session.updated",
+            "session": {
+                "request_id": "test-request",
+                "model": REALTIME_STT_MODEL,
+                "audio_format": {"encoding": "pcm_s16le", "sample_rate": 24000},
+            },
+        },
+        {"type": "error", "error": {"code": 422, "message": "invalid configuration"}},
+    ],
+)
+async def test_session_configuration_must_be_acknowledged_before_audio(transport, ack):
+    client, socket, _ = transport
+    created = socket.recv.return_value
+    socket.recv.side_effect = [created, json.dumps(ack)]
+    with pytest.raises(RealtimeError, match="configuration"):
+        await async_transcribe_realtime(client, REALTIME_STT_MODEL, audio(b"ab"))
+    assert [message["type"] for message in socket.sent] == ["session.update"]
+    assert socket.closed
+
+
+async def test_session_configuration_ack_has_setup_deadline(transport, monkeypatch):
+    client, socket, _ = transport
+    created = socket.recv.return_value
+    calls = 0
+
+    async def recv():
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return created
+        await asyncio.Event().wait()
+
+    socket.recv.side_effect = recv
+    monkeypatch.setattr(
+        "custom_components.mistral_conversation.api.SETUP_TIMEOUT_MS", 20
+    )
+    with pytest.raises(RealtimeError) as error:
+        await async_transcribe_realtime(client, REALTIME_STT_MODEL, audio(b"ab"))
+    assert error.value.kind is ApiErrorKind.TIMEOUT
+    assert [message["type"] for message in socket.sent] == ["session.update"]
+    assert socket.closed

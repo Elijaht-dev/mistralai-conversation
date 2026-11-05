@@ -14,18 +14,23 @@ from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.typing import ConfigType
 
 from .const import (
+    CONF_IMAGE_MODEL,
     CONF_MAX_TOKENS,
     CONF_NORMALIZE_AUDIO,
     CONF_REASONING_EFFORT,
     CONF_SAFE_PROMPT,
     CONF_TARGET_LOUDNESS,
     CONF_TEMPERATURE,
+    CONF_TRANSCRIPTION_MODE,
     DEFAULT_AI_TASK_NAME,
     DEFAULT_AI_TASK_OPTIONS,
     DEFAULT_CONVERSATION_OPTIONS,
+    DEFAULT_IMAGE_MODEL,
+    DEFAULT_STT_MODEL,
     DEFAULT_STT_NAME,
     DEFAULT_STT_OPTIONS,
     DEFAULT_TARGET_LOUDNESS,
+    DEFAULT_TTS_MODEL,
     DOMAIN,
     LOGGER,
     REASONING_SETTINGS,
@@ -58,11 +63,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: MistralConfigEntry) -> b
 
     entry.runtime_data = coordinator
     LOGGER.debug(
-        "Available Mistral chat models: %s",
+        "Available Mistral models: %s",
         [model.id for model in coordinator.data or []],
     )
 
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    try:
+        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    except BaseException:
+        await coordinator.async_close()
+        raise
     entry.async_on_unload(entry.add_update_listener(_async_update_entry))
     entry.async_on_unload(
         coordinator.async_add_listener(
@@ -179,6 +188,22 @@ def _migrate_subentry_data(data: dict[str, Any]) -> dict[str, Any]:
     return migrated
 
 
+def _migrate_model_defaults(hass: HomeAssistant, entry: MistralConfigEntry) -> None:
+    """Materialize legacy defaults before new entities adopt newer models."""
+    for subentry in entry.subentries.values():
+        data = dict(subentry.data)
+        if subentry.subentry_type == SUBENTRY_TYPE_STT:
+            data.setdefault(CONF_MODEL, DEFAULT_STT_MODEL)
+            data.setdefault(CONF_TRANSCRIPTION_MODE, "auto")
+        elif subentry.subentry_type == SUBENTRY_TYPE_TTS:
+            data.setdefault(CONF_MODEL, DEFAULT_TTS_MODEL)
+        elif subentry.subentry_type == SUBENTRY_TYPE_AI_TASK:
+            data.setdefault(CONF_IMAGE_MODEL, DEFAULT_IMAGE_MODEL)
+        else:
+            continue
+        hass.config_entries.async_update_subentry(entry, subentry, data=data)
+
+
 async def async_migrate_entry(
     hass: HomeAssistant, entry: ConfigEntry[MistralCoordinator]
 ) -> bool:
@@ -241,6 +266,10 @@ async def async_migrate_entry(
             data.setdefault(CONF_TARGET_LOUDNESS, DEFAULT_TARGET_LOUDNESS)
             hass.config_entries.async_update_subentry(entry, subentry, data=data)
         hass.config_entries.async_update_entry(entry, minor_version=4)
+
+    if entry.minor_version < 5:
+        _migrate_model_defaults(hass, entry)
+        hass.config_entries.async_update_entry(entry, minor_version=5)
 
     return True
 

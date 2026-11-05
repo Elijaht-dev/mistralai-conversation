@@ -18,6 +18,7 @@ import pytest
         "realtime",
         "image_start",
         "image_download",
+        "image_url",
         "image_delete",
     ],
 )

@@ -1,0 +1,10 @@
+hassil==3.12.1
+ha-ffmpeg==3.2.2
+gazetteer-matcher==1.2.0
+home-assistant-intents==2026.10.27
+mistralai[realtime]==3.7.0
+mypy==2.4.0
+mutagen==1.47.0
+pytest-cov==7.1.0
+PyTurboJPEG==2.6.1
+ruff==0.17.3

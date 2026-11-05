@@ -10,6 +10,6 @@
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/Elijaht-dev/mistralai-conversation/issues",
   "loggers": ["mistralai"],
-  "requirements": ["mistralai[realtime]==2.10.1"],
-  "version": "0.5.5"
+  "requirements": ["mistralai[realtime]==3.7.0"],
+  "version": "0.6.0"
 }

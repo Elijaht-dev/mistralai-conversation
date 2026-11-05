@@ -10,7 +10,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 import voluptuous as vol
 from homeassistant.components import conversation
-from homeassistant.components.llm import LLMTools
 from homeassistant.core import Context, HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import intent, llm
@@ -27,7 +26,6 @@ from mistralai.client.models import (
     UsageInfo,
     UserMessage,
 )
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.mistral_conversation.const import (
     MAX_ATTACHMENTS,
@@ -46,6 +44,7 @@ from custom_components.mistral_conversation.entity import (
     _transform_stream,
     async_prepare_attachments,
 )
+from tests.ha import MockConfigEntry, mock_llm_tools
 
 from .helpers import completion_event, event_stream, mistral_error, tool_result_content
 
@@ -582,11 +581,7 @@ async def test_conversation_success_and_request_parameters(
             ),
         ]
     )
-    with patch(
-        "homeassistant.components.llm.async_get_tools",
-        new_callable=AsyncMock,
-        return_value=LLMTools(tools=[]),
-    ):
+    with mock_llm_tools([]):
         result = await conversation.async_converse(
             hass,
             "Hello",
@@ -642,11 +637,7 @@ async def test_conversation_after_local_time_intents(
         )
 
     mock_init_component.chat.stream_async.side_effect = capture_request
-    with patch(
-        "homeassistant.components.llm.async_get_tools",
-        new_callable=AsyncMock,
-        return_value=LLMTools(tools=[]),
-    ):
+    with mock_llm_tools([]):
         result = await conversation.async_converse(
             hass,
             "Hello",
@@ -718,11 +709,7 @@ async def test_conversation_function_call_round_trip(
         ),
     ]
 
-    with patch(
-        "homeassistant.components.llm.async_get_tools",
-        new_callable=AsyncMock,
-        return_value=LLMTools(tools=[mock_tool]),
-    ):
+    with mock_llm_tools([mock_tool]):
         result = await conversation.async_converse(
             hass,
             "Check the kitchen",

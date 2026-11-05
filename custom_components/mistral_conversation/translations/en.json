@@ -46,7 +46,8 @@
         "max_tokens_context": "Maximum response tokens cannot exceed this model's {max_context_length}-token context window.",
         "model_no_reasoning": "The selected model does not advertise reasoning support.",
         "model_reasoning_effort": "This model does not support this setting. Review the Reasoning field before saving.",
-        "model_no_tools": "The selected model does not advertise function-calling support."
+        "model_no_tools": "The selected model does not advertise function-calling support.",
+        "model_no_chat": "The selected model does not support chat."
       },
       "initiate_flow": {
         "reconfigure": "Reconfigure AI Task",
@@ -88,7 +89,8 @@
         "max_tokens_context": "Maximum response tokens cannot exceed this model's {max_context_length}-token context window.",
         "model_no_reasoning": "The selected model does not advertise reasoning support.",
         "model_reasoning_effort": "This model does not support this setting. Review the Reasoning field before saving.",
-        "model_no_tools": "The selected model does not advertise function-calling support. Clear Home Assistant APIs or choose another model."
+        "model_no_tools": "The selected model does not advertise function-calling support. Clear Home Assistant APIs or choose another model.",
+        "model_no_chat": "The selected model does not support chat."
       },
       "initiate_flow": {
         "reconfigure": "Reconfigure conversation agent",
@@ -136,15 +138,20 @@
         "init": {
           "data": {
             "model": "Transcription model",
-            "name": "Name"
+            "name": "Name",
+            "transcription_mode": "Transcription mode"
           },
           "data_description": {
-            "model": "New entities use voxtral-mini-transcribe-realtime-2602 by default to send audio during speech with automatic language detection. Select voxtral-mini-latest for batch transcription. Other custom IDs also use batch transcription.",
-            "name": "Name shown for this speech-to-text entity in Home Assistant."
+            "model": "Choose a Voxtral model or enter a custom ID. New entities use Realtime 3.",
+            "name": "Name shown for this speech-to-text entity in Home Assistant.",
+            "transcription_mode": "Automatic uses known model capabilities; unknown models use Batch. Choose Batch or Realtime for a custom model."
           },
           "description": "Configure Mistral transcription for Assist. Voice audio is sent to Mistral AI, during speech when using Realtime. Assist receives the final transcript when speech ends.",
           "title": "Mistral speech-to-text"
         }
+      },
+      "error": {
+        "model_no_transcription": "The selected model does not support this transcription mode."
       }
     },
     "tts": {
@@ -155,7 +162,8 @@
       },
       "entry_type": "Text-to-speech",
       "error": {
-        "target_loudness_invalid": "Choose a whole-number loudness target between -24 and -12 LUFS."
+        "target_loudness_invalid": "Choose a whole-number loudness target between -24 and -12 LUFS.",
+        "model_no_speech": "The selected model does not support speech generation."
       },
       "initiate_flow": {
         "reconfigure": "Reconfigure text-to-speech",
@@ -320,6 +328,12 @@
     },
     "user_message_not_found": {
       "message": "Attachments require a final user message."
+    },
+    "model_no_chat": {
+      "message": "Model {model} does not support this usage."
+    },
+    "model_no_speech": {
+      "message": "Model {model} does not support this usage."
     }
   },
   "issues": {
@@ -358,6 +372,13 @@
     "reasoning_always_on": {
       "options": {
         "value": "Reasoning always active"
+      }
+    },
+    "transcription_mode": {
+      "options": {
+        "auto": "Automatic",
+        "batch": "Batch",
+        "realtime": "Realtime"
       }
     }
   }

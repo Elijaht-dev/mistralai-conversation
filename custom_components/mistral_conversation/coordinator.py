@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import override
 
-import httpx
+import httpx2
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_API_KEY
 from homeassistant.core import HomeAssistant, callback
@@ -14,7 +14,12 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from mistralai.client import Mistral
 from mistralai.client.errors import MistralError, NoResponseError
 
-from .api import async_close_client, async_create_client, async_get_models
+from .api import (
+    MistralClientResources,
+    async_close_client,
+    async_create_client,
+    async_get_models,
+)
 from .audio import AudioNormalizer
 from .const import DOMAIN, LOGGER, ApiErrorKind, MistralModel
 from .errors import api_error_message, classify_api_error
@@ -29,7 +34,7 @@ class MistralCoordinator(DataUpdateCoordinator[list[MistralModel]]):
     """Refresh model metadata and expose a shared Mistral client."""
 
     config_entry: MistralConfigEntry
-    _client: Mistral
+    _resources: MistralClientResources
 
     def __init__(self, hass: HomeAssistant, config_entry: MistralConfigEntry) -> None:
         """Initialize the coordinator."""
@@ -47,12 +52,12 @@ class MistralCoordinator(DataUpdateCoordinator[list[MistralModel]]):
     @property
     def client(self) -> Mistral:
         """Return the shared Mistral client."""
-        return self._client
+        return self._resources.client
 
     @override
     async def _async_setup(self) -> None:
         """Create the SDK client before the first refresh."""
-        self._client = await async_create_client(
+        self._resources = await async_create_client(
             self.hass, self.config_entry.data[CONF_API_KEY]
         )
 
@@ -60,8 +65,8 @@ class MistralCoordinator(DataUpdateCoordinator[list[MistralModel]]):
         """Close resources created by the coordinator."""
         if self._audio_normalizer is not None:
             await self._audio_normalizer.async_close()
-        if hasattr(self, "_client"):
-            await async_close_client(self.hass, self._client)
+        if hasattr(self, "_resources"):
+            await async_close_client(self.hass, self._resources)
 
     def get_audio_normalizer(self, ffmpeg_binary: str) -> AudioNormalizer:
         """Return the account-scoped audio processor."""
@@ -84,7 +89,7 @@ class MistralCoordinator(DataUpdateCoordinator[list[MistralModel]]):
         except (
             MistralError,
             NoResponseError,
-            httpx.HTTPError,
+            httpx2.HTTPError,
             TimeoutError,
         ) as err:
             error_kind = classify_api_error(err)

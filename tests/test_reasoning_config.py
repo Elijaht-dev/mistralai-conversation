@@ -9,16 +9,18 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers.translation import async_get_translations
 from homeassistant.setup import async_setup_component
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.mistral_conversation.const import (
+    CONF_IMAGE_MODEL,
     CONF_REASONING_EFFORT,
     DEFAULT_CONVERSATION_OPTIONS,
+    DEFAULT_IMAGE_MODEL,
     DOMAIN,
     SUBENTRY_TYPE_AI_TASK,
     SUBENTRY_TYPE_CONVERSATION,
     MistralModel,
 )
+from tests.ha import MockConfigEntry
 
 
 @pytest.mark.parametrize(
@@ -127,7 +129,13 @@ async def test_reconfigure_reasoning_choices(
             )
     else:
         assert selector.config["options"] == choices
-    assert subentry.data == data
+    # Setup materializes the old image-model fallback during migration 1.5.
+    assert subentry.data == data | (
+        {CONF_IMAGE_MODEL: DEFAULT_IMAGE_MODEL}
+        if subentry_type == SUBENTRY_TYPE_AI_TASK
+        else {}
+    )
+    data = dict(subentry.data)
 
     user_input = {**data, CONF_NAME: subentry.title}
     if isinstance(choices, dict):

@@ -4,20 +4,21 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import json
 from dataclasses import replace
 from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx
+import httpx2
 import pytest
 from homeassistant.components import ai_task, conversation
 from homeassistant.const import CONF_MODEL
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
+from mistralai.client import models
 from PIL import Image
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.mistral_conversation.const import (
     CONF_IMAGE_MODEL,
@@ -26,12 +27,15 @@ from custom_components.mistral_conversation.const import (
     CONF_SAFE_PROMPT,
     CONF_TEMPERATURE,
     SUBENTRY_TYPE_AI_TASK,
+    ApiErrorKind,
     MistralModel,
 )
+from custom_components.mistral_conversation.errors import ImageDownloadError
 from custom_components.mistral_conversation.image import (
     GeneratedImage,
     ImageGenerationError,
 )
+from tests.ha import MockConfigEntry
 
 from .helpers import mistral_error
 
@@ -96,6 +100,63 @@ async def _generate(hass: HomeAssistant, *, attachments: list[dict] | None = Non
         instructions="Draw a lighthouse",
         attachments=attachments,
     )
+
+
+@pytest.mark.parametrize("source", ["files", "url"])
+async def test_image_response_formats_work_through_public_ha_action(
+    hass: HomeAssistant,
+    media_directory: Path,
+    mock_init_component: MagicMock,
+    image_bytes: bytes,
+    source: str,
+) -> None:
+    """Files and signed tool URLs both produce retrievable native HA media."""
+    client = mock_init_component
+    output = models.MessageOutputEntry(
+        content=[models.ToolFileChunk(tool="image_generation", file_id="test-file")]
+    )
+    if source == "url":
+        output = models.ToolExecutionEntry(
+            name="image_generation",
+            arguments="{}",
+            info={
+                "result": json.dumps(
+                    {"url": "https://files.mistral.ai/generated/test.png"}
+                )
+            },
+        )
+    client.beta.conversations.start_async.return_value = SimpleNamespace(
+        outputs=[output]
+    )
+    client.files.download_async.return_value = httpx2.Response(
+        200, stream=httpx2.ByteStream(image_bytes)
+    )
+    client.files.delete_async.return_value = SimpleNamespace(
+        id="test-file", deleted=True
+    )
+    async with httpx2.AsyncClient(
+        transport=httpx2.MockTransport(
+            lambda request: httpx2.Response(200, stream=httpx2.ByteStream(image_bytes))
+        )
+    ) as transport:
+        client.sdk_configuration.async_client = transport
+        result = await _generate(hass)
+        assert not transport.is_closed
+    assert result["mime_type"] == "image/png"
+    assert result["media_source_id"].startswith("media-source://ai_task/")
+    assert result["url"].startswith("/ai_task/image/")
+    files = await hass.async_add_executor_job(
+        lambda: list(media_directory.rglob("*.png"))
+    )
+    assert len(files) == 1
+    assert await hass.async_add_executor_job(files[0].read_bytes) == image_bytes
+    client.beta.conversations.start_async.assert_awaited_once()
+    if source == "files":
+        client.files.download_async.assert_awaited_once()
+        client.files.delete_async.assert_awaited_once()
+    else:
+        client.files.download_async.assert_not_awaited()
+        client.files.delete_async.assert_not_awaited()
 
 
 async def test_generate_image_uses_default_model_and_ha_media_storage(
@@ -365,6 +426,15 @@ async def test_image_result_errors_are_translated(
 @pytest.mark.parametrize(
     ("error", "translation_key", "unavailable", "refresh"),
     [
+        (ImageDownloadError(), "api_error", False, False),
+        (ImageDownloadError(ApiErrorKind.RATE_LIMIT), "api_rate_limit", False, False),
+        (ImageDownloadError(ApiErrorKind.TIMEOUT), "api_timeout", True, False),
+        (
+            ImageDownloadError(ApiErrorKind.CONNECTION),
+            "api_connection_error",
+            True,
+            False,
+        ),
         (
             mistral_error(401, "secret prompt and file ID"),
             "api_authentication_error",
@@ -389,9 +459,9 @@ async def test_image_result_errors_are_translated(
             True,
             False,
         ),
-        (httpx.ReadTimeout("secret prompt and file ID"), "api_timeout", True, False),
+        (httpx2.ReadTimeout("secret prompt and file ID"), "api_timeout", True, False),
         (
-            httpx.ConnectError("secret prompt and file ID"),
+            httpx2.ConnectError("secret prompt and file ID"),
             "api_connection_error",
             True,
             False,

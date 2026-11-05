@@ -105,6 +105,7 @@ async def test_tts_properties_and_saved_voices(
 
     assert entity.default_language == "en-US"
     assert "fr-FR" in entity.supported_languages
+
     assert entity.supported_options == [
         tts.ATTR_VOICE,
         tts.ATTR_PREFERRED_FORMAT,
@@ -120,6 +121,16 @@ async def test_tts_properties_and_saved_voices(
     voices = entity.async_get_supported_voices("en-US")
     assert [voice.voice_id for voice in voices] == ["voice-2", "voice-1"]
     assert voices[1].name == "Home (en, fr)"
+
+
+async def test_tts_rejects_known_chat_model_before_sending_text(hass, tts_component):
+    _, client = tts_component
+    entity = _entity(hass)
+    entity.model = "mistral-small-latest"
+    with pytest.raises(HomeAssistantError) as error:
+        await entity.async_get_tts_audio("Test", "en-US", {})
+    assert error.value.translation_key == "model_no_speech"
+    client.audio.speech.complete_async.assert_not_awaited()
 
 
 @pytest.mark.parametrize(

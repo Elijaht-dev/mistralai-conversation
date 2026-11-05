@@ -22,10 +22,13 @@ DEFAULT_STT_NAME: Final = "Mistral speech-to-text"
 DEFAULT_TTS_NAME: Final = "Mistral text-to-speech"
 DEFAULT_MODEL: Final = "mistral-small-latest"
 DEFAULT_IMAGE_MODEL: Final = "mistral-medium-latest"
+DEFAULT_NEW_IMAGE_MODEL: Final = "mistral-large-4"
 # Keep this fallback for saved STT subentries without a model and legacy migrations.
 DEFAULT_STT_MODEL: Final = "voxtral-mini-latest"
-REALTIME_STT_MODEL: Final = "voxtral-mini-transcribe-realtime-2602"
+LEGACY_REALTIME_STT_MODEL: Final = "voxtral-mini-transcribe-realtime-2602"
+REALTIME_STT_MODEL: Final = "voxtral-mini-transcribe-realtime-3-0"
 DEFAULT_TTS_MODEL: Final = "voxtral-mini-tts-2603"
+DEFAULT_NEW_TTS_MODEL: Final = "voxtral-mini-tts-3-0"
 
 SUBENTRY_TYPE_CONVERSATION: Final = "conversation"
 SUBENTRY_TYPE_AI_TASK: Final = "ai_task_data"
@@ -38,6 +41,7 @@ CONF_REASONING_EFFORT: Final = "reasoning_effort"
 CONF_SAFE_PROMPT: Final = "safe_prompt"
 CONF_TEMPERATURE: Final = "temperature"
 CONF_VOICE_ID: Final = "voice_id"
+CONF_TRANSCRIPTION_MODE: Final = "transcription_mode"
 CONF_NORMALIZE_AUDIO: Final = "normalize_audio"
 CONF_TARGET_LOUDNESS: Final = "target_loudness"
 
@@ -89,16 +93,22 @@ DEFAULT_AI_TASK_OPTIONS = {
     CONF_SAFE_PROMPT: False,
     CONF_TEMPERATURE: DEFAULT_TEMPERATURE,
 }
+DEFAULT_NEW_AI_TASK_OPTIONS = {
+    **DEFAULT_AI_TASK_OPTIONS,
+    CONF_IMAGE_MODEL: DEFAULT_NEW_IMAGE_MODEL,
+}
 
 DEFAULT_STT_OPTIONS = {
     CONF_MODEL: DEFAULT_STT_MODEL,
+    CONF_TRANSCRIPTION_MODE: "auto",
 }
 DEFAULT_NEW_STT_OPTIONS = {
     CONF_MODEL: REALTIME_STT_MODEL,
+    CONF_TRANSCRIPTION_MODE: "auto",
 }
 
 DEFAULT_TTS_OPTIONS = {
-    CONF_MODEL: DEFAULT_TTS_MODEL,
+    CONF_MODEL: DEFAULT_NEW_TTS_MODEL,
     CONF_NORMALIZE_AUDIO: True,
     CONF_TARGET_LOUDNESS: -16,
 }
@@ -168,6 +178,10 @@ class MistralModel:
     name: str | None = None
     description: str | None = None
     aliases: tuple[str, ...] = ()
+    completion_chat: bool = True
+    audio_transcription: bool = False
+    audio_transcription_realtime: bool = False
+    audio_speech: bool = False
     function_calling: bool = False
     reasoning: bool = False
     vision: bool = False

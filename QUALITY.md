@@ -15,7 +15,7 @@ status, Home Assistant review, or a Quality Scale certification.
 | Home Assistant API | Conversation, AI Task, STT, and TTS entities |
 | Configuration | One account entry with typed feature subentries |
 | Provider boundary | Official `mistralai` SDK and generated request models |
-| Lifecycle | Shared HA HTTP client, coordinator refresh, deterministic close |
+| Lifecycle | Shared HA HTTPX2 client, owned compatibility transport on older HA, coordinator refresh, deterministic close |
 | Credentials | Validation, duplicate prevention, and reauthentication |
 | Tools | HA LLM APIs, typed schemas, parallel calls, bounded rounds |
 | Structured data | Native strict Mistral JSON-schema response format |
@@ -54,7 +54,7 @@ drift.
   calls/results are preserved without modifying Home Assistant's chat log.
   Unmatched tool results are not silently discarded.
 - SDK construction and synchronous cleanup run in Home Assistant's executor.
-  Services are prepared before use. For the pinned SDK 2.10.1, selected lazy
+  Services are prepared before use. For the pinned SDK 3.7.0, selected lazy
   model exports and the utility/error exports are resolved and cached during
   integration import. This binds the original SDK objects without replacing
   their behavior or disabling Home Assistant's blocking-call detection.
@@ -88,11 +88,11 @@ drift.
   custom voice creation, consent, and retention remain outside this integration.
 - Realtime STT is the default for newly created entities. It sends PCM chunks
   during Assist's STT stage, uses provider language detection, and returns a final
-  transcript. Home Assistant retains end-of-speech detection. Existing entities,
-  legacy configurations with no saved model, and migration-created legacy STT
-  entities retain batch behavior. Custom IDs continue to use the batch API.
+  transcript. Home Assistant retains end-of-speech detection. Existing entities
+  retain their model; legacy configurations without one retain the batch default.
+  Unknown custom IDs use Batch in Automatic mode and can explicitly use Realtime.
 - Realtime opens a separate WebSocket per request using Home Assistant's cached,
-  verified TLS context. SDK 2.10.1's connection helper cannot accept that context,
+  verified TLS context. SDK 3.7.0's connection helper cannot accept that context,
   so a small connection adapter handles the handshake while the official SDK
   owns audio messages and transcription events. No global SDK or TLS function is
   replaced. The shared Home Assistant HTTP client remains in use for HTTP
@@ -103,9 +103,9 @@ drift.
   a different transcription endpoint.
 - TTS is not auto-created during migration because the provider requires an
   explicit preset or saved voice choice.
-- Existing AI Task entities also expose image generation. An optional image-model
-  setting defaults to `mistral-medium-latest` without rewriting saved data or
-  changing data-generation settings. No new config subentry or migration is needed.
+- Existing AI Task entities also expose image generation. The image-model setting
+  defaults to `mistral-large-4` for new entities. Migration 1.5 materializes the
+  previous implicit `mistral-medium-latest` choice and preserves explicit values.
   This selects the Mistral model calling the image tool, not the underlying
   image generator managed by the provider.
 - Image requests use the pinned SDK's asynchronous Conversations and Files APIs
@@ -141,17 +141,37 @@ drift.
   account. Audio stays in process pipes; timeout, cancellation, and unload kill
   and reap subprocesses. Local failures are translated without changing
   provider availability or silently returning unprocessed audio.
-- Compatibility is declared from Home Assistant 2026.7.4. Automated tests use
-  the newer Home Assistant 2026.10.1 development baseline without raising the
-  user-facing minimum.
+- Compatibility is declared from Home Assistant 2026.7.4. Automated tests cover
+  that minimum, 2026.10.4, and 2026.11.0 in separate environments.
 
-Mistral SDK 3 remains deferred. Home Assistant's HTTPX2 migration was merged
-in core PR #183371 on 2026-10-06, but the stable 2026.10.4 release still provides
-the shared HTTPX client. Revisit the SDK migration when a supported Home
-Assistant release provides the compatible shared transport, and validate
-typing, streaming, downloads, cleanup, Realtime, and cold-start imports.
+The candidate uses Mistral SDK 3.7.0 and HTTPX2 2.14.0. Home Assistant 2026.11
+supplies the shared transport; older supported releases use an explicitly owned
+HTTPX2 client per account. Setup failure, cancellation, validation and unload
+release owned resources without closing HA's shared client. The WebSocket
+adapter still supplies HA's verified TLS context because the SDK connector has
+no public SSL-context argument.
+
+Curated selectors retain custom IDs and saved legacy values. Discovery retains
+chat and audio capabilities for validation and routing. STT Automatic uses
+capabilities before documented IDs; explicit modes cannot bypass known limits.
+Realtime session configuration is acknowledged before PCM upload. SDK-typed
+turn events do not terminate transcription; Assist owns end-of-speech and the
+final provider transcript is required. Existing model defaults are materialized
+by configuration migration 1.5 before new entities adopt Voxtral 3 and Large 4.
+
+Tests use the official HA 2026.11 fixture source pinned to the release commit,
+with separate legacy fixture packages for HA 2026.10.4 and 2026.7.4. Fixture
+imports and schema rendering follow the installed HA version. Test transports
+and provider responses are mocked; normal CI never makes a live Mistral request.
 
 ## Release gate
+
+The unreleased HTTPX2 / SDK 3 candidate passed 436 tests on each of Home
+Assistant 2026.11.0, 2026.10.4, and 2026.7.4 under Python 3.14. Total coverage
+was 94.18%, 94.18%, and 94.32%; branch coverage was 88.84%, 88.84%, and 88.99%,
+respectively. Ruff, strict mypy on the 2026.11 baseline, dependency checks in all
+three environments, matching English/French translation keys and placeholders,
+and offline HACS validation passed. Public HACS and Hassfest remain CI gates.
 
 Version `0.5.5` updates only the test environment, documentation, and integration
 version. The full suite passed 385 tests on Home Assistant 2026.10.4 with

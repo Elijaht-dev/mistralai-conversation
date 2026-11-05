@@ -396,14 +396,16 @@ def _parse_model(model: BaseModelCard | FTModelCard) -> MistralModel | None:
         return None
 
     capabilities = model.capabilities
-    if not capabilities.completion_chat:
-        return None
 
     return MistralModel(
         id=model.id,
         name=_optional_string(model.name),
         description=_optional_string(model.description),
         aliases=tuple(alias for alias in model.aliases or [] if alias),
+        completion_chat=bool(capabilities.completion_chat),
+        audio_transcription=bool(capabilities.audio_transcription),
+        audio_transcription_realtime=bool(capabilities.audio_transcription_realtime),
+        audio_speech=bool(capabilities.audio_speech),
         function_calling=bool(capabilities.function_calling),
         reasoning=bool(capabilities.reasoning),
         vision=bool(capabilities.vision),

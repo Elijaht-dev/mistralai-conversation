@@ -24,7 +24,7 @@ endorsed by Home Assistant or Mistral AI.
 - AI Task image and PDF attachments on compatible multimodal models
 - Voxtral batch and Realtime speech-to-text for Home Assistant Assist voice pipelines
 - Streaming Voxtral text-to-speech with preset and saved custom Mistral voices
-- Live model discovery, aliases, capability metadata, and custom model IDs
+- Curated model lists, live capability discovery, aliases, and custom model IDs
 - Streamed text, reasoning, token usage, and parallel tool calls
 - Multi-turn history with provider-native signed reasoning replay
 - Home Assistant Assist tools for reading and controlling exposed entities
@@ -109,7 +109,7 @@ the HACS dashboard:
 | Option | Purpose |
 | --- | --- |
 | Name | Label shown for this agent |
-| Model | Discovered, custom, or fine-tuned Mistral model ID |
+| Model | Curated, custom, or fine-tuned Mistral model ID |
 | Instructions | Templated system instructions |
 | Home Assistant APIs | Tool APIs exposed to Mistral; clear for chat-only use |
 | Maximum response tokens | Upper bound for generated output |
@@ -118,6 +118,13 @@ the HACS dashboard:
 | Mistral safety prompt | Requests Mistral's provider-side safety prompt |
 
 The default model is `mistral-small-latest`, with the built-in Assist API enabled.
+
+Model menus use a curated list and always allow another model ID. Conversation
+and AI Task data offer Mistral Small 4, Large 4, and Ministral 3 in 3B, 8B, and
+14B sizes. Account discovery supplies capability checks, aliases, and retirement
+repairs rather than filling menus with every model. Saved custom and legacy
+values remain visible. Known incompatible models are rejected before requests;
+unknown custom and fine-tuned models remain configurable.
 
 With **Prefer handling commands locally** enabled in an Assist pipeline, locally
 handled commands and Home Assistant's spoken replies remain in the conversation
@@ -159,13 +166,14 @@ JSON-schema response format. Compatible models can also receive Home Assistant
 image and PDF attachments.
 
 The same entity also supports `ai_task.generate_image`. **Model for the
-image-generation tool** defaults to `mistral-medium-latest`. It selects the
-Mistral model that interprets your instructions and reference images and calls
+image-generation tool** defaults to `mistral-large-4` for new entities. It selects
+the Mistral model that interprets your instructions and reference images and calls
 the `image_generation` tool. The underlying image generator is managed by Mistral
 and is not selected by this setting. The setting is independent of the data model
-and accepts a discovered or custom model ID. Existing entities use this default
-without changing their saved data settings. The other AI Task controls apply to
-data generation; image requests use provider defaults and a 2,048-token text
+and offers Large 4, Small 4, or a custom model ID. Existing entities retain their
+saved image model, including the previous implicit `mistral-medium-latest`
+default. The other AI Task controls apply to data generation; image requests use
+provider defaults and a 2,048-token text
 output limit.
 
 ```yaml
@@ -206,26 +214,37 @@ kept locally or copied to another local folder.
 
 ### Speech-to-text
 
-New speech-to-text entities default to `voxtral-mini-transcribe-realtime-2602`.
+New speech-to-text entities default to `voxtral-mini-transcribe-realtime-3-0`.
 It transcribes audio as Assist receives it through Mistral's WebSocket API, using
 mono, 16-bit, 16 kHz PCM without buffering the complete recording. Audio starts
 leaving Home Assistant during the STT stage. Existing entities keep their model,
 including older configurations that used the implicit batch default.
 
-Select `voxtral-mini-latest` for batch transcription. It adds the WAV container
-expected by the batch API and forwards the pipeline language to Mistral. Other
-custom model IDs continue to use the batch API. Both paths bound audio input.
+Select `voxtral-mini-transcribe-3-0` or `voxtral-small-transcribe-3` for file
+(batch) transcription. It adds the WAV container expected by the API and forwards
+the pipeline language to Mistral. This is one recording per Assist request,
+not Mistral's deferred batch-jobs service. Both paths bound audio input.
+
+**Transcription mode** offers Automatic, Batch, and Realtime. Automatic uses
+discovered capabilities first, then documented Realtime IDs and aliases,
+including the older `voxtral-mini-transcribe-realtime-2602`. Unknown custom IDs
+use Batch; select Realtime explicitly for an undiscovered custom streaming
+model. A manual choice cannot bypass known incompatible capabilities.
 
 Realtime uses automatic language detection and the provider's default streaming
 delay. Assist still determines when the utterance ends and receives one final
-transcript before starting the conversation agent. This can reduce the wait after
+transcript before starting the conversation agent. Voxtral 3 turn events are
+accepted, but a turn boundary does not finish transcription: the integration
+waits for the final transcript so trailing words are retained. This can reduce the wait after
 speaking; it does not add live captions or interruption of spoken responses.
 An interrupted or failed Realtime request returns an error without retrying the
 recording through the batch API.
 
 ### Text-to-speech
 
-Text-to-speech defaults to `voxtral-mini-tts-2603` and supports MP3, Opus, FLAC,
+New text-to-speech entities default to `voxtral-mini-tts-3-0`; existing entities
+retain their model, including the previous implicit `voxtral-mini-tts-2603`.
+Text-to-speech supports MP3, Opus, FLAC,
 WAV, and raw PCM output. The setup flow reads preset and saved custom voices
 available to the account while still allowing a custom voice ID.
 

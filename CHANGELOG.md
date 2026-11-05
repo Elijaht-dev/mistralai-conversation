@@ -9,11 +9,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
-- Migrate to Mistral SDK 3.7.0 and HTTPX2 2.14.0, sharing HA 2026.11 transport
-  and closing an owned verified transport on older supported releases.
-- Use cursor-paginated voice discovery, acknowledge Realtime session settings,
-  and preload SDK types without suppressing HA blocking-call detection.
-- Test with matching native fixtures on HA 2026.11.0, 2026.10.4, and 2026.7.4.
+- Migrate to Mistral SDK 3.7.0 and HTTPX2 2.14.0, using HA's shared transport
+  on 2026.11 and an owned verified transport on older supported releases.
+- Use Voxtral Realtime 3, Voxtral TTS 3, and Large 4 image-tool defaults for new
+  entities. Configuration migration 1.5 preserves saved and implicit old choices.
+- Harmonize curated model selectors while retaining custom and legacy IDs;
+  use discovered chat and audio capabilities for validation and endpoint routing.
+- Add Automatic, Batch, and Realtime transcription modes. Support Voxtral 3
+  turn events and wait for the final transcript after all audio is sent.
+- Use cursor-paginated voice discovery and update SDK cold-start preloading.
+- Test with HA 2026.11.0, 2026.10.4, and the unchanged 2026.7.4 minimum.
+
+### Validation
+
+- 436 tests passed on each of HA 2026.11.0, 2026.10.4, and 2026.7.4. Total
+  coverage is at least 94.18%, with at least 88.84% branch coverage. Formatting,
+  lint, strict typing, dependency checks, translation parity, and offline HACS
+  validation passed. Public CI remains required before publication.
 
 ## [0.5.5] - 2026-11-01
 

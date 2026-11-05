@@ -107,6 +107,12 @@ class MistralAITaskEntity(ai_task.AITaskEntity, MistralBaseEntity):
             for attachment in task.attachments or []
         ]
         model, known = self.coordinator.get_model_info(self._image_model)
+        if known and not model.completion_chat:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="model_no_chat",
+                translation_placeholders={"model": self._image_model},
+            )
         if attachments and known and not model.vision:
             raise HomeAssistantError(
                 translation_domain=DOMAIN,

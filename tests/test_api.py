@@ -83,8 +83,9 @@ async def test_get_models_parses_metadata_and_sorts() -> None:
 
     models = await async_get_models(client)
 
-    assert [model.id for model in models] == ["a-model", "z-model"]
-    model = models[1]
+    assert [model.id for model in models] == ["a-model", "not-chat", "z-model"]
+    assert not models[1].completion_chat
+    model = models[2]
     assert model.name == "Zed"
     assert model.description == "A capable model"
     assert model.aliases == ("z-latest",)
@@ -356,6 +357,34 @@ async def test_get_voices_preserves_provider_count_bound(monkeypatch):
     )
     assert len(await async_get_voices(client)) == 2
     assert client.audio.voices.search_async.await_args_list[1].kwargs["page_size"] == 1
+
+
+async def test_audio_model_discovery_retains_capabilities():
+    client = MagicMock()
+    client.models.list_async = AsyncMock(
+        return_value=SimpleNamespace(
+            data=[
+                BaseModelCard(
+                    id="voice",
+                    aliases=["voice-latest"],
+                    capabilities=ModelCapabilities(
+                        completion_chat=False,
+                        audio_transcription=True,
+                        audio_transcription_realtime=True,
+                        audio_speech=True,
+                    ),
+                )
+            ]
+        )
+    )
+    (model,) = await async_get_models(client)
+    assert not model.completion_chat
+    assert (
+        model.audio_transcription
+        and model.audio_transcription_realtime
+        and model.audio_speech
+    )
+    assert model.matches("voice-latest")
 
 
 async def test_validate_api_key_closes_client(

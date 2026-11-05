@@ -12,13 +12,16 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from homeassistant.components import stt
 from homeassistant.config_entries import ConfigSubentry
+from homeassistant.const import CONF_MODEL
 from homeassistant.core import HomeAssistant
 
 from custom_components.mistral_conversation.const import (
+    CONF_TRANSCRIPTION_MODE,
     DEFAULT_STT_MODEL,
     REALTIME_STT_MODEL,
     REQUEST_TIMEOUT_MS,
     SUBENTRY_TYPE_STT,
+    MistralModel,
 )
 from custom_components.mistral_conversation.stt import MistralSTTEntity
 from tests.ha import MockConfigEntry
@@ -132,7 +135,7 @@ async def test_stt_provider_error_updates_availability(
     assert mock_config_entry.runtime_data.last_update_success is False
 
 
-@pytest.mark.parametrize("response_text", ["", None])
+@pytest.mark.parametrize("response_text", ["", None, "  \n"])
 async def test_stt_empty_provider_response(
     hass: HomeAssistant,
     mock_init_component: MagicMock,
@@ -199,6 +202,59 @@ async def test_stt_routes_exact_realtime_model(
         mock_init_component.audio.transcriptions.complete_async.assert_not_awaited()
     else:
         mock_init_component.audio.realtime.connect.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    ("model", "known", "mode", "expected"),
+    [
+        (
+            MistralModel(id="ft:streaming", audio_transcription_realtime=True),
+            True,
+            "auto",
+            "realtime",
+        ),
+        (
+            MistralModel(id=REALTIME_STT_MODEL, audio_transcription=True),
+            True,
+            "auto",
+            "batch",
+        ),
+        (MistralModel(id="chat-only"), True, "realtime", "error"),
+        (MistralModel(id="custom"), False, "realtime", "realtime"),
+        (MistralModel(id=REALTIME_STT_MODEL), False, "batch", "batch"),
+    ],
+)
+async def test_stt_endpoint_routing_through_entity(
+    mock_config_entry, mock_init_component, model, known, mode, expected
+):
+    """Assist receives one final result and incompatible models never leave HA."""
+    mock_config_entry.runtime_data.async_set_updated_data([model] if known else [])
+    subentry = ConfigSubentry(
+        data=MappingProxyType({CONF_MODEL: model.id, CONF_TRANSCRIPTION_MODE: mode}),
+        subentry_type=SUBENTRY_TYPE_STT,
+        title="Test",
+        unique_id=None,
+    )
+    entity = MistralSTTEntity(mock_config_entry, subentry)
+    socket = Socket()
+    mock_init_component.audio.realtime.connect = AsyncMock(
+        return_value=connection(socket)
+    )
+    mock_init_component.audio.transcriptions.complete_async.return_value = (
+        SimpleNamespace(text="Hello")
+    )
+    result = await entity.async_process_audio_stream(_metadata(), _audio_stream(b"ab"))
+    assert result.result is (
+        stt.SpeechResultState.ERROR
+        if expected == "error"
+        else stt.SpeechResultState.SUCCESS
+    )
+    assert mock_init_component.audio.realtime.connect.await_count == int(
+        expected == "realtime"
+    )
+    assert mock_init_component.audio.transcriptions.complete_async.await_count == int(
+        expected == "batch"
+    )
 
 
 @pytest.mark.parametrize("phase", ["connect", "upload", "final"])

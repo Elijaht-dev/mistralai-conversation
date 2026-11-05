@@ -17,15 +17,16 @@ from mistralai.client.errors import MistralError, NoResponseError
 
 from .api import async_transcribe_realtime
 from .const import (
+    CONF_TRANSCRIPTION_MODE,
     LOGGER,
     MAX_STT_AUDIO_BYTES,
-    REALTIME_STT_MODEL,
     REQUEST_TIMEOUT_MS,
     SUBENTRY_TYPE_STT,
 )
 from .coordinator import MistralConfigEntry
 from .entity import MistralBaseEntity
 from .errors import RealtimeError
+from .model_catalog import resolve_transcription_transport
 
 PARALLEL_UPDATES = 0
 
@@ -146,8 +147,24 @@ class MistralSTTEntity(stt.SpeechToTextEntity, MistralBaseEntity):
         stream: AsyncIterable[bytes],
     ) -> stt.SpeechResult:
         """Choose the documented transport for the selected Voxtral model."""
-        if self.model == REALTIME_STT_MODEL:
+        model, known = self.coordinator.get_model_info(self.model)
+        try:
+            transport = resolve_transcription_transport(
+                model, known, self.subentry.data.get(CONF_TRANSCRIPTION_MODE, "auto")
+            )
+        except ValueError:
+            LOGGER.warning(
+                "Mistral STT model does not support the selected transcription mode"
+            )
+            return stt.SpeechResult(None, stt.SpeechResultState.ERROR)
+        if transport == "realtime":
             return await self._async_process_realtime(stream)
+        return await self._async_process_batch(metadata, stream)
+
+    async def _async_process_batch(
+        self, metadata: stt.SpeechMetadata, stream: AsyncIterable[bytes]
+    ) -> stt.SpeechResult:
+        """Wrap bounded raw Assist audio in the WAV container used by the file API."""
         audio_bytes = bytearray()
         async for chunk in stream:
             if len(audio_bytes) + len(chunk) > MAX_STT_AUDIO_BYTES:
@@ -188,7 +205,7 @@ class MistralSTTEntity(stt.SpeechToTextEntity, MistralBaseEntity):
             LOGGER.warning("Mistral STT failed (%s): %s", translation_key, message)
             return stt.SpeechResult(None, stt.SpeechResultState.ERROR)
 
-        if not response.text:
+        if not response.text or not response.text.strip():
             return stt.SpeechResult(None, stt.SpeechResultState.ERROR)
 
         self.coordinator.async_set_updated_data(self.coordinator.data or [])

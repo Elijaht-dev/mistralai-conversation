@@ -572,6 +572,12 @@ class MistralBaseEntity(CoordinatorEntity[MistralCoordinator]):
         attachments: list[tuple[Path, str | None]],
     ) -> None:
         """Reject requests that contradict known provider capabilities."""
+        if known and not model.completion_chat:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="model_no_chat",
+                translation_placeholders={"model": model.id},
+            )
         tools = chat_log.llm_api.tools if chat_log.llm_api else []
         if len(tools) > MAX_TOOLS:
             raise HomeAssistantError(

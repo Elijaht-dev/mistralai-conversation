@@ -223,6 +223,7 @@ class MistralTTSEntity(TextToSpeechEntity, MistralBaseEntity):
         options: dict[str, Any],
     ) -> TtsAudioType:
         """Generate a bounded audio response with Mistral."""
+        self._validate_speech_model()
         if len(message) > MAX_TTS_TEXT_LENGTH:
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
@@ -323,3 +324,13 @@ class MistralTTSEntity(TextToSpeechEntity, MistralBaseEntity):
 
         self.coordinator.async_set_updated_data(self.coordinator.data or [])
         return response_format, processed_audio
+
+    def _validate_speech_model(self) -> None:
+        """Reject known incompatible models before sending any text to Mistral."""
+        model, known = self.coordinator.get_model_info(self.model)
+        if known and not model.audio_speech:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="model_no_speech",
+                translation_placeholders={"model": self.model},
+            )

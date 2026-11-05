@@ -26,12 +26,15 @@ from custom_components.mistral_conversation.const import (
     CONF_SAFE_PROMPT,
     CONF_TARGET_LOUDNESS,
     CONF_TEMPERATURE,
+    CONF_TRANSCRIPTION_MODE,
     CONF_VOICE_ID,
     DEFAULT_AI_TASK_NAME,
     DEFAULT_AI_TASK_OPTIONS,
     DEFAULT_CONVERSATION_NAME,
     DEFAULT_CONVERSATION_OPTIONS,
     DEFAULT_IMAGE_MODEL,
+    DEFAULT_NEW_AI_TASK_OPTIONS,
+    DEFAULT_NEW_IMAGE_MODEL,
     DEFAULT_NEW_STT_OPTIONS,
     DEFAULT_STT_MODEL,
     DEFAULT_STT_NAME,
@@ -86,7 +89,7 @@ async def test_user_form_and_create_entry(
         },
         {
             "subentry_type": SUBENTRY_TYPE_AI_TASK,
-            "data": DEFAULT_AI_TASK_OPTIONS,
+            "data": DEFAULT_NEW_AI_TASK_OPTIONS,
             "title": DEFAULT_AI_TASK_NAME,
             "unique_id": None,
         },
@@ -407,7 +410,7 @@ async def test_create_ai_task_subentry(
     image_selector = result["data_schema"].schema[CONF_IMAGE_MODEL]
     assert image_selector.config["custom_value"]
     assert any(
-        option["value"] == DEFAULT_IMAGE_MODEL
+        option["value"] == DEFAULT_NEW_IMAGE_MODEL
         for option in image_selector.config["options"]
     )
 
@@ -439,7 +442,10 @@ async def test_ai_task_custom_image_model_and_legacy_reconfigure(
         for subentry in mock_config_entry.subentries.values()
         if subentry.subentry_type == SUBENTRY_TYPE_AI_TASK
     )
-    assert dict(subentry.data) == DEFAULT_AI_TASK_OPTIONS
+    assert dict(subentry.data) == {
+        **DEFAULT_AI_TASK_OPTIONS,
+        CONF_IMAGE_MODEL: DEFAULT_IMAGE_MODEL,
+    }
 
     result = await mock_config_entry.start_subentry_reconfigure_flow(
         hass, subentry.subentry_id
@@ -451,7 +457,10 @@ async def test_ai_task_custom_image_model_and_legacy_reconfigure(
         if getattr(marker, "schema", None) == CONF_IMAGE_MODEL
     )
     assert image_model_field.default() == DEFAULT_IMAGE_MODEL
-    assert dict(subentry.data) == DEFAULT_AI_TASK_OPTIONS
+    assert dict(subentry.data) == {
+        **DEFAULT_AI_TASK_OPTIONS,
+        CONF_IMAGE_MODEL: DEFAULT_IMAGE_MODEL,
+    }
 
     result = await hass.config_entries.subentries.async_configure(
         result["flow_id"],
@@ -494,8 +503,12 @@ async def test_create_stt_subentry(
         context={"source": config_entries.SOURCE_USER},
     )
     selector = result["data_schema"].schema[CONF_MODEL]
-    assert DEFAULT_STT_MODEL in selector.config["options"]
-    assert REALTIME_STT_MODEL in selector.config["options"]
+    assert "voxtral-mini-transcribe-3-0" in {
+        option["value"] for option in selector.config["options"]
+    }
+    assert REALTIME_STT_MODEL in {
+        option["value"] for option in selector.config["options"]
+    }
     assert selector.config["custom_value"]
     model_field = next(
         marker
@@ -513,7 +526,10 @@ async def test_create_stt_subentry(
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["title"] == "Hall microphone"
-    assert result["data"] == {CONF_MODEL: selected_model}
+    assert result["data"] == {
+        CONF_MODEL: selected_model,
+        CONF_TRANSCRIPTION_MODE: "auto",
+    }
 
     subentry = next(
         subentry
@@ -524,7 +540,7 @@ async def test_create_stt_subentry(
         hass, subentry.subentry_id
     )
     selector = result["data_schema"].schema[CONF_MODEL]
-    assert selected_model in selector.config["options"]
+    assert selected_model in {option["value"] for option in selector.config["options"]}
     model_field = next(
         marker
         for marker in result["data_schema"].schema
@@ -553,7 +569,10 @@ async def test_create_stt_subentry_with_default_model(
         result["flow_id"], {CONF_NAME: "Default microphone"}
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["data"] == {CONF_MODEL: REALTIME_STT_MODEL}
+    assert result["data"] == {
+        CONF_MODEL: REALTIME_STT_MODEL,
+        CONF_TRANSCRIPTION_MODE: "auto",
+    }
 
 
 async def test_create_and_reconfigure_tts_subentry(
@@ -641,3 +660,96 @@ async def test_create_and_reconfigure_tts_subentry(
     assert tts_subentry.data[CONF_VOICE_ID] == "custom-voice-id"
     assert tts_subentry.data[CONF_NORMALIZE_AUDIO] is False
     assert tts_subentry.data[CONF_TARGET_LOUDNESS] == -20
+
+
+@pytest.mark.parametrize(
+    ("surface", "field", "expected"),
+    [
+        (SUBENTRY_TYPE_CONVERSATION, CONF_MODEL, "mistral-small-latest"),
+        (SUBENTRY_TYPE_AI_TASK, CONF_IMAGE_MODEL, "mistral-large-4"),
+        (SUBENTRY_TYPE_STT, CONF_MODEL, REALTIME_STT_MODEL),
+        (SUBENTRY_TYPE_TTS, CONF_MODEL, "voxtral-mini-tts-3-0"),
+    ],
+)
+async def test_model_presets_keep_custom_input_and_new_defaults(
+    hass, mock_config_entry, mock_init_component, surface, field, expected
+):
+    """Every model field presents curated names, without merging discovery."""
+    mock_config_entry.runtime_data.async_set_updated_data(
+        [MistralModel(id="account-only-model")]
+    )
+    result = await hass.config_entries.subentries.async_init(
+        (mock_config_entry.entry_id, surface),
+        context={"source": config_entries.SOURCE_USER},
+    )
+    selector = result["data_schema"].schema[field]
+    options = selector.config["options"]
+    assert selector.config["custom_value"]
+    assert expected in {option["value"] for option in options}
+    assert "account-only-model" not in {option["value"] for option in options}
+    assert all(option["label"].endswith(f"({option['value']})") for option in options)
+    marker = next(
+        marker
+        for marker in result["data_schema"].schema
+        if getattr(marker, "schema", None) == field
+    )
+    assert marker.default() == expected
+
+
+@pytest.mark.parametrize("surface", [SUBENTRY_TYPE_STT, SUBENTRY_TYPE_TTS])
+async def test_audio_config_rejects_known_incompatible_models(
+    hass, mock_config_entry, mock_init_component, surface
+):
+    """Manual model entry cannot bypass capabilities advertised by the provider."""
+    result = await hass.config_entries.subentries.async_init(
+        (mock_config_entry.entry_id, surface),
+        context={"source": config_entries.SOURCE_USER},
+    )
+    values = {CONF_NAME: "Audio", CONF_MODEL: "mistral-small-latest"}
+    if surface == SUBENTRY_TYPE_TTS:
+        values[CONF_VOICE_ID] = "test-voice"
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"], values
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {
+        CONF_MODEL: "model_no_transcription"
+        if surface == SUBENTRY_TYPE_STT
+        else "model_no_speech"
+    }
+
+
+async def test_stt_custom_realtime_mode_round_trip(
+    hass, mock_config_entry, mock_init_component
+):
+    result = await hass.config_entries.subentries.async_init(
+        (mock_config_entry.entry_id, SUBENTRY_TYPE_STT),
+        context={"source": config_entries.SOURCE_USER},
+    )
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        {
+            CONF_NAME: "Custom STT",
+            CONF_MODEL: "ft:custom",
+            CONF_TRANSCRIPTION_MODE: "realtime",
+        },
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"] == {
+        CONF_MODEL: "ft:custom",
+        CONF_TRANSCRIPTION_MODE: "realtime",
+    }
+    subentry = next(
+        entry
+        for entry in mock_config_entry.subentries.values()
+        if entry.title == "Custom STT"
+    )
+    result = await mock_config_entry.start_subentry_reconfigure_flow(
+        hass, subentry.subentry_id
+    )
+    mode = next(
+        marker
+        for marker in result["data_schema"].schema
+        if getattr(marker, "schema", None) == CONF_TRANSCRIPTION_MODE
+    )
+    assert mode.default() == "realtime"

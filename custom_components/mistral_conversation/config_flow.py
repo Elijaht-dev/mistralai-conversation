@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any, cast, override
 
 import httpx2
@@ -50,14 +49,15 @@ from .const import (
     CONF_SAFE_PROMPT,
     CONF_TARGET_LOUDNESS,
     CONF_TEMPERATURE,
+    CONF_TRANSCRIPTION_MODE,
     CONF_VOICE_ID,
     DEFAULT_AI_TASK_NAME,
-    DEFAULT_AI_TASK_OPTIONS,
     DEFAULT_CONVERSATION_NAME,
     DEFAULT_CONVERSATION_OPTIONS,
     DEFAULT_IMAGE_MODEL,
     DEFAULT_MAX_TOKENS,
     DEFAULT_MODEL,
+    DEFAULT_NEW_AI_TASK_OPTIONS,
     DEFAULT_NEW_STT_OPTIONS,
     DEFAULT_STT_MODEL,
     DEFAULT_STT_NAME,
@@ -83,8 +83,9 @@ from .const import (
     MistralVoice,
     validate_target_loudness,
 )
-from .coordinator import MistralConfigEntry
+from .coordinator import MistralConfigEntry, MistralCoordinator
 from .errors import api_error_message, classify_api_error
+from .model_catalog import MODEL_PRESETS, ModelUsage, resolve_transcription_transport
 from .reasoning import fixed_reasoning_setting, reasoning_error, reasoning_options
 
 if TYPE_CHECKING:
@@ -113,6 +114,8 @@ def _validate_model_options(
 ) -> dict[str, str]:
     """Validate options against advertised model capabilities."""
     errors: dict[str, str] = {}
+    if known and not model.completion_chat:
+        errors[CONF_MODEL] = "model_no_chat"
     if error := reasoning_error(
         model, known, options.get(CONF_REASONING_EFFORT, REASONING_EFFORT_NONE)
     ):
@@ -169,33 +172,41 @@ def _reasoning_selector(
     )
 
 
-def _image_model_selector(
-    model_options: list[SelectOptionDict], suggested: dict[str, Any]
-) -> tuple[SelectSelector, str]:
-    """Offer discovered chat models and the saved or default image model."""
+def _validate_image_model(
+    coordinator: MistralCoordinator, subentry_type: str, options: dict[str, Any]
+) -> dict[str, str]:
+    """Validate the independent image-tool model on AI Task forms."""
+    if subentry_type == SUBENTRY_TYPE_AI_TASK:
+        model, known = coordinator.get_model_info(
+            options.get(CONF_IMAGE_MODEL, DEFAULT_IMAGE_MODEL)
+        )
+        if known and not model.completion_chat:
+            return {CONF_IMAGE_MODEL: "model_no_chat"}
+    return {}
+
+
+def _image_model_selector(suggested: dict[str, Any]) -> tuple[SelectSelector, str]:
+    """Offer image-tool presets and preserve the configured model."""
     configured_model = cast(str, suggested.get(CONF_IMAGE_MODEL, DEFAULT_IMAGE_MODEL))
-    options = list(model_options)
-    if configured_model not in {option["value"] for option in options}:
-        options.append(SelectOptionDict(value=configured_model, label=configured_model))
+    options = _model_options("image", configured_model)
     return (
         SelectSelector(
             SelectSelectorConfig(
                 options=options,
                 custom_value=True,
                 mode=SelectSelectorMode.DROPDOWN,
-                sort=True,
+                sort=False,
             )
         ),
         configured_model,
     )
 
 
-def _chat_model_options(
-    discovered: Iterable[MistralModel], configured_model: str
-) -> list[SelectOptionDict]:
-    """Include the selected model even when discovery no longer lists it."""
+def _model_options(usage: ModelUsage, configured_model: str) -> list[SelectOptionDict]:
+    """Show curated choices and retain saved custom or legacy model IDs."""
     options = [
-        SelectOptionDict(value=model.id, label=model.label) for model in discovered
+        SelectOptionDict(value=model_id, label=f"{name} ({model_id})")
+        for model_id, name in MODEL_PRESETS[usage]
     ]
     if configured_model not in {option["value"] for option in options}:
         options.append(SelectOptionDict(value=configured_model, label=configured_model))
@@ -206,7 +217,7 @@ class MistralConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Mistral AI Conversation."""
 
     VERSION = 1
-    MINOR_VERSION = 4
+    MINOR_VERSION = 5
 
     @classmethod
     @callback
@@ -257,7 +268,7 @@ class MistralConfigFlow(ConfigFlow, domain=DOMAIN):
                         },
                         {
                             "subentry_type": SUBENTRY_TYPE_AI_TASK,
-                            "data": DEFAULT_AI_TASK_OPTIONS,
+                            "data": DEFAULT_NEW_AI_TASK_OPTIONS,
                             "title": DEFAULT_AI_TASK_NAME,
                             "unique_id": None,
                         },
@@ -331,7 +342,7 @@ class ConversationSubentryFlowHandler(ConfigSubentryFlow):
     ) -> SubentryFlowResult:
         """Create a conversation or AI Task entity."""
         self.options = (
-            DEFAULT_AI_TASK_OPTIONS.copy()
+            DEFAULT_NEW_AI_TASK_OPTIONS.copy()
             if self._subentry_type == SUBENTRY_TYPE_AI_TASK
             else DEFAULT_CONVERSATION_OPTIONS.copy()
         )
@@ -372,6 +383,9 @@ class ConversationSubentryFlowHandler(ConfigSubentryFlow):
                 user_input = {**user_input, CONF_REASONING_EFFORT: fixed_setting[1]}
                 suggested = self.options | user_input
             errors = _validate_model_options(model, known, user_input)
+            errors.update(
+                _validate_image_model(coordinator, self._subentry_type, user_input)
+            )
             if model.max_context_length is not None:
                 description_placeholders["max_context_length"] = str(
                     model.max_context_length
@@ -398,7 +412,7 @@ class ConversationSubentryFlowHandler(ConfigSubentryFlow):
             self.options = suggested
 
         configured_model = suggested.get(CONF_MODEL, DEFAULT_MODEL)
-        model_options = _chat_model_options(coordinator.data or [], configured_model)
+        model_options = _model_options("chat", configured_model)
 
         default_name = (
             DEFAULT_AI_TASK_NAME
@@ -438,7 +452,7 @@ class ConversationSubentryFlowHandler(ConfigSubentryFlow):
                     options=model_options,
                     custom_value=True,
                     mode=SelectSelectorMode.DROPDOWN,
-                    sort=True,
+                    sort=False,
                 )
             ),
         }
@@ -466,9 +480,7 @@ class ConversationSubentryFlowHandler(ConfigSubentryFlow):
                 }
             )
         else:
-            image_selector, image_default = _image_model_selector(
-                model_options, suggested
-            )
+            image_selector, image_default = _image_model_selector(suggested)
             schema_fields[vol.Required(CONF_IMAGE_MODEL, default=image_default)] = (
                 image_selector
             )
@@ -552,18 +564,33 @@ class STTSubentryFlowHandler(ConfigSubentryFlow):
             return self.async_abort(reason="entry_not_loaded")
 
         suggested = self.options
+        errors: dict[str, str] = {}
         if user_input is not None:
             data = user_input.copy()
             name = data.pop(CONF_NAME)
-            if self._is_new:
-                data.setdefault(CONF_MODEL, REALTIME_STT_MODEL)
-                return self.async_create_entry(title=name, data=data)
-            return self.async_update_and_abort(
-                entry,
-                self._get_reconfigure_subentry(),
-                title=name,
-                data=data,
+            data.setdefault(
+                CONF_MODEL, REALTIME_STT_MODEL if self._is_new else DEFAULT_STT_MODEL
             )
+            data.setdefault(CONF_TRANSCRIPTION_MODE, "auto")
+            model, known = cast(MistralConfigEntry, entry).runtime_data.get_model_info(
+                data[CONF_MODEL]
+            )
+            try:
+                resolve_transcription_transport(
+                    model, known, data[CONF_TRANSCRIPTION_MODE]
+                )
+            except ValueError:
+                errors[CONF_MODEL] = "model_no_transcription"
+                suggested = self.options | user_input
+            else:
+                if self._is_new:
+                    return self.async_create_entry(title=name, data=data)
+                return self.async_update_and_abort(
+                    entry,
+                    self._get_reconfigure_subentry(),
+                    title=name,
+                    data=data,
+                )
 
         configured_model = suggested.get(CONF_MODEL, DEFAULT_STT_MODEL)
         subentry_name = (
@@ -571,9 +598,7 @@ class STTSubentryFlowHandler(ConfigSubentryFlow):
             if self._is_new
             else suggested.get(CONF_NAME, self._get_reconfigure_subentry().title)
         )
-        model_options = list(
-            dict.fromkeys((DEFAULT_STT_MODEL, REALTIME_STT_MODEL, configured_model))
-        )
+        model_options = _model_options("stt", configured_model)
         schema = vol.Schema(
             {
                 vol.Required(CONF_NAME, default=subentry_name): cv.string,
@@ -585,7 +610,17 @@ class STTSubentryFlowHandler(ConfigSubentryFlow):
                         options=model_options,
                         custom_value=True,
                         mode=SelectSelectorMode.DROPDOWN,
-                        sort=True,
+                        sort=False,
+                    )
+                ),
+                vol.Required(
+                    CONF_TRANSCRIPTION_MODE,
+                    default=suggested.get(CONF_TRANSCRIPTION_MODE, "auto"),
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        options=["auto", "batch", "realtime"],
+                        translation_key=CONF_TRANSCRIPTION_MODE,
+                        mode=SelectSelectorMode.DROPDOWN,
                     )
                 ),
             }
@@ -593,6 +628,7 @@ class STTSubentryFlowHandler(ConfigSubentryFlow):
         return self.async_show_form(
             step_id="init",
             data_schema=self.add_suggested_values_to_schema(schema, suggested),
+            errors=errors or None,
             last_step=True,
         )
 
@@ -657,13 +693,18 @@ class TTSSubentryFlowHandler(ConfigSubentryFlow):
 
         errors: dict[str, str] = {}
         if user_input is not None:
+            selected, known = cast(
+                MistralConfigEntry, entry
+            ).runtime_data.get_model_info(user_input[CONF_MODEL])
+            if known and not selected.audio_speech:
+                errors[CONF_MODEL] = "model_no_speech"
             try:
                 user_input[CONF_TARGET_LOUDNESS] = validate_target_loudness(
                     user_input[CONF_TARGET_LOUDNESS]
                 )
             except KeyError, ValueError:
                 errors[CONF_TARGET_LOUDNESS] = "target_loudness_invalid"
-            else:
+            if not errors:
                 data = user_input.copy()
                 name = data.pop(CONF_NAME)
                 if self._is_new:
@@ -709,7 +750,7 @@ class TTSSubentryFlowHandler(ConfigSubentryFlow):
                 SelectOptionDict(value=configured_voice, label=configured_voice)
             )
 
-        model_options = list(dict.fromkeys((DEFAULT_TTS_MODEL, configured_model)))
+        model_options = _model_options("tts", configured_model)
         schema = vol.Schema(
             {
                 vol.Required(CONF_NAME, default=subentry_name): cv.string,
@@ -721,7 +762,7 @@ class TTSSubentryFlowHandler(ConfigSubentryFlow):
                         options=model_options,
                         custom_value=True,
                         mode=SelectSelectorMode.DROPDOWN,
-                        sort=True,
+                        sort=False,
                     )
                 ),
                 vol.Required(CONF_VOICE_ID): SelectSelector(

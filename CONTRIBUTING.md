@@ -1,10 +1,8 @@
 # Contributing
 
-Thank you for improving Mistral AI Conversation.
-
 ## Development setup
 
-Use Python 3.14 and create an isolated virtual environment:
+Use Python 3.14.2+ and an isolated virtual environment:
 
 ```bash
 python -m venv .venv
@@ -12,48 +10,66 @@ python -m pip install --upgrade pip
 python -m pip install --requirement requirements_test.txt
 ```
 
-Install FFmpeg on your test machine and make `ffmpeg` available on `PATH` for
-the speech-normalization tests. CI installs it explicitly.
+Install FFmpeg on `PATH` for speech-normalization tests. PyTurboJPEG 2.6.1
+requires a native libjpeg-turbo 3.0+ library; use the
+[official releases](https://github.com/libjpeg-turbo/libjpeg-turbo/releases).
+On Linux, include its library directory in `LD_LIBRARY_PATH`.
 
-The pinned PyTurboJPEG 2.6.1 also requires a native libjpeg-turbo 3.0 or newer.
-Install a compatible library from the
-[official libjpeg-turbo releases](https://github.com/libjpeg-turbo/libjpeg-turbo/releases).
-The JPEG test encodes and decodes synthetic pixels to verify the native backend.
-CI extracts the official 3.2.1 package into an isolated temporary directory,
-verifies its SHA-256 digest, and selects it with `LD_LIBRARY_PATH`.
-On Linux, keep that directory on the library path for local test runs too.
+CI extracts checksum-verified libjpeg-turbo 3.2.1 into a temporary directory.
+The JPEG test performs real encoding and decoding with synthetic pixels.
+These native dependencies belong to the development environment; Home Assistant
+manages its own runtime image libraries.
 
-Use `requirements_test_2026_10.txt` or `requirements_test_2026_7.txt` in separate
-virtual environments to run the compatibility suites. The primary environment
-uses the official HA 2026.11 fixtures pinned to the release source commit.
+Use separate virtual environments for the compatibility suites:
 
-Run the complete local quality gate before opening a pull request:
+| Home Assistant | Requirements |
+| --- | --- |
+| 2026.11.0 | `requirements_test.txt` |
+| 2026.10.4 | `requirements_test_2026_10.txt` |
+| 2026.7.4 | `requirements_test_2026_7.txt` |
+
+Shared pins live in `requirements_test_base.txt`. Keep each HA version paired
+with its matching fixtures.
+
+## Validation
+
+Run the local gate before opening a pull request:
 
 ```bash
+python -m pip check
 ruff format --check .
 ruff check .
 mypy
 pytest --cov=custom_components.mistral_conversation --cov-report=term-missing
+python scripts/validate_hacs.py
+git diff --check
 ```
 
-## Change expectations
+CI also enforces at least 85% branch coverage and runs Hassfest/public HACS
+validation. Live-provider checks are separate and require owner authorization;
+normal tests use mocked provider behavior.
 
-- Keep provider-specific objects behind the typed SDK boundary.
-- Preserve Home Assistant config-entry, subentry, entity, translation, diagnostics,
-  repair, and exception conventions.
-- Add regression tests for behavior changes and provider edge cases.
-- Mock Mistral calls; never commit API keys, recordings, prompts, or user data.
-- Update user-facing translations and documentation with changed behavior.
-- Keep changes focused and document compatibility or migration effects.
+For documentation-only changes, review accuracy and links and run
+`git diff --check`. The Python gate is not required.
 
-Use conventional, imperative commit subjects. Pull requests should explain the
-user impact, testing performed, and any security or privacy implications.
+## Changes and pull requests
 
-## Reporting defects
+- Keep patches focused and preserve strict typing and HA lifecycle conventions.
+- Add regression tests for behavior, boundaries, cleanup and migrations.
+- Keep provider objects behind the typed SDK boundary.
+- Update English/French strings together and document changed behavior.
+- Keep dependency pins, compatibility metadata and release notes consistent.
+- Exclude credentials, personal data and generated artifacts.
 
-Include the Home Assistant version, integration version, selected model ID,
-sanitized diagnostics, and relevant logs. Remove API keys, prompt content, entity
-names, addresses, and other private data before sharing.
+Use conventional, imperative commit subjects. Describe the problem, resulting
+behavior and validation in pull requests. [QUALITY.md](QUALITY.md) defines
+runtime guarantees and release requirements.
 
-For vulnerabilities, follow [SECURITY.md](SECURITY.md) instead of opening a public
-issue.
+## Reporting issues
+
+Include integration/HA versions, selected model ID, reproduction steps and
+redacted logs or diagnostics. Remove credentials, prompts, entity inventories,
+addresses, attachments and audio before sharing.
+
+Report suspected vulnerabilities privately as described in
+[SECURITY.md](SECURITY.md).

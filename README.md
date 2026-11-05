@@ -4,177 +4,105 @@
 [![Home Assistant 2026.7.4+](https://img.shields.io/badge/Home%20Assistant-2026.7.4%2B-41BDF5.svg)](https://www.home-assistant.io/)
 [![Mistral SDK 3.7.0](https://img.shields.io/badge/mistralai-3.7.0-FA520F.svg)](https://pypi.org/project/mistralai/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-
 [![Open your Home Assistant instance and add this repository to HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Elijaht-dev&repository=mistralai-conversation&category=integration)
 
-A custom Home Assistant AI integration for Mistral AI, implemented against the
-official `mistralai` Python SDK. It provides Conversation, AI Task,
-speech-to-text, and text-to-speech entities using Home Assistant's current
-entity, config-subentry, coordinator, repair, and diagnostics patterns.
+A custom Home Assistant integration for Mistral AI using the official Python
+SDK. It provides Conversation, AI Task, speech-to-text and text-to-speech
+entities, with English and French configuration interfaces.
 
-This is an independent custom integration. It is not developed, reviewed, or
-endorsed by Home Assistant or Mistral AI.
-
-## Features
-
-- UI configuration, API-key validation, and reauthentication
-- Multiple independently configured conversation agents per Mistral account
-- Home Assistant AI Task data generation with native Mistral JSON-schema output
-- Home Assistant AI Task image generation from instructions and optional image references
-- AI Task image and PDF attachments on compatible multimodal models
-- Voxtral batch and Realtime speech-to-text for Home Assistant Assist voice pipelines
-- Streaming Voxtral text-to-speech with preset and saved custom Mistral voices
-- Curated model lists, live capability discovery, aliases, and custom model IDs
-- Streamed text, reasoning, token usage, and parallel tool calls
-- Multi-turn history with provider-native signed reasoning replay
-- Home Assistant Assist tools for reading and controlling exposed entities
-- Bounded tool execution: 128 declared tools and 10 tool rounds per request
-- PNG, JPEG, GIF, WebP, and PDF attachments with local type, count, and size
-  checks
-- Model-aware validation for tools, reasoning, vision, documents, and context size
-- Configurable instructions, model, output limit, temperature, reasoning effort,
-  Mistral safety prompt, and exposed Home Assistant APIs
-- Coordinator-backed availability, translated runtime errors, diagnostics, and
-  deprecated-model repairs
-- English and French user-interface translations
+This is an independent project, not developed, reviewed or endorsed by Home
+Assistant or Mistral AI. This README describes the development branch;
+[CHANGELOG.md](CHANGELOG.md) lists released and unreleased changes.
 
 ## Requirements
 
-- Home Assistant 2026.7.4 or newer
-- A Mistral AI API key and available API credit
-- A chat-capable Mistral model for Conversation and AI Task
-- Access to Mistral's audio endpoints for speech-to-text or text-to-speech
+- Home Assistant 2026.7.4 or newer.
+- A Mistral AI API key with credit and access to the selected models/endpoints.
+- An available preset or saved voice for text-to-speech.
+- FFmpeg through Home Assistant for speech loudness normalization.
 
-Tool control, reasoning, image input, and PDF input also require the corresponding
-capability on the selected model. Unknown custom and fine-tuned model IDs remain
-configurable because their capabilities may not be present in model discovery.
-Text-to-speech additionally requires a preset or saved voice available to the
-Mistral account.
-
-The integration pins `mistralai[realtime]==3.7.0` and `httpx2==2.14.0`, including
-the SDK's WebSocket support for Realtime transcription. Home Assistant 2026.11
-provides the shared HTTPX2 client. On supported older releases, the integration
-creates and closes its own account-scoped HTTPX2 transport with Home Assistant's
-verified TLS context. The declared minimum remains Home Assistant 2026.7.4.
-
-Version `0.2.3` addresses blocking SDK initialization and lazy imports reported
-at startup in issue [#51](https://github.com/Elijaht-dev/mistralai-conversation/issues/51).
-It keeps Home Assistant's shared asynchronous HTTP client and prepares SDK
-services before their first request. A full restart on Home Assistant 2026.9.2
-showed no Mistral blocking-call warnings or setup errors in the observed logs.
-I also tested Conversation, Assist tools, AI Task, STT, and TTS on that instance.
-Runtime code is unchanged from the tested `0.2.3b1` beta.
-
-I tested the 0.2.0 release on Home Assistant 2026.8.6 and 2026.9.0.
-The declared minimum remains 2026.7.4.
+The integration installs its pinned Mistral SDK dependencies automatically.
+Current versions and compatibility details are in [QUALITY.md](QUALITY.md).
 
 ## Installation
 
 ### HACS
 
-This integration is included in the default HACS catalog.
-
-Use the **Open your Home Assistant instance** button above, or install it from
-the HACS dashboard:
-
-1. Open **HACS** in Home Assistant.
-2. Search for **Mistral AI Conversation**.
-3. Select it, choose **Download**, and restart Home Assistant.
+Find **Mistral AI Conversation** in HACS, download it and restart Home Assistant.
+The HACS button above opens the repository in your instance.
 
 ### Manual installation
 
-1. Download or clone this repository.
-2. Copy `custom_components/mistral_conversation` into Home Assistant's
+1. Copy `custom_components/mistral_conversation` into your Home Assistant
    `config/custom_components` directory.
-3. Confirm the resulting path is
-   `config/custom_components/mistral_conversation/manifest.json`.
-4. Restart Home Assistant.
-5. Clear the browser cache if the integration does not appear immediately.
+2. Confirm that `config/custom_components/mistral_conversation/manifest.json`
+   exists.
+3. Restart Home Assistant.
 
 ## Configuration
 
-1. Create an API key in the
-   [Mistral AI console](https://console.mistral.ai/api-keys/).
-2. Open **Settings → Devices & services → Add integration**.
-3. Search for **Mistral AI Conversation** and enter the API key.
-4. Reconfigure the default Conversation, AI Task, or speech-to-text entity, or
-   add more entities from the integration page.
-5. Add a text-to-speech entity and explicitly select a preset or saved Mistral
-   voice.
-6. In **Settings → Voice assistants**, select the Mistral conversation,
-   speech-to-text, and text-to-speech entities for the desired pipeline.
+1. Create an API key in the [Mistral AI console](https://console.mistral.ai/api-keys/).
+2. Open **Settings → Devices & services → Add integration** and select
+   **Mistral AI Conversation**.
+3. Enter the key. The account creates Conversation, AI Task and STT entities.
+4. Reconfigure these entities or add more from the integration page.
+5. Add a TTS entity and explicitly select a preset or saved voice.
+6. Select the desired entities in **Settings → Voice assistants**.
+
+Each entity has its own settings. Upgrades preserve existing model selections,
+voices, audio options and pipelines.
+
+### Models
+
+Model menus offer a curated list and accept custom or fine-tuned IDs. Saved
+values remain visible even when absent from the list. Discovery supplies
+capability checks, aliases and model-retirement repairs.
+
+| New entity or setting | Default model |
+| --- | --- |
+| Conversation | `mistral-small-latest` |
+| AI Task data | `mistral-small-latest` |
+| AI Task image tool | `mistral-large-4` |
+| STT | `voxtral-mini-transcribe-realtime-3-0` |
+| TTS | `voxtral-mini-tts-3-0` |
+
+Conversation and AI Task data offer Small 4, Large 4 and Ministral 3 in 3B, 8B
+and 14B sizes. The image-tool menu offers Large 4 and Small 4. The STT menu
+offers Realtime 3, Mini Transcribe 3 and Small Transcribe 3.
+
+Known incompatible capabilities are rejected locally. Unknown custom models
+remain configurable; Mistral determines whether their requests are supported.
 
 ### Conversation
 
 | Option | Purpose |
 | --- | --- |
-| Name | Label shown for this agent |
-| Model | Curated, custom, or fine-tuned Mistral model ID |
 | Instructions | Templated system instructions |
-| Home Assistant APIs | Tool APIs exposed to Mistral; clear for chat-only use |
-| Maximum response tokens | Upper bound for generated output |
-| Temperature | Predictability-to-variation control from 0 to 1 |
-| Reasoning | Automatic, Disabled, Enabled, or a fixed model state; see below |
-| Mistral safety prompt | Requests Mistral's provider-side safety prompt |
+| Home Assistant APIs | Tools exposed to the model; clear for chat-only use |
+| Maximum response tokens | Output limit |
+| Temperature | Variation control from 0 to 1 |
+| Reasoning | Automatic, Disabled, Enabled, or a fixed model state |
+| Mistral safety prompt | Enable Mistral's provider-side safety prompt |
 
-The default model is `mistral-small-latest`, with the built-in Assist API enabled.
+The built-in Assist API is enabled by default. Home Assistant controls which
+entities are exposed and validates tool execution.
 
-Model menus use a curated list and always allow another model ID. Conversation
-and AI Task data offer Mistral Small 4, Large 4, and Ministral 3 in 3B, 8B, and
-14B sizes. Account discovery supplies capability checks, aliases, and retirement
-repairs rather than filling menus with every model. Saved custom and legacy
-values remain visible. Known incompatible models are rejected before requests;
-unknown custom and fine-tuned models remain configurable.
+Reasoning controls depend on the selected model. Fixed states appear during
+reconfiguration. Model changes save in one submission; reopen the form to see
+the updated controls. Unsupported saved efforts must be corrected before use;
+custom SDK efforts remain editable where supported.
 
-With **Prefer handling commands locally** enabled in an Assist pipeline, locally
-handled commands and Home Assistant's spoken replies remain in the conversation
-history. Their internal tool-call/result pairs are omitted from requests to
-Mistral, so a later Mistral turn can continue the same conversation.
-
-During creation, **Reasoning** always offers Automatic, Disabled, and Enabled.
-On reconfiguration, the control reflects the saved model:
-
-| Model | Reasoning choices |
-| --- | --- |
-| Mistral Small 4 and Medium 3.5 | Automatic, Disabled, Enabled |
-| Magistral Small and Medium | Fixed text: Reasoning always active |
-| Discovered models without reasoning, including Ministral | Fixed text: Reasoning always disabled |
-| Other or unknown custom models | Automatic, Disabled, Enabled; other SDK efforts can be entered manually if supported |
-
-**Automatic** omits the reasoning parameter and lets Mistral choose its behavior.
-**Disabled** corresponds to `none` and **Enabled** to `high`. Disabled omits the
-parameter for non-reasoning and unknown models; for compatible adjustable models
-it explicitly sends `none`. Magistral's fixed state uses provider-default native
-reasoning, which cannot be disabled this way.
-
-Model changes save in one submission; controls update when you reopen the
-configuration. Models with fixed reasoning apply their only supported behavior
-when saved, regardless of an incompatible dropdown selection. Existing settings
-remain unchanged until you explicitly save. Other incompatible efforts
-require a compatible selection and fail locally at runtime until reconfigured.
-Custom efforts remain visible when already saved and can still be entered
-manually; they are not silently mapped to High. See Mistral's
-[reasoning guide](https://docs.mistral.ai/studio/conversations/reasoning)
-and [native reasoning guide](https://docs.mistral.ai/resources/deprecated/native-reasoning).
+With **Prefer handling commands locally** enabled, locally handled commands
+and spoken replies remain available for later conversation turns.
 
 ### AI Task
 
-The default AI Task entity uses the same chat-model controls as Conversation,
-without a conversation prompt or a fixed Home Assistant tool selection. It
-supports unstructured text and schema-constrained data through Mistral's native
-JSON-schema response format. Compatible models can also receive Home Assistant
-image and PDF attachments.
+AI Task supports plain text and structured data using native JSON-schema
+output. Compatible models also accept image and PDF attachments.
 
-The same entity also supports `ai_task.generate_image`. **Model for the
-image-generation tool** defaults to `mistral-large-4` for new entities. It selects
-the Mistral model that interprets your instructions and reference images and calls
-the `image_generation` tool. The underlying image generator is managed by Mistral
-and is not selected by this setting. The setting is independent of the data model
-and offers Large 4, Small 4, or a custom model ID. Existing entities retain their
-saved image model, including the previous implicit `mistral-medium-latest`
-default. The other AI Task controls apply to data generation; image requests use
-provider defaults and a 2,048-token text
-output limit.
+The same entity provides `ai_task.generate_image`. Its independent image-tool
+model interprets instructions and reference images; Mistral manages the
+underlying image generator.
 
 ```yaml
 action: ai_task.generate_image
@@ -185,85 +113,46 @@ data:
 response_variable: generated_image
 ```
 
-Home Assistant stores the image in its AI Task media directory and returns its
-standard result, including `media_source_id` and a signed `url`. Home Assistant
-must have a media directory configured. Its media storage and access behavior
-are managed by Home Assistant, not by this integration.
+Home Assistant needs a media directory to store generated images. The action
+returns its standard media result, including `media_source_id` and a signed
+`url`. Image references provide visual context; exact image editing is not
+guaranteed. PDF references are not supported for image generation.
 
-The action also accepts Home Assistant image attachments as visual context.
-Reference images require a vision-capable model when its capabilities are known.
-PNG, JPEG, GIF, and WebP references retain the ten-file and 20 MiB-per-file
-limits; PDF references are not accepted for image generation. Reference context
-does not guarantee faithful image editing or preservation of the original.
-
-Image generation uses Mistral's Conversations API with only the `image_generation`
-tool enabled. It does not create a saved Mistral agent. One action returns the
-first generated image; an answer containing only text is an error and is not
-automatically retried. Generated images are limited to 20 MiB and checked locally
-before being returned. Generation and download share a 300-second deadline.
-
-After the request, the integration attempts to delete the generated Mistral files
-whose identifiers it received, including unused additional images. Cleanup has a
-separate ten-second deadline. A cleanup failure produces a warning and does not
-discard an image already retrieved. I verified deletion of a generated image
-against Mistral's live API on 2026-09-26: deletion was confirmed and a subsequent
-download was rejected. This does not establish zero provider retention.
-Deleting the provider file does not delete Home Assistant's local media copy:
-that copy remains available through the returned `media_source_id` and can be
-kept locally or copied to another local folder.
+A response without an image is an error and is not automatically retried.
+Live image validation of the SDK 3 development version remains incomplete;
+see the [recorded validation](QUALITY.md#recorded-validation).
 
 ### Speech-to-text
 
-New speech-to-text entities default to `voxtral-mini-transcribe-realtime-3-0`.
-It transcribes audio as Assist receives it through Mistral's WebSocket API, using
-mono, 16-bit, 16 kHz PCM without buffering the complete recording. Audio starts
-leaving Home Assistant during the STT stage. Existing entities keep their model,
-including older configurations that used the implicit batch default.
+STT accepts mono, 16-bit, 16 kHz PCM from Assist.
 
-Select `voxtral-mini-transcribe-3-0` or `voxtral-small-transcribe-3` for file
-(batch) transcription. It adds the WAV container expected by the API and forwards
-the pipeline language to Mistral. This is one recording per Assist request,
-not Mistral's deferred batch-jobs service. Both paths bound audio input.
+| Transcription mode | Behavior |
+| --- | --- |
+| Automatic | Use discovered capabilities, then documented model IDs; unknown IDs use Batch |
+| Batch | Buffer one recording, add a WAV header and send the pipeline language |
+| Realtime | Send audio during capture through the WebSocket endpoint |
 
-**Transcription mode** offers Automatic, Batch, and Realtime. Automatic uses
-discovered capabilities first, then documented Realtime IDs and aliases,
-including the older `voxtral-mini-transcribe-realtime-2602`. Unknown custom IDs
-use Batch; select Realtime explicitly for an undiscovered custom streaming
-model. A manual choice cannot bypass known incompatible capabilities.
+Mini Transcribe 3 and Small Transcribe 3 use the file transcription endpoint.
+This Batch mode processes one Assist recording per request.
 
-Realtime uses automatic language detection and the provider's default streaming
-delay. Assist still determines when the utterance ends and receives one final
-transcript before starting the conversation agent. Voxtral 3 turn events are
-accepted, but a turn boundary does not finish transcription: the integration
-waits for the final transcript so trailing words are retained. This can reduce the wait after
-speaking; it does not add live captions or interruption of spoken responses.
-An interrupted or failed Realtime request returns an error without retrying the
-recording through the batch API.
+Realtime uses automatic language detection. Assist determines when speech ends,
+and the integration waits for the final transcript before starting the
+conversation agent. Turn-detection events do not discard trailing words.
+A failed Realtime request is not retried through Batch.
+
+Manual mode selection supports custom models and still respects known
+capability restrictions.
 
 ### Text-to-speech
 
-New text-to-speech entities default to `voxtral-mini-tts-3-0`; existing entities
-retain their model, including the previous implicit `voxtral-mini-tts-2603`.
-Text-to-speech supports MP3, Opus, FLAC,
-WAV, and raw PCM output. The setup flow reads preset and saved custom voices
-available to the account while still allowing a custom voice ID.
+TTS supports MP3, Opus, FLAC, WAV and raw PCM. Select a preset or saved custom
+voice, or enter its ID.
 
-New text-to-speech entities normalize generated speech locally to **-16 LUFS**
-by default. The entity's **Normalize speech loudness** switch and **Target
-loudness** control accept whole-number targets from -24 to -12 LUFS. Existing
-entities keep normalization off during migration, preserving their previous
-audio and voice settings; enable it when ready. Normalization requires an
-available FFmpeg executable through Home Assistant's FFmpeg integration.
-It measures the generated WAV response before applying a second processing pass.
-The processor limits upward gain to 20 dB, protects true peaks at -2 dBTP,
-and does not amplify silence or very short/unmeasurable clips. Processing is
-limited to 30 seconds including queue time and two concurrent jobs per account;
-failure returns a translated error rather than unprocessed audio.
-The -2 dBTP ceiling applies during processing; output resampling and lossy
-MP3 or Opus encoding can slightly shift decoded peaks. MP3 uses high-quality
-variable-bitrate encoding.
+New entities enable **Normalize speech loudness** at **-16 LUFS**. The target
+accepts whole numbers from -24 to -12 LUFS. Existing entities retain their
+normalization settings.
 
-You can override either setting for one `tts.speak` call with its `options`:
+Options can be overridden for one call:
 
 ```yaml
 action: tts.speak
@@ -277,93 +166,52 @@ data:
     target_loudness: -18
 ```
 
-TTS media-source URLs also accept string query values, for example
-`media-source://tts/tts.mistral_text_to_speech?message=Hello&normalize_audio=true&target_loudness=-18`.
-Use `normalize_audio=false` to request the original Mistral output for one call.
-The effective options are part of Home Assistant's TTS cache key.
+Use `normalize_audio: false` to request the original provider audio.
+Normalization errors return a translated error. Processing limits are listed
+in [QUALITY.md](QUALITY.md#limits).
 
-Mistral requires an explicit `voice_id`, so the integration does not silently
-create, clone, or select a voice. Only use a cloned voice with the speaker's
-informed consent. Voice creation and retention are managed by Mistral, not by
-this integration.
+## Data and control
 
-## Data, control, and security
+Prompts, relevant history, exposed tool schemas/results, attachments, recordings
+and text for speech generation are sent to Mistral AI. API use may incur charges.
+Home Assistant stores API keys and redacts them from integration diagnostics.
+Request traces exclude prompts, attachments, recordings, transcripts and audio.
 
-Prompts, AI Task instructions, relevant conversation history, exposed tool
-definitions, tool results, attachments, speech recordings, and text submitted
-for speech generation are sent to Mistral AI. Generated speech may enter Home
-Assistant's TTS cache. API use may incur charges. API keys are stored in Home
-Assistant's config-entry storage and are redacted from diagnostics. The
-integration does not log prompt, attachment, recording, transcript, or generated
-audio content in its request trace.
+Home Assistant can retain generated images and cached speech. The integration
+attempts to delete generated Mistral image files whose IDs it receives;
+this does not guarantee zero provider retention or delete HA's local media.
 
-Image-generation instructions and reference images also leave Home Assistant
-for Mistral. Image requests explicitly use `store=False` for conversation history;
-this is not a guarantee of zero provider retention. Generated files may remain
-at Mistral if deletion fails or a timeout/cancellation prevents their identifiers
-from reaching Home Assistant. The integration does not log generated image
-content or file identifiers. Home Assistant retains its own generated image files.
+Voice creation and retention are managed by Mistral. Use a cloned voice only
+with the speaker's informed consent.
 
-When a Home Assistant API is selected, the model can call its exposed tools.
-Review the entities exposed to the voice assistant before enabling control,
-especially locks, covers, alarms, garage doors, and other safety-sensitive
-devices. Home Assistant remains responsible for tool validation and execution.
+Review the entities exposed to Assist, particularly safety-sensitive devices.
+See [SECURITY.md](SECURITY.md) for deployment and vulnerability-reporting guidance.
 
-Attachments are encoded as data URLs. Each file is limited to 20 MB and each
-request to 10 files. The configured model must support the input type.
-
-Speech-to-text input and decoded text-to-speech output are each limited to 25 MB
-per request. Text-to-speech input is limited to 5,000 characters. These local
-bounds protect Home Assistant memory independently of provider-side limits.
-When normalization is enabled, both the received WAV and the processed output
-retain the 25 MB bound. FFmpeg receives audio over pipes; the integration does
-not write a temporary recording or generated clip to disk. Home Assistant's
-own TTS cache can still store the resulting audio.
-
-See [SECURITY.md](SECURITY.md) for vulnerability reporting and deployment
-guidance.
-
-## Failure behavior
-
-- Authentication errors start Home Assistant's reauthentication flow.
-- Timeouts, connection failures, rate limits, and provider errors are translated
-  into distinct Home Assistant errors.
-- Connection-level failures mark the entity unavailable until model discovery
-  succeeds again; request validation and rate-limit errors do not.
-- Invalid or incomplete streamed tool calls are rejected before execution.
-- Empty responses, explicit stream errors, excessive tools, oversized
-  attachments, oversized audio, malformed speech data, and runaway tool loops
-  fail closed.
-- Model deprecation metadata creates a Home Assistant repair issue when Mistral
-  provides a replacement.
+| Input or output | Local limit |
+| --- | --- |
+| PNG, JPEG, GIF, WebP and PDF attachments | 10 files, 20 MiB per file |
+| Generated image | 20 MiB |
+| STT input / TTS output | 25 MiB per request |
+| TTS text | 5,000 characters |
 
 ## Troubleshooting
 
-- **Invalid API key:** complete the reauthentication notification.
-- **Model rejects tools:** select a function-calling model or clear **Home
-  Assistant APIs**.
-- **Model rejects reasoning:** review **Reasoning** in the entity configuration.
-  On Small 4 and Medium 3.5, choose **Automatic**, **Disabled**, or **Enabled**.
-  For a fixed state, review and save the form. Replace older custom efforts such
-  as Low or Medium if the model does not support them.
-- **Attachment rejected:** select a vision/document-capable model and use a
-  supported image or PDF.
-- **Speech-to-text unavailable:** confirm the account can use Voxtral
-  transcription and that the Assist pipeline uses the advertised PCM format.
-- **Audio model rejected:** select an available model for the corresponding
-  audio endpoint. I checked `voxtral-mini-transcribe-3-0` for batch STT and
-  `voxtral-mini-tts-3-0` for TTS on Home Assistant 2026.10.4 with SDK 2.10.1.
-  A Voxtral 3 voice requires a compatible TTS model.
-- **No text-to-speech entity:** add one from the integration page and select a
-  preset or saved voice.
-- **Voice missing from the list:** enter its saved Mistral voice ID manually, or
-  confirm that the API key can list voices.
-- **Speech normalization fails:** confirm FFmpeg is installed and available to
-  Home Assistant, then retry or disable normalization for that entity.
-- **No entities can be controlled:** confirm that the voice assistant exposes
-  them and that an appropriate Home Assistant API is selected.
+| Problem | Check |
+| --- | --- |
+| Invalid API key | Complete Home Assistant's reauthentication flow |
+| Model rejects a request | Check model access, endpoint and capabilities |
+| Tools cannot control entities | Review exposed entities and the selected Home Assistant API |
+| Attachment rejected | Check MIME type, size and model vision/document support |
+| STT unavailable | Check endpoint access, transcription mode and PCM format |
+| Voice missing | Confirm account access or enter the saved voice ID |
+| Normalization fails | Confirm FFmpeg is available, or disable normalization |
+| Image request returns no file | Review the image model and current validation status in QUALITY |
 
-Enable debug logging only while diagnosing a problem:
+Authentication, connection, rate-limit, timeout and provider failures have
+distinct handling. Connection failures mark entities unavailable until model
+discovery recovers. Malformed responses and exceeded limits fail closed.
+
+For temporary integration debug logging:
 
 ```yaml
 logger:
@@ -371,32 +219,14 @@ logger:
     custom_components.mistral_conversation: debug
 ```
 
-SDK debug logging can expose additional request metadata and should be enabled
-with care.
+Avoid verbose SDK logging in normal operation and redact logs before sharing.
 
-## Quality and development
+## Development
 
-The repository validates on Python 3.14 with Ruff, strict mypy, Home
-Assistant-native pytest fixtures, branch coverage, HACS structural readiness, and
-Hassfest. The official HACS remote validator also runs on every public push and
-pull request. Provider calls are mocked in tests; no live API key is required.
-
-```bash
-python -m pip install --requirement requirements_test.txt
-ruff format --check .
-ruff check .
-mypy
-pytest --cov=custom_components.mistral_conversation --cov-report=term-missing
-```
-
-See [QUALITY.md](QUALITY.md) for the design comparison and assurance boundaries,
-and [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow.
-
-The development environment pins PyTurboJPEG 2.6.1 and verifies JPEG encoding
-and decoding against libjpeg-turbo 3+. See the contribution guide for native
-library setup. This is a test dependency; Home Assistant manages its own runtime
-image libraries.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and checks,
+[QUALITY.md](QUALITY.md) for architecture and validation, and
+[CHANGELOG.md](CHANGELOG.md) for release history.
 
 ## License
 
-MIT
+[MIT](LICENSE)

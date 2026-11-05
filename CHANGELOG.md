@@ -1,438 +1,299 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+Release history follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
+and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Curated model menus with custom IDs and Automatic, Batch and Realtime STT modes.
+- Voxtral 3 support, including Realtime turn events and cancellation/recovery.
+
 ### Changed
 
-- Migrate to Mistral SDK 3.7.0 and HTTPX2 2.14.0, using HA's shared transport
-  on 2026.11 and an owned verified transport on older supported releases.
-- Use Voxtral Realtime 3, Voxtral TTS 3, and Large 4 image-tool defaults for new
-  entities. Configuration migration 1.5 preserves saved and implicit old choices.
-- Harmonize curated model selectors while retaining custom and legacy IDs;
-  use discovered chat and audio capabilities for validation and endpoint routing.
-- Add Automatic, Batch, and Realtime transcription modes. Support Voxtral 3
-  turn events and wait for the final transcript after all audio is sent.
-- Use cursor-paginated voice discovery and update SDK cold-start preloading.
-- Test with HA 2026.11.0, 2026.10.4, and the unchanged 2026.7.4 minimum.
-- Update the test-only PyTurboJPEG dependency to 2.6.1 and verify JPEG encoding
-  and decoding with an isolated, checksum-verified libjpeg-turbo 3.2.1 backend.
+- Use Mistral SDK 3.7.0 and HTTPX2 2.14.0, with HA's shared transport on 2026.11
+  and an owned verified transport on older supported versions.
+- Default new audio entities to Voxtral 3 and new image-tool settings to Large 4.
+  Migration 1.5 preserves existing explicit and implicit choices.
+- Use discovered chat/audio capabilities and cursor-paginated voice discovery.
+- Test HA 2026.11.0, 2026.10.4 and the unchanged 2026.7.4 minimum.
+- Update test-only PyTurboJPEG to 2.6.1 with a verified libjpeg-turbo 3.2.1 backend.
+- Reorganize the user, contributor and quality guides and condense release history.
 
 ### Validation
 
-- 437 tests passed on each of HA 2026.11.0, 2026.10.4, and 2026.7.4. Total
-  coverage is at least 94.18%, with at least 88.84% branch coverage. Formatting,
-  lint, strict typing, dependency checks, translation parity, and offline HACS
-  validation passed. Public CI remains required before publication.
-- The candidate passed real HA 2026.11.0 Conversation, local-intent follow-ups,
-  read-only tools, structured AI Task, synthetic batch STT, Realtime 3 with
-  cancellation/recovery, and TTS audio retrieval without playback. Configuration
-  and pipelines were preserved, temporary voice entities were removed, and the
-  observed Mistral logs had no warnings, errors or blocking-call lines.
-- Live image generation remains unvalidated: Large 4, Small and the previous
-  Medium alias returned no generated-file chunks in these SDK 3.7.0 probes.
-  The cause is not established; successful image/reference/cleanup validation
-  remains a publication gate. See `QUALITY.md` for the assurance boundary.
+437 tests pass on each HA baseline. Live voice, Conversation and structured
+AI Task checks passed; image generation remains unvalidated. Details and
+publication requirements are in [QUALITY.md](QUALITY.md#recorded-validation).
 
 ## [0.5.5] - 2026-11-01
 
 ### Changed
 
-- Update the test environment to Home Assistant 2026.10.4 with its matching
-  pytest fixtures 0.13.375, intents 2026.10.27, and Ruff 0.17.3.
-- Keep Mistral SDK 2.10.1 until a supported stable Home Assistant release
-  provides the shared HTTPX2 transport. Home Assistant 2026.10.4 still uses HTTPX.
-- Keep PyTurboJPEG 1.8.3; its major-version update is outside this maintenance.
+- Update tests to HA 2026.10.4, fixtures 0.13.375, intents 2026.10.27 and Ruff 0.17.3.
+- Keep runtime behavior, SDK 2.10.1 and the HA 2026.7.4 minimum unchanged.
 
 ### Validation
 
-- 385 tests passed on Home Assistant 2026.10.4, with 94.07% total coverage and
-  88.34% branch coverage. Ruff, strict mypy, dependency checks, and offline HACS
-  validation passed.
-- Runtime code, Mistral SDK 2.10.1, and the Home Assistant 2026.7.4 minimum are
-  unchanged. Real-instance Conversation, local-intent follow-ups, read-only
-  tools, structured AI Task, synthetic STT, and TTS generation without playback
-  passed on the identical installed runtime. Audio validation used available
-  Voxtral 3 model IDs with the existing voice and normalization settings;
-  see `QUALITY.md` for the validation boundary.
+385 automated tests passed. Live Conversation, tools, structured AI Task and
+synthetic STT/TTS checks passed on HA 2026.10.4 with available Voxtral 3 model IDs.
 
 ## [0.5.4] - 2026-10-12
 
 ### Changed
 
-- Update the test environment to Home Assistant 2026.10.1 with its matching
-  pytest fixtures 0.13.372, intents 2026.10.6, mypy 2.4.0, and Ruff 0.16.10.
-- Keep Mistral SDK 2.10.1 until a supported Home Assistant release provides
-  the shared HTTPX2 transport. The core migration is merged, but HTTPX2 is
-  absent from stable Home Assistant 2026.10.1.
+- Update tests to HA 2026.10.1, fixtures 0.13.372, intents 2026.10.6,
+  mypy 2.4.0 and Ruff 0.16.10.
 
 ### Fixed
 
-- Read native Home Assistant tool results without deprecated access, while
-  preserving support for legacy conversation history.
-- Align schema typing with Home Assistant's Probatio runtime alias while
-  retaining compatibility with older Home Assistant releases.
+- Support native HA tool results and schema typing while retaining older history
+  and HA compatibility.
 
 ### Validation
 
-- 385 tests passed on both Home Assistant 2026.10.1 and 2026.9.4. The newer
-  baseline reached 94.07% total coverage and 88.34% branch coverage locally,
-  with Ruff, strict mypy, dependency checks, and offline HACS validation passing.
-- On Home Assistant 2026.10.1, after a protected backup, configuration check,
-  and full restart, fresh Conversation, follow-ups after one and two local
-  intents, a read-only tool round trip, structured AI Task, synthetic STT,
-  and TTS generation without playback passed. Configuration and pipelines
-  were preserved, with no Mistral errors or blocking warnings in the observed logs.
+385 tests passed on HA 2026.10.1 and 2026.9.4. Live checks covered Conversation,
+local-intent follow-ups, tools, AI Task and synthetic voice on HA 2026.10.1.
 
 ## [0.5.3] - 2026-10-08
 
 ### Fixed
 
-- Preserve valid Mistral message history after locally handled Assist commands
-  when **Prefer handling commands locally** is enabled. External tool results
-  are omitted with their tool calls while retaining the command and spoken reply,
-  preventing the `Unexpected role 'tool' after role 'user'` error in issue #77.
+- Preserve follow-up conversations after locally handled Assist commands,
+  omitting their external tool exchanges while retaining user messages/replies.
 
 ### Validation
 
-- I validated the fix with 384 passing tests, 94.15% total coverage, 88.50%
-  branch coverage, Ruff, strict mypy, and offline HACS structure validation.
-- On Home Assistant 2026.10.0, fresh Mistral conversations and follow-ups after
-  one and two locally handled time queries succeeded with the same conversation
-  ID. Home Assistant's original history, a read-only tool round trip, and
-  structured AI Task output were also verified.
-- Synthetic speech-to-text input and text-to-speech generation without playback
-  also succeeded on that instance.
+384 automated tests passed. Conversation history, tools, AI Task and synthetic
+voice checks passed on HA 2026.10.0.
 
 ## [0.5.2] - 2026-10-06
 
 ### Changed
 
-- Update the test environment to Home Assistant 2026.9.4 with its matching
-  pytest fixtures 0.13.367, intents 2026.9.30, and Ruff 0.16.9.
-- Defer Mistral SDK 3 until Home Assistant provides a compatible shared HTTPX2
-  client. Runtime requests continue to use Mistral SDK 2.10.1.
+- Update tests to HA 2026.9.4, fixtures 0.13.367, intents 2026.9.30 and Ruff 0.16.9.
 
 ### Validation
 
-- I validated the combined test environment locally with 376 passing tests,
-  94.04% total coverage, 88.23% branch coverage, `pip check`, Ruff, strict mypy,
-  and HACS structure validation. I skipped the real-instance smoke test for
-  this maintenance release. Runtime requests, Mistral SDK 2.10.1, and the
-  Home Assistant 2026.7.4 minimum are unchanged.
+376 automated tests passed. Live smoke tests were not repeated for this
+dependency-only maintenance release.
 
 ## [0.5.1] - 2026-09-26
 
 ### Changed
 
-- Clarify in English and French that the image setting selects the Mistral model
-  calling the generation tool, not the underlying image generator.
-- Update the test environment to Home Assistant 2026.9.3 with its matching
-  pytest fixtures 0.13.366, Hassil 3.12.1, intents 2026.9.17, and Ruff 0.16.8.
-- Group Home Assistant and its pytest fixtures in Dependabot so their exact
-  version constraints are updated together.
+- Clarify the image-tool model setting in English and French.
+- Update tests to HA 2026.9.3, fixtures 0.13.366, Hassil 3.12.1,
+  intents 2026.9.17 and Ruff 0.16.8.
+- Group HA and its pytest fixtures in Dependabot.
 
 ### Validation
 
-- I validated this maintenance release locally with 376 passing tests, 94.04%
-  total coverage, 88.23% branch coverage, Ruff, strict mypy, and HACS structure
-  validation. I skipped the real-instance smoke test. Runtime requests, Mistral
-  SDK 2.10.1, and the Home Assistant 2026.7.4 minimum are unchanged.
+376 automated tests passed. Live smoke tests were not repeated for this
+maintenance release.
 
 ## [0.5.0] - 2026-09-26
 
 ### Added
 
-- Add `ai_task.generate_image` to existing AI Task entities with an independent
-  image model, defaulting to `mistral-medium-latest`, and optional image references.
-  Home Assistant stores and exposes the result through its native media response.
-- Bound generated image downloads to 20 MiB and generation/download to 300 seconds.
-  Attempt cleanup of returned Mistral-generated files within a separate ten-second
-  deadline, without discarding a retrieved image if cleanup fails.
+- Image generation for AI Task with an independent model and optional references.
+- Native HA media results, bounded downloads and best-effort provider-file cleanup.
 
 ### Changed
 
-- Default new STT entities to `voxtral-mini-transcribe-realtime-2602` for streamed
-  Assist transcription. I kept existing selections, implicit legacy batch
-  defaults, and migration-created legacy entities unchanged. Batch transcription
-  remains selectable.
+- Default new STT entities to Realtime while preserving existing batch choices.
 
 ### Validation
 
-- I tested text-only generation, an image reference, native media downloads, and
-  the existing Conversation, Assist tool, structured AI Task, batch STT, and TTS
-  paths on Home Assistant 2026.9.3 on 2026-09-26. I also verified that a new STT
-  form selects Realtime by default, then tested Realtime transcription,
-  cancellation, and recovery. Existing settings were preserved.
-- I confirmed deletion of a generated file through Mistral's live API and checked
-  that it could no longer be downloaded. Exact image-editing fidelity and zero
-  provider retention are not guaranteed.
-- The local gate passes 374 tests with 94.03% total coverage and 88.23% branch
-  coverage, Ruff, strict mypy, and HACS structure validation. Official HACS and
-  Hassfest checks are also required before publication.
+374 automated tests passed. Live checks on HA 2026.9.3 covered image generation,
+references, HA downloads, provider deletion, existing features and Realtime
+cancellation/recovery.
 
 ## [0.4.0] - 2026-09-24
 
 ### Added
 
-- Add optional local two-pass FFmpeg loudness normalization for text-to-speech.
-  New TTS entities enable it at -16 LUFS; existing entities migrate with it off
-  and retain their model and voice. The target can be set from -24 to -12 LUFS
-  per entity or overridden per `tts.speak` and TTS media-source request.
-- Bound normalization input and output to 25 MiB, processing and queue time to
-  30 seconds, and concurrent jobs to two per account. Cap upward gain at 20 dB,
-  protect -2 dBTP true peaks, and avoid amplifying unmeasurable speech.
+- Optional two-pass FFmpeg loudness normalization, enabled at -16 LUFS for new
+  TTS entities and disabled during migration for existing entities.
+- Per-request loudness overrides and bounded gain, peaks, processing and concurrency.
 
 ### Validation
 
-- All 327 tests pass with 93.89% branch-enabled coverage, including real FFmpeg
-  loudness, decoded peak, format, and process cleanup tests.
-- Live checks passed on Home Assistant 2026.9.3 for all five normalized output
-  formats, existing TTS settings, Conversation, a read-only Assist tool call,
-  structured AI Task output, and batch STT. I also tested the audio on my setup
-  before release.
+327 automated tests passed. Normalized formats and existing features were
+checked on HA 2026.9.3, with a live audio check before release.
 
 ## [0.3.1] - 2026-09-21
 
 ### Changed
 
-- Update the official `mistralai[realtime]` SDK from 2.10.0 to 2.10.1.
-- Update the automated test baseline to Home Assistant 2026.9.2 and
-  `pytest-homeassistant-custom-component` 0.13.365 together, resolving the
-  dependency conflicts in their separate updates. The supported Home Assistant
-  minimum remains 2026.7.4.
-- Update development dependencies to `gazetteer-matcher` 1.2.0 and Ruff 0.16.7.
-
-### Validation
-
-- Extend real-SDK cold-start coverage to populated preset and custom voice
-  responses, including the required voice type in SDK 2.10.1.
-- I did not repeat real-instance smoke testing for this dependency maintenance
-  release; validation relies on the complete automated gate.
+- Update SDK to 2.10.1, tests to HA 2026.9.2 with fixtures 0.13.365,
+  gazetteer-matcher to 1.2.0 and Ruff to 0.16.7.
+- Extend cold-start tests to preset/custom voice responses.
 
 ### Fixed
 
-- Restore the missing 0.3.0 changelog comparison link.
+- Restore the 0.3.0 changelog comparison link.
+
+### Validation
+
+The complete automated gate passed; live smoke tests were not repeated for
+this dependency-only release.
 
 ## [0.3.0] - 2026-09-20
 
 ### Added
 
-- Offer Voxtral Realtime as an optional speech-to-text model for Assist, sending
-  audio while the user speaks and returning the completed transcript. Existing
-  entities and the default batch model remain unchanged.
-- Bound Realtime audio and request duration, close WebSocket connections on
-  cancellation and unload, and preserve authentication and availability handling.
+- Optional Realtime STT for Assist with bounded input/duration and deterministic
+  connection cleanup. Existing entities retain batch behavior.
 
 ### Validation
 
-- All 282 tests pass with 94.56% branch-enabled coverage, including fresh-process
-  SDK and local TLS WebSocket tests with Home Assistant's blocking detector.
-- On Home Assistant 2026.9.2, configuration validation and a full restart passed
-  with no Mistral blocking-call warnings or errors in the observed logs.
-- Real-instance checks passed for Realtime Assist transcription, cancellation
-  and recovery, existing batch STT, Conversation, a read-only Assist tool round
-  trip, structured AI Task output, and TTS generation without playback.
+282 automated tests passed. Startup, Realtime cancellation/recovery and
+existing integration features were checked on HA 2026.9.2.
 
 ## [0.2.3] - 2026-09-14
 
 ### Changed
 
-- Promote the SDK startup blocking fixes from `0.2.3b1` to stable without
-  runtime code changes.
+- Promote the tested SDK startup fixes from 0.2.3b1 without further runtime changes.
 
 ### Validation
 
-- I tested Conversation, Assist tool-call, AI Task, STT, and TTS on Home
-  Assistant 2026.9.2 after the beta's full restart check.
+Live Conversation, tools, AI Task, STT and TTS checks passed on HA 2026.9.2.
 
 ## [0.2.3b1] - 2026-09-14
 
 ### Fixed
 
-- Move Mistral SDK construction and synchronous cleanup off Home Assistant's
-  event loop while preserving the shared asynchronous HTTP transport.
-- Prepare SDK services and cache the original lazy exports used by model
-  discovery, chat, speech, transcription, and voice discovery before requests.
-- Close SDK-owned resources when initialization fails or setup is cancelled.
+- Move SDK construction/cleanup off the event loop, prepare services before
+  requests and release resources after initialization failure or cancellation.
 
 ### Validation
 
-- Add fresh-process regression tests using Home Assistant's blocking-call
-  detector and the real SDK with mocked HTTP responses.
-- All 239 tests pass with 93.77% branch-enabled coverage.
-- Configuration validation and a full restart passed on Home Assistant 2026.9.2,
-  with no Mistral blocking-call warnings or setup errors in the observed logs.
-  Live Conversation, tool-call, AI Task, STT, and TTS smoke tests remain pending.
+239 automated tests passed, including fresh-process blocking detection.
+Configuration and full-startup checks passed on HA 2026.9.2.
 
 ## [0.2.2] - 2026-09-12
 
 ### Changed
 
-- Updated the official `mistralai` SDK baseline from 2.9.4 to 2.10.0.
-- Advanced the automated test baseline to Home Assistant 2026.9.1 and
-  `pytest-homeassistant-custom-component` 0.13.364 without changing the
-  user-facing minimum Home Assistant version.
-- Updated the Ruff development baseline from 0.16.5 to 0.16.6.
+- Update SDK to 2.10.0, tests to HA 2026.9.1 with fixtures 0.13.364,
+  and Ruff to 0.16.6.
 
 ## [0.2.1] - 2026-09-06
 
 ### Changed
 
-- Updated the official `mistralai` SDK baseline from 2.9.3 to 2.9.4.
-- Updated the Ruff development baseline from 0.16.4 to 0.16.5.
+- Update SDK to 2.9.4 and Ruff to 0.16.5.
 
 ### Fixed
 
-- Corrected the changelog comparison links for the 0.2.0 release history.
+- Correct comparison links for the 0.2.0 release history.
 
 ## [0.2.0] - 2026-09-05
 
 ### Fixed
 
-- Restore setup on Home Assistant 2026.9 while retaining the legacy OpenAPI
-  converter on older supported versions.
-- Omit unsupported reasoning parameters for non-reasoning models and respect
-  model-specific reasoning controls, including Small 4 with Magistral aliases.
+- Support HA 2026.9 schema conversion and model-specific reasoning controls.
 
 ### Changed
 
-- Promote the beta fixes to stable without further runtime changes.
-- Simplify reasoning configuration to Automatic / Disabled / Enabled during
-  creation, with fixed model states on reconfiguration and single-submit saves.
+- Promote the beta fixes with simplified reasoning controls and single-submit
+  model changes.
 
 ### Validation
 
-- I tested the beta on two real Home Assistant installations, running 2026.8.6
-  and 2026.9.0, before publishing the stable release.
+The beta was checked on HA 2026.8.6 and 2026.9.0 before the stable release.
 
 ## [0.2.0b2] - 2026-09-05
 
 ### Fixed
 
-- Keep Small 4 reasoning adjustable when its metadata includes legacy Magistral
-  aliases. Exact model IDs now take precedence over aliases during discovery
-  lookup, and canonical model reasoning rules take precedence over alias rules.
+- Prefer canonical model IDs and reasoning rules over redirected legacy aliases.
 
 ### Changed
 
-- Always show the reasoning dropdown when creating Conversation or AI Task
-  entities. Fixed reasoning labels appear only during reconfiguration.
-- Save model changes in one submission without an intermediate control review.
-  Models with fixed reasoning apply their supported behavior when saved; the
-  corresponding label appears when reopening the configuration.
+- Show reasoning choices during creation and fixed model states on reconfiguration.
+- Save model changes in one submission.
 
 ## [0.2.0b1] - 2026-09-05
 
 ### Fixed
 
-- Fixed Conversation and AI Task requests failing with HTTP 400 on non-reasoning
-  models such as Ministral when reasoning effort is set to None. The unsupported
-  parameter is now omitted for these models and unknown custom model IDs, while
-  retaining explicit reasoning controls for compatible models.
-- Limited the reasoning choices for Mistral Small 4 and Medium 3.5 to their
-  documented `none` / `high` controls, and added Automatic for provider-managed
-  behavior, including Magistral's native reasoning. Incompatible saved efforts
-  now fail locally with a translated reconfiguration message instead of being
-  sent to Mistral. Undocumented custom-model efforts remain available.
+- Omit unsupported reasoning parameters and reject incompatible saved efforts
+  locally. Preserve custom-model effort choices.
 
 ### Changed
 
-- Simplified the Reasoning control to Automatic / Disabled / Enabled, with
-  fixed text for unavailable or always-active reasoning. Changing models across
-  these states presents the updated controls before saving. Existing custom
-  efforts remain editable without changing their stored meaning.
+- Introduce Automatic, Disabled and Enabled reasoning controls.
 
 ## [0.1.8b1] - 2026-09-04
 
 ### Fixed
 
-- Restored setup on Home Assistant 2026.9 by using Probatio's OpenAPI schema
-  converter while retaining the previous converter on older supported Home
-  Assistant releases.
+- Support HA 2026.9 schema conversion while retaining older HA compatibility.
 
 ### Changed
 
-- Advanced the automated test baseline to Home Assistant 2026.9.0 and its
-  matching Home Assistant-native test fixture.
+- Update the test baseline and fixtures to HA 2026.9.0.
 
 ## [0.1.7] - 2026-08-29
 
 ### Fixed
 
-- Restored the minimum Home Assistant version to 2026.7.4. The declared
-  compatibility floor is no longer raised with the newer development test
-  baseline.
+- Restore the supported minimum to HA 2026.7.4 independently of test baselines.
 
 ## [0.1.6] - 2026-08-29
 
 ### Changed
 
-- Raised the minimum Home Assistant version from 2026.8.2 to 2026.8.3 and
-  synchronized the Home Assistant-native test fixture.
-- Updated the Hassil, Home Assistant intents, and Ruff development baselines.
+- Raise the minimum to HA 2026.8.3 and update fixtures, Hassil, intents and Ruff.
 
 ## [0.1.5] - 2026-08-23
 
 ### Changed
 
-- Raised the minimum Home Assistant version from 2026.8.1 to 2026.8.2 and
-  synchronized the Home Assistant-native test fixture.
-- Updated the official `mistralai` SDK baseline from 2.9.2 to 2.9.3.
-- Updated the Ruff and mypy development baselines.
-- Updated the HACS installation instructions now that the integration is
-  included in the default HACS catalog.
+- Raise the minimum to HA 2026.8.2 and update its fixtures.
+- Update SDK to 2.9.3 and refresh Ruff/mypy.
+- Update HACS instructions after inclusion in the default catalog.
 
 ## [0.1.4] - 2026-08-15
 
 ### Changed
 
-- Updated the official `mistralai` SDK baseline from 2.9.1 to 2.9.2.
+- Update SDK to 2.9.2.
 
 ## [0.1.3] - 2026-08-08
 
 ### Changed
 
-- Raised the minimum Home Assistant version from 2026.7.4 to 2026.8.1 and
-  synchronized the Home Assistant-native test fixture.
+- Raise the minimum to HA 2026.8.1 and update its fixtures.
 
 ## [0.1.2] - 2026-08-08
 
 ### Changed
 
-- Updated the official `mistralai` SDK baseline from 2.8.0 to 2.9.1.
+- Update SDK to 2.9.1.
 
 ## [0.1.1] - 2026-08-01
 
 ### Changed
 
-- Updated the official `mistralai` SDK baseline from 2.7.2 to 2.8.0.
+- Update SDK to 2.8.0.
 
 ### Fixed
 
-- Corrected the Home Assistant and HACS icon and logo assets.
+- Correct the HA/HACS icon and logo assets.
 
 ## [0.1.0] - 2026-07-26
 
 ### Added
 
-- Public HACS custom-repository baseline.
-- Typed Mistral SDK request and streaming response boundary.
-- Streaming text, reasoning, token usage, and parallel tool calls.
-- Home Assistant conversation subentries and Assist tool support.
-- Home Assistant AI Task entities with native JSON-schema structured output.
-- Voxtral speech-to-text entities for Assist voice pipelines.
-- Streaming Voxtral text-to-speech with explicit preset or saved voice
-  selection.
-- Images and PDF attachments with bounded local validation.
-- Model capability validation, aliases, coordinator availability, diagnostics,
-  reauthentication, migrations, and deprecated-model repairs.
-- English and French translations.
-- Ruff, strict mypy, pytest coverage, HACS, Hassfest, and Dependabot automation.
+- Public HACS integration with typed SDK streaming, Conversation and AI Task.
+- STT, TTS with explicit voices, bounded image/PDF attachments and Assist tools.
+- Capability checks, model repairs, reauthentication, diagnostics and migrations.
+- English/French translations and automated quality, HACS and Hassfest checks.
 
 [Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.5...HEAD
 [0.5.5]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.4...v0.5.5

@@ -39,8 +39,8 @@ Assistant-certified, or endorsed by Mistral AI.
 ## Repository map
 
 - `custom_components/mistral_conversation/` is the only runtime integration.
-- `api.py` owns SDK client creation, credential validation, and model/voice
-  discovery.
+- `api.py` owns SDK client/transport creation, credential validation, and
+  model/voice discovery.
 - `coordinator.py` owns the shared client, model metadata, availability, and
   refresh lifecycle.
 - `conversation.py` is the thin Home Assistant `ConversationEntity` adapter.
@@ -49,6 +49,7 @@ Assistant-certified, or endorsed by Mistral AI.
 - `entity.py` owns message conversion, streaming, capability checks,
   attachments, structured chat output, and the tool-execution loop.
 - `tool_calls.py` reconstructs fragmented and parallel streamed tool calls.
+- `model_catalog.py` owns curated model choices and STT endpoint selection.
 - `config_flow.py`, `diagnostics.py`, and `repairs.py` implement their matching
   Home Assistant surfaces.
 - `translations/en.json` and `translations/fr.json` are both maintained.
@@ -63,8 +64,9 @@ Assistant-certified, or endorsed by Mistral AI.
 - Keep configuration UI-only: one account config entry with typed Conversation,
   AI Task, STT, and TTS config subentries.
 - Store shared runtime state in typed `ConfigEntry.runtime_data`.
-- Use Home Assistant's shared HTTP client when constructing the Mistral client,
-  and close provider resources deterministically during unload or failed setup.
+- Use Home Assistant's shared HTTPX2 client when available. On older supported
+  versions, track ownership of the account's compatibility transport explicitly.
+  Close owned resources during unload or failed setup; preserve HA's shared client.
 - Keep the event loop non-blocking. Put filesystem or other blocking work in
   `hass.async_add_executor_job`.
 - Raise translated Home Assistant exceptions and preserve reauthentication,
@@ -141,9 +143,10 @@ Assistant-certified, or endorsed by Mistral AI.
 When changing dependency or compatibility versions, update every matching
 surface:
 
-- Mistral SDK: `manifest.json`, `requirements_test.txt`, and README text/badges.
-- Home Assistant minimum: `hacs.json`, `requirements_test.txt`, and README
-  text/badges.
+- Mistral SDK: `manifest.json`, `requirements_test_base.txt` (included by
+  `requirements_test.txt`), and README text/badges.
+- Home Assistant minimum: `hacs.json`, matching `requirements_test*.txt` files,
+  the CI matrix, and README text/badges.
 - Integration release: `manifest.json` and `CHANGELOG.md`.
 
 Do not publish a release, create a tag, change repository visibility, or submit

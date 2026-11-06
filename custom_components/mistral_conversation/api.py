@@ -58,7 +58,12 @@ from .const import (
     MistralModel,
     MistralVoice,
 )
-from .errors import ImageDownloadError, RealtimeError, SpeechStreamError
+from .errors import (
+    ImageDownloadError,
+    RealtimeError,
+    SpeechStreamError,
+    classify_api_error,
+)
 
 # SDK 3.7.0's lazy exports do not cache resolved attributes. Merely importing
 # their modules still calls import_module (with relative names) on every access.
@@ -101,6 +106,8 @@ for _name in (
     "AudioV2VoicesListRequest",
     "AudioV2VoicesListResponse",
     "VoiceListPage",
+    "GetVoiceV1AudioVoicesVoiceIDGetRequest",
+    "VoiceResponse",
     "VoiceGender",
     "VoiceKind",
     "AudioFormat",
@@ -421,6 +428,21 @@ def _optional_string(value: object) -> str | None:
     return value if isinstance(value, str) and value else None
 
 
+async def _speech_voice_matches(
+    client: Mistral, requested: str, acknowledged: str
+) -> bool:
+    """Accept an ID/slug pair only when the official voice record links them."""
+    if requested == acknowledged:
+        return True
+    voice = await client.audio.voices.get_async(
+        voice_id=requested, timeout_ms=SETUP_TIMEOUT_MS
+    )
+    aliases = {voice.id}
+    if isinstance(voice.slug, str) and voice.slug:
+        aliases.add(voice.slug)
+    return requested in aliases and acknowledged in aliases
+
+
 @asynccontextmanager
 async def _connect_realtime_speech(
     client: Mistral, model: str, voice_id: str, output_format: models.SpeechOutputFormat
@@ -449,10 +471,13 @@ async def _connect_realtime_speech(
             updated = parse_realtime_speech_event(json.loads(await websocket.recv()))
             if (
                 not isinstance(updated, models.RealtimeSpeechSessionUpdated)
-                or updated.session.voice != voice_id
                 or updated.session.is_ref_audio
                 or updated.session.response_format != output_format
                 or updated.session.streaming_mode != "responsive"
+                or not isinstance(updated.session.voice, str)
+                or not await _speech_voice_matches(
+                    client, voice_id, updated.session.voice
+                )
             ):
                 raise SpeechStreamError("tts_response_invalid")
         try:
@@ -557,6 +582,8 @@ async def _receive_speech_audio(
 
 def _speech_transport_error(err: Exception) -> RealtimeError:
     """Keep close-frame reasons, provider content and credentials private."""
+    if isinstance(err, errors.MistralError | errors.NoResponseError | httpx2.HTTPError):
+        return RealtimeError("Realtime speech failed", classify_api_error(err))
     cause: BaseException | None = err
     while cause is not None:
         if (

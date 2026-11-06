@@ -164,6 +164,8 @@ entities keep Standard until changed. The mode is configured per entity;
 Discovered model mode/format restrictions are checked before synthesis. Custom
 model and voice IDs remain configurable; Mistral must accept them on the chosen
 endpoint. A rejected voice is never replaced automatically.
+Preset UUIDs and their official voice slugs identify the same voice; the saved
+selection is preserved when Mistral acknowledges its corresponding slug.
 
 Realtime uses one connection per request and sends the original text deltas,
 including spaces. Failures stop the stream without retrying through Standard.

@@ -78,10 +78,15 @@ HA's incremental text/audio interface to the official SDK speech protocol in
 overrides. Known speech modes and output formats are validated against discovery;
 missing metadata does not prohibit custom models. Voice selection is explicit.
 
-Realtime TTS validates its session acknowledgement, decodes each base64 delta
-strictly, and requires a final speech event after input completion. It then closes
-the one-generation connection from the client side, following the SDK contract;
-the provider may end TCP without a WebSocket close frame after its final event.
+Realtime TTS validates its session acknowledgement and verifies UUID/slug voice
+aliases against the official voice record when the acknowledged identifier
+differs. An unrelated voice is rejected before text upload. Metadata lookup
+shares the 10-second setup deadline and preserves authentication, rate-limit
+and transport error classification.
+It decodes each base64 delta strictly and requires a final speech event after
+input completion. It then closes the one-generation connection from the client
+side, following the SDK contract. The provider may end TCP without a WebSocket
+close frame after its final event.
 Missing or premature final events still fail closed. A coalescing byte buffer
 decouples protocol reads from a slow HA converter or audio consumer. It is
 bounded by the cumulative 25 MiB output limit; fast readers receive audio
@@ -169,6 +174,22 @@ checksum-verified libjpeg-turbo 3.2.1. Setup and commands are in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Recorded validation
+
+### Version 1.0.1
+
+The voice UUID/slug acknowledgement regression is covered by public HA TTS
+tests, strict rejection of unrelated voices, lookup failures, cancellation and
+the real SDK over local TLS with HA's blocking detector enabled.
+
+All 602 tests passed in each of the five pinned HA/HTTPX2 environments, with
+94.72–94.84% total coverage and 90.08–90.20% branch coverage. Formatting, linting,
+strict typing, dependency checks and offline HACS validation passed.
+
+After backup, configuration validation and a full restart on HA 2026.11.0,
+all 25 installed runtime files matched the candidate. The existing voice UUID,
+entity settings and Assist pipeline were preserved. Standalone and Assist audio
+returned HTTP 200 and decoded successfully. The owner confirmed playback in the
+browser and mobile app. Synthetic Assist audio arrived before text completion.
 
 ### Version 1.0.0
 

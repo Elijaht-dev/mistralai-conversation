@@ -8,12 +8,15 @@ import io
 import json
 import wave
 from contextlib import asynccontextmanager
-from unittest.mock import MagicMock
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock, MagicMock
 
+import httpx2
 import pytest
 from homeassistant.components import tts
 from homeassistant.exceptions import HomeAssistantError
-from mistralai.client.models import Security
+from mistralai.client.errors import NoResponseError
+from mistralai.client.models import Security, VoiceResponse
 from websockets.datastructures import Headers
 from websockets.exceptions import ConnectionClosedError, InvalidStatus
 from websockets.frames import Close
@@ -31,8 +34,20 @@ from custom_components.mistral_conversation.errors import (
     SpeechStreamError,
 )
 
+from .helpers import mistral_error
 from .test_tts import ENTITY_ID, _entity
 from .test_tts import tts_component as tts_component  # noqa: PLC0414 -- pytest fixture
+
+
+def voice_record(voice_id="test-voice", slug=None):
+    return VoiceResponse(
+        id=voice_id,
+        slug=slug,
+        name="Test voice",
+        created_at=datetime(2026, 1, 1, tzinfo=UTC),
+        type="preset",
+        user_id=None,
+    )
 
 
 def session(**settings):
@@ -138,6 +153,7 @@ def speech_transport(monkeypatch):
     )
     client.sdk_configuration.security = Security(api_key="test-api-key")
     client.sdk_configuration.user_agent = "test-agent"
+    client.audio.voices.get_async = AsyncMock(return_value=voice_record())
     calls = []
 
     @asynccontextmanager
@@ -201,6 +217,103 @@ async def test_incremental_text_and_audio_before_text_finishes(speech_transport)
     assert options["ssl"].check_hostname
     assert options["additional_headers"] == {"Authorization": "Bearer test-api-key"}
     assert options["max_queue"] == 1
+    client.audio.voices.get_async.assert_not_awaited()
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+async def test_voice_uuid_and_slug_are_verified_without_replacing_selection(
+    speech_transport, reverse
+):
+    client, socket, _ = speech_transport
+    voice_id, slug = "00000000-0000-4000-8000-000000000001", "voice_123"
+    requested, acknowledged = (slug, voice_id) if reverse else (voice_id, slug)
+    client.audio.voices.get_async.return_value = voice_record(voice_id, slug)
+    socket.ack = {"type": "session.updated", "session": session(voice=acknowledged)}
+    stream = async_stream_speech(client, "test-model", requested, "mp3", text("Hello"))
+    assert b"".join([chunk async for chunk in stream]) == b"audio"
+    assert socket.sent[0]["session"]["voice"] == requested
+    client.audio.voices.get_async.assert_awaited_once_with(
+        voice_id=requested, timeout_ms=10000
+    )
+    assert socket.closed
+
+
+@pytest.mark.parametrize(
+    ("record_id", "slug", "acknowledged"),
+    [
+        ("test-voice", None, "other"),
+        ("test-voice", "", "other"),
+        ("test-voice", "voice_123", "other"),
+        ("unrelated", "voice_123", "voice_123"),
+    ],
+)
+async def test_unverified_voice_acknowledgement_never_sends_text(
+    speech_transport, record_id, slug, acknowledged
+):
+    client, socket, _ = speech_transport
+    client.audio.voices.get_async.return_value = voice_record(record_id, slug)
+    socket.ack = {"type": "session.updated", "session": session(voice=acknowledged)}
+    with pytest.raises(SpeechStreamError):
+        await collect(client)
+    assert [message["type"] for message in socket.sent] == ["session.update"]
+    assert socket.closed
+
+
+@pytest.mark.parametrize(
+    ("failure", "kind"),
+    [
+        (mistral_error(401, "private"), ApiErrorKind.AUTHENTICATION),
+        (mistral_error(403, "private"), ApiErrorKind.AUTHENTICATION),
+        (mistral_error(404, "private"), ApiErrorKind.API),
+        (mistral_error(429, "private"), ApiErrorKind.RATE_LIMIT),
+        (mistral_error(503, "private"), ApiErrorKind.CONNECTION),
+        (NoResponseError("private"), ApiErrorKind.CONNECTION),
+        (httpx2.ConnectError("private"), ApiErrorKind.CONNECTION),
+        (httpx2.ReadTimeout("private"), ApiErrorKind.TIMEOUT),
+    ],
+)
+async def test_voice_lookup_errors_keep_classification_and_privacy(
+    speech_transport, failure, kind, caplog
+):
+    client, socket, _ = speech_transport
+    socket.ack = {"type": "session.updated", "session": session(voice="voice_123")}
+    client.audio.voices.get_async.side_effect = failure
+    with pytest.raises(RealtimeError) as error:
+        await collect(client)
+    assert error.value.kind == kind
+    assert "private" not in str(error.value) + caplog.text
+    assert [message["type"] for message in socket.sent] == ["session.update"]
+    assert socket.closed
+
+
+@pytest.mark.parametrize("cancel", [False, True])
+async def test_voice_resolution_is_bounded_and_cancellable(
+    speech_transport, monkeypatch, cancel
+):
+    client, socket, _ = speech_transport
+    started = asyncio.Event()
+
+    async def lookup(**kwargs):
+        started.set()
+        await asyncio.Event().wait()
+
+    client.audio.voices.get_async.side_effect = lookup
+    socket.ack = {"type": "session.updated", "session": session(voice="voice_123")}
+    monkeypatch.setattr(
+        "custom_components.mistral_conversation.api.SETUP_TIMEOUT_MS", 50
+    )
+    task = asyncio.create_task(collect(client))
+    await started.wait()
+    if cancel:
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+    else:
+        with pytest.raises(RealtimeError) as error:
+            await task
+        assert error.value.kind == ApiErrorKind.TIMEOUT
+    assert socket.closed
+    assert [message["type"] for message in socket.sent] == ["session.update"]
 
 
 @pytest.mark.parametrize(
@@ -208,6 +321,13 @@ async def test_incremental_text_and_audio_before_text_finishes(speech_transport)
     [
         {"type": "error", "error": {"code": 401, "message": "private"}},
         {"type": "session.updated", "session": session(voice="other")},
+        {"type": "session.updated", "session": session(voice=None)},
+        {
+            "type": "session.updated",
+            "session": {
+                key: value for key, value in session().items() if key != "voice"
+            },
+        },
         {"type": "session.updated", "session": session(response_format="wav")},
         {"type": "session.updated", "session": session(streaming_mode="long_form")},
         {"type": "session.updated", "session": session(is_ref_audio=True)},
@@ -531,6 +651,30 @@ async def test_ha_public_stream_is_incremental(hass, realtime_entity, speech_tra
     first_audio.set()
     assert b"".join([chunk async for chunk in audio]) == b"audio"
     assert socket.closed
+    realtime_entity.coordinator.client.audio.speech.complete_async.assert_not_awaited()
+
+
+@pytest.mark.parametrize("override", [False, True])
+async def test_public_tts_preserves_voice_uuid_with_verified_slug_ack(
+    hass, realtime_entity, speech_transport, override
+):
+    client, socket, _ = speech_transport
+    requested = "test-override-id" if override else "voice-1"
+    client.audio.voices.get_async.return_value = voice_record(requested, "voice_123")
+    realtime_entity.coordinator.client.audio.voices.get_async = (
+        client.audio.voices.get_async
+    )
+    socket.ack = {"type": "session.updated", "session": session(voice="voice_123")}
+    options = {tts.ATTR_PREFERRED_FORMAT: "mp3"}
+    if override:
+        options[tts.ATTR_VOICE] = requested
+    stream = tts.async_create_stream(hass, ENTITY_ID, options=options)
+    stream.async_set_message("Hello")
+    assert b"".join([chunk async for chunk in stream.async_stream_result()]) == b"audio"
+    assert socket.sent[0]["session"]["voice"] == requested
+    client.audio.voices.get_async.assert_awaited_once_with(
+        voice_id=requested, timeout_ms=10000
+    )
     realtime_entity.coordinator.client.audio.speech.complete_async.assert_not_awaited()
 
 

@@ -19,7 +19,7 @@ def configure_slow_transport(api):
     api.websocket_connect = connect
 
 
-async def exercise_realtime(hass, api, client, status, *, slow=False):
+async def exercise_realtime(hass, api, client, status, *, slow=False, alias=False):
     """Prove incremental speech without lazy imports or TLS setup on HA's loop."""
     serve, context = await hass.async_add_executor_job(prepare_tls, api)
     if slow:
@@ -48,7 +48,11 @@ async def exercise_realtime(hass, api, client, status, *, slow=False):
                     json.dumps(
                         {
                             "type": "session.updated",
-                            "session": {**session, **message["session"]},
+                            "session": {
+                                **session,
+                                **message["session"],
+                                **({"voice": "test-voice-slug"} if alias else {}),
+                            },
                         }
                     )
                 )
@@ -62,33 +66,7 @@ async def exercise_realtime(hass, api, client, status, *, slow=False):
                     )
                 )
             elif message["type"] == "input_text.end":
-                if slow and status == 200:
-                    for _ in range(12):
-                        await socket.send(
-                            json.dumps(
-                                {
-                                    "type": "speech.audio.delta",
-                                    "audio_data": base64.b64encode(b"test").decode(),
-                                }
-                            )
-                        )
-                event = (
-                    {"type": "speech.audio.done", "usage": {}}
-                    if status == 200
-                    else {
-                        "type": "error",
-                        "error": {"code": 422, "message": "test error"},
-                    }
-                )
-                await socket.send(json.dumps(event))
-                if slow and status == 200:
-                    await socket.wait_closed()
-                elif status == 200:
-                    # The live speech endpoint can end TCP after its final event
-                    # without emitting a WebSocket close frame.
-                    socket.transport.abort()
-                else:
-                    await socket.close()
+                await finish_generation(socket, status, slow=slow)
 
     async def text():
         yield "Hello "
@@ -102,7 +80,12 @@ async def exercise_realtime(hass, api, client, status, *, slow=False):
         stream = api.async_stream_speech(
             client, "test-model", "test-voice", "mp3", text()
         )
-        assert await anext(stream) == b"test"
+        try:
+            assert await anext(stream) == b"test"
+        except api.RealtimeError:
+            assert alias and status != 200
+            assert [message["type"] for message in received] == ["session.update"]
+            return
         assert all(message["type"] != "input_text.end" for message in received)
         first_audio.set()
         if slow:
@@ -120,3 +103,30 @@ async def exercise_realtime(hass, api, client, status, *, slow=False):
         "input_text.append",
         "input_text.end",
     ]
+
+
+async def finish_generation(socket, status, *, slow):
+    """Simulate the terminal event and the provider's close behavior."""
+    if slow and status == 200:
+        for _ in range(12):
+            await socket.send(
+                json.dumps(
+                    {
+                        "type": "speech.audio.delta",
+                        "audio_data": base64.b64encode(b"test").decode(),
+                    }
+                )
+            )
+    event = (
+        {"type": "speech.audio.done", "usage": {}}
+        if status == 200
+        else {"type": "error", "error": {"code": 422, "message": "test error"}}
+    )
+    await socket.send(json.dumps(event))
+    if slow and status == 200:
+        await socket.wait_closed()
+    elif status == 200:
+        # The live endpoint can end TCP without a WebSocket close frame.
+        socket.transport.abort()
+    else:
+        await socket.close()

@@ -5,6 +5,16 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-06
+
+### Fixed
+
+- Realtime TTS now verifies voice UUID/slug aliases through the official voice
+  record. Version 1.0.0 could reject a voice selected from the list when Mistral
+  acknowledged its internal slug, causing Assist to report an audio playback error.
+  The saved voice and per-call selection remain unchanged; unrelated voices are
+  still rejected before any text is sent.
+
 ## [1.0.0] - 2026-11-06
 
 ### Added
@@ -342,7 +352,8 @@ The beta was checked on HA 2026.8.6 and 2026.9.0 before the stable release.
 - Capability checks, model repairs, reauthentication, diagnostics and migrations.
 - English/French translations and automated quality, HACS and Hassfest checks.
 
-[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.6.0...v1.0.0
 [0.6.0]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.5...v0.6.0
 [0.5.5]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.4...v0.5.5

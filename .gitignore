@@ -3,6 +3,7 @@ __pycache__/
 .coverage
 coverage.xml
 htmlcov/
+dist/
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/

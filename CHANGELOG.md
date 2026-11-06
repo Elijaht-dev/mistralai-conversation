@@ -5,6 +5,11 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Package future HACS/Marketplace releases as `mistral_conversation.zip`,
+  checked in CI and attached automatically when a release is published.
+
 ## [1.0.1] - 2026-11-06
 
 ### Fixed

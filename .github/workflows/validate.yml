@@ -117,6 +117,11 @@ jobs:
       - name: Validate HACS repository structure
         run: python scripts/validate_hacs.py
 
+      - name: Build and verify HACS release archive
+        run: |
+          git archive --format=zip --output="$RUNNER_TEMP/mistral_conversation.zip" HEAD:custom_components/mistral_conversation
+          python -m zipfile --test "$RUNNER_TEMP/mistral_conversation.zip"
+
       - name: HACS validation
         if: ${{ github.event.repository.private == false }}
         uses: hacs/action@main

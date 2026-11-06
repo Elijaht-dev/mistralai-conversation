@@ -289,6 +289,10 @@ the earlier successful reference test used identical runtime code.
 
 ## Publication gate
 
+The release workflow attaches `mistral_conversation.zip`, built from the tagged
+integration files, when a release is published. CI checks archive integrity.
+Existing assets are not overwritten, preserving their download counts.
+
 Before a feature or SDK release:
 
 1. Pass the complete local checks and public HACS/Hassfest CI.

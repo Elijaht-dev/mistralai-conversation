@@ -33,6 +33,10 @@ Use the HACS button above to add this repository, or add
 a custom **Integration** repository. Download **Mistral AI Conversation** in HACS
 and restart Home Assistant.
 
+HACS/Marketplace releases configured with `zip_release` install the attached
+`mistral_conversation.zip`. GitHub counts downloads of this file, including
+updates and redownloads; this is not a count of unique users.
+
 ### Manual installation
 
 1. Copy `custom_components/mistral_conversation` into your Home Assistant

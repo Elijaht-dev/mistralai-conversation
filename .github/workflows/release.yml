@@ -1,0 +1,41 @@
+name: Release package
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-package-${{ github.event.release.id }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    name: Attach HACS release archive
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Check out release commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Validate HACS repository structure
+        run: python scripts/validate_hacs.py
+
+      - name: Build and verify HACS release archive
+        run: |
+          git archive --format=zip --output="$RUNNER_TEMP/mistral_conversation.zip" HEAD:custom_components/mistral_conversation
+          python -m zipfile --test "$RUNNER_TEMP/mistral_conversation.zip"
+
+      - name: Attach archive to the published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$RELEASE_TAG" "$RUNNER_TEMP/mistral_conversation.zip"

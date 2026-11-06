@@ -5,10 +5,13 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-11-07
+
 ### Changed
 
-- Package future HACS/Marketplace releases as `mistral_conversation.zip`,
+- Package HACS/Marketplace releases as `mistral_conversation.zip`,
   checked in CI and attached automatically when a release is published.
+- Classify the integration under AI and voice. No functional or dependency changes.
 
 ## [1.0.1] - 2026-11-06
 

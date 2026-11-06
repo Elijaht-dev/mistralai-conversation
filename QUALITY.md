@@ -175,6 +175,11 @@ checksum-verified libjpeg-turbo 3.2.1. Setup and commands are in
 
 ## Recorded validation
 
+### Version 1.0.2
+
+Packaging only: Python files and dependency pins are unchanged from 1.0.1.
+ZIP layout is verified; runtime tests and live smoke checks were not repeated.
+
 ### Version 1.0.1
 
 The voice UUID/slug acknowledgement regression is covered by public HA TTS

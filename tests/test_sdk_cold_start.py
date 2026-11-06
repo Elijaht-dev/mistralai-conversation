@@ -18,6 +18,7 @@ import pytest
         "realtime",
         "realtime_tts",
         "realtime_tts_slow",
+        "realtime_tts_alias",
         "image_start",
         "image_download",
         "image_url",

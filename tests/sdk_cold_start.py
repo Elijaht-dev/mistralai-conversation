@@ -169,8 +169,44 @@ async def exercise_realtime_endpoint(hass, api, client, endpoint, status):
     )
     if endpoint == "realtime_tts_slow":
         await realtime.exercise_realtime(hass, api, client, status, slow=True)
+    elif endpoint == "realtime_tts_alias":
+        await realtime.exercise_realtime(hass, api, client, status, alias=True)
     else:
         await realtime.exercise_realtime(hass, api, client, status)
+
+
+def voice_response(httpx2, endpoint):
+    """Use the actual list and single-voice SDK response schemas."""
+    preset = {
+        "id": "test-preset",
+        "name": "Preset",
+        "created_at": "2026-09-01T00:00:00Z",
+        "user_id": None,
+        "type": "preset",
+        "languages": ["en"],
+    }
+    if endpoint == "realtime_tts_alias":
+        return httpx2.Response(
+            200,
+            json={**preset, "id": "test-voice", "slug": "test-voice-slug"},
+        )
+    return httpx2.Response(
+        200,
+        json={
+            "data": [
+                preset,
+                {
+                    **preset,
+                    "id": "test-custom",
+                    "name": "Custom",
+                    "user_id": "test-user",
+                    "type": "custom",
+                    "languages": ["fr"],
+                },
+            ],
+            "next_page_token": None,
+        },
+    )
 
 
 async def main() -> None:
@@ -240,31 +276,11 @@ async def main() -> None:
                     "\n\n"
                 ),
             )
-        if endpoint == "voices":
-            return httpx2.Response(
-                200,
-                json={
-                    "data": [
-                        {
-                            "id": "test-preset",
-                            "name": "Preset",
-                            "created_at": "2026-09-01T00:00:00Z",
-                            "user_id": None,
-                            "type": "preset",
-                            "languages": ["en"],
-                        },
-                        {
-                            "id": "test-custom",
-                            "name": "Custom",
-                            "created_at": "2026-09-01T00:00:00Z",
-                            "user_id": "test-user",
-                            "type": "custom",
-                            "languages": ["fr"],
-                        },
-                    ],
-                    "next_page_token": None,
-                },
-            )
+        if endpoint in ("voices", "realtime_tts_alias"):
+            if endpoint == "realtime_tts_alias":
+                assert request.url.path == "/v1/audio/voices/test-voice"
+                assert request.headers["Authorization"] == "Bearer test-api-key"
+            return voice_response(httpx2, endpoint)
         return (
             image_response(httpx2, endpoint)
             if endpoint.startswith("image_")
@@ -277,7 +293,7 @@ async def main() -> None:
         client = resources.client
         sync_transport = client.sdk_configuration.client
         try:
-            if endpoint in ("realtime", "realtime_tts", "realtime_tts_slow"):
+            if endpoint.startswith("realtime"):
                 await exercise_realtime_endpoint(hass, api, client, endpoint, status)
             else:
                 await exercise(api, client, endpoint)
@@ -288,6 +304,7 @@ async def main() -> None:
                 "realtime",
                 "realtime_tts",
                 "realtime_tts_slow",
+                "realtime_tts_alias",
                 "image_url",
             )
         finally:

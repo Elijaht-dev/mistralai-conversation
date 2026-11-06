@@ -22,6 +22,15 @@ class RealtimeError(Exception):
         self.kind = kind
 
 
+class SpeechStreamError(RealtimeError):
+    """A local speech-stream validation failure with a translated error key."""
+
+    def __init__(self, translation_key: str) -> None:
+        """Exclude input text and provider payloads from validation failures."""
+        super().__init__("Invalid realtime speech stream")
+        self.translation_key = translation_key
+
+
 class ImageDownloadError(Exception):
     """A storage failure without its signed URL or provider response body."""
 

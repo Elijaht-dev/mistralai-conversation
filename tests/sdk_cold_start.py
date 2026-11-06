@@ -159,6 +159,20 @@ def assert_image_request(endpoint: str, request) -> None:
         assert "authorization" not in request.headers
 
 
+async def exercise_realtime_endpoint(hass, api, client, endpoint, status):
+    """Select the local TLS fixture matching the first realtime request."""
+    realtime = await hass.async_add_executor_job(
+        importlib.import_module,
+        "tests.realtime_cold_start"
+        if endpoint == "realtime"
+        else "tests.realtime_speech_cold_start",
+    )
+    if endpoint == "realtime_tts_slow":
+        await realtime.exercise_realtime(hass, api, client, status, slow=True)
+    else:
+        await realtime.exercise_realtime(hass, api, client, status)
+
+
 async def main() -> None:
     """Exercise the first request without pytest preloading provider modules."""
     hass = HomeAssistant("/tmp/mistral-cold-start")
@@ -263,22 +277,26 @@ async def main() -> None:
         client = resources.client
         sync_transport = client.sdk_configuration.client
         try:
-            if endpoint == "realtime":
-                realtime = await hass.async_add_executor_job(
-                    importlib.import_module, "tests.realtime_cold_start"
-                )
-                await realtime.exercise_realtime(hass, api, client, status)
+            if endpoint in ("realtime", "realtime_tts", "realtime_tts_slow"):
+                await exercise_realtime_endpoint(hass, api, client, endpoint, status)
             else:
                 await exercise(api, client, endpoint)
         except api.errors.MistralError:
             assert status != 200
         else:
-            assert status == 200 or endpoint in ("realtime", "image_url")
+            assert status == 200 or endpoint in (
+                "realtime",
+                "realtime_tts",
+                "realtime_tts_slow",
+                "image_url",
+            )
         finally:
             await api.async_close_client(hass, resources)
         assert sync_transport.is_closed
         assert not transport.is_closed
-        assert len(requests) == (0 if endpoint == "realtime" else 1)
+        assert len(requests) == (
+            0 if endpoint in ("realtime", "realtime_tts", "realtime_tts_slow") else 1
+        )
         if endpoint.startswith("image_"):
             assert_image_request(endpoint, requests[0])
     await hass.async_stop()

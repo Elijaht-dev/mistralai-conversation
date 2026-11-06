@@ -6,6 +6,7 @@ from .const import LEGACY_REALTIME_STT_MODEL, REALTIME_STT_MODEL, MistralModel
 
 type TranscriptionMode = Literal["auto", "batch", "realtime"]
 type TranscriptionTransport = Literal["batch", "realtime"]
+type SynthesisMode = Literal["standard", "realtime"]
 type ModelUsage = Literal["chat", "image", "stt", "tts"]
 
 MODEL_PRESETS: dict[ModelUsage, tuple[tuple[str, str], ...]] = {
@@ -36,6 +37,31 @@ _REALTIME_MODELS = frozenset(
         "voxtral-mini-transcribe-realtime-latest",
     }
 )
+
+
+def speech_model_error(
+    model: MistralModel, known: bool, mode: str, output_format: str | None = None
+) -> str | None:
+    """Validate speech settings without guessing missing provider metadata."""
+    if mode not in ("standard", "realtime"):
+        return "tts_option_invalid"
+    if not known:
+        return None
+    if not model.audio_speech:
+        return "model_no_speech"
+    provider_mode = "offline" if mode == "standard" else "realtime"
+    if (
+        model.audio_speech_modes is not None
+        and provider_mode not in model.audio_speech_modes
+    ):
+        return "model_no_synthesis_mode"
+    if (
+        output_format is not None
+        and model.audio_speech_formats is not None
+        and output_format not in model.audio_speech_formats
+    ):
+        return "tts_format_unsupported"
+    return None
 
 
 def resolve_transcription_transport(

@@ -37,6 +37,7 @@ from custom_components.mistral_conversation.const import (
     CONF_NORMALIZE_AUDIO,
     CONF_REASONING_EFFORT,
     CONF_SAFE_PROMPT,
+    CONF_SYNTHESIS_MODE,
     CONF_TARGET_LOUDNESS,
     CONF_TEMPERATURE,
     CONF_TRANSCRIPTION_MODE,
@@ -296,7 +297,7 @@ async def test_migration_normalizes_preview_data(
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.minor_version == 5
+    assert entry.minor_version == 6
     chat_only, legacy = [
         subentry
         for subentry in entry.subentries.values()
@@ -362,7 +363,7 @@ async def test_migration_does_not_duplicate_voice_platform_subentries(
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.minor_version == 5
+    assert entry.minor_version == 6
     assert [subentry.subentry_type for subentry in entry.subentries.values()].count(
         SUBENTRY_TYPE_AI_TASK
     ) == 1
@@ -412,16 +413,52 @@ async def test_migration_keeps_existing_tts_audio_unchanged(
     subentry = next(iter(entry.subentries.values()))
 
     assert await async_migrate_entry(hass, entry)
-    assert entry.minor_version == 5
+    assert entry.minor_version == 6
     assert subentry.data == {
         CONF_MODEL: DEFAULT_TTS_MODEL,
         CONF_VOICE_ID: "voice-1",
+        CONF_SYNTHESIS_MODE: "standard",
         CONF_NORMALIZE_AUDIO: False,
         CONF_TARGET_LOUDNESS: DEFAULT_TARGET_LOUDNESS,
     }
     assert await async_migrate_entry(hass, entry)
-    assert entry.minor_version == 5
+    assert entry.minor_version == 6
     assert len(entry.subentries) == 1
+
+
+@pytest.mark.parametrize("saved_mode", [None, "realtime"])
+async def test_migration_preserves_speech_settings_and_subentry_ids(hass, saved_mode):
+    """Version 1.6 materializes Standard while preserving explicit choices."""
+    original = {
+        CONF_MODEL: "ft:voice",
+        CONF_VOICE_ID: "test-custom-voice",
+        CONF_NORMALIZE_AUDIO: False,
+        CONF_TARGET_LOUDNESS: -18,
+        **({CONF_SYNTHESIS_MODE: saved_mode} if saved_mode else {}),
+    }
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        version=1,
+        minor_version=5,
+        data={CONF_API_KEY: "test-api-key"},
+        subentries_data=[
+            {
+                "subentry_type": SUBENTRY_TYPE_TTS,
+                "data": original,
+                "title": "Existing voice",
+                "unique_id": None,
+            }
+        ],
+    )
+    entry.add_to_hass(hass)
+    before = tuple(entry.subentries)
+    assert await async_migrate_entry(hass, entry)
+    assert tuple(entry.subentries) == before
+    subentry = next(iter(entry.subentries.values()))
+    assert subentry.data == {**original, CONF_SYNTHESIS_MODE: saved_mode or "standard"}
+    assert entry.minor_version == 6
+    assert await async_migrate_entry(hass, entry)
+    assert subentry.data == {**original, CONF_SYNTHESIS_MODE: saved_mode or "standard"}
 
 
 @pytest.mark.parametrize("explicit", [False, True])
@@ -456,7 +493,7 @@ async def test_migration_materializes_old_defaults_and_preserves_settings(
     )
     entry.add_to_hass(hass)
     assert await async_migrate_entry(hass, entry)
-    assert entry.minor_version == 5
+    assert entry.minor_version == 6
     by_type = {
         subentry.subentry_type: dict(subentry.data)
         for subentry in entry.subentries.values()

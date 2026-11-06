@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import binascii
 import json
 import re
 from collections.abc import AsyncGenerator, AsyncIterable
-from contextlib import asynccontextmanager, suppress
+from contextlib import aclosing, asynccontextmanager, suppress
 from dataclasses import dataclass, field
 from datetime import datetime
 from types import TracebackType
@@ -34,13 +36,20 @@ from mistralai.extra.realtime.connection import (
     UnknownRealtimeEvent,
     parse_realtime_event,
 )
+from mistralai.extra.realtime.speech import (
+    RealtimeSpeechConnection,
+    RealtimeSpeechEvent,
+    parse_realtime_speech_event,
+)
 from websockets.asyncio.client import connect as websocket_connect
-from websockets.exceptions import InvalidStatus, WebSocketException
+from websockets.exceptions import ConnectionClosed, InvalidStatus, WebSocketException
 
 from .const import (
     IMAGE_MAX_TOKENS,
     LOGGER,
     MAX_STT_AUDIO_BYTES,
+    MAX_TTS_AUDIO_BYTES,
+    MAX_TTS_TEXT_LENGTH,
     MAX_VOICES,
     REQUEST_TIMEOUT_MS,
     SETUP_TIMEOUT_MS,
@@ -49,7 +58,7 @@ from .const import (
     MistralModel,
     MistralVoice,
 )
-from .errors import ImageDownloadError, RealtimeError
+from .errors import ImageDownloadError, RealtimeError, SpeechStreamError
 
 # SDK 3.7.0's lazy exports do not cache resolved attributes. Merely importing
 # their modules still calls import_module (with relative names) on every access.
@@ -79,6 +88,16 @@ for _name in (
     "ConversationHistoryUnionTypedDict",
     "SpeechResponse",
     "SpeechStreamEvents",
+    "SpeechStreamAudioDelta",
+    "SpeechStreamDone",
+    "AudioSpeechCapabilities",
+    "RealtimeSpeechSessionCreated",
+    "RealtimeSpeechError",
+    "RealtimeSpeechSessionUpdated",
+    "RealtimeSpeechSessionUpdatePayload",
+    "RealtimeSpeechSessionUpdateMessage",
+    "RealtimeSpeechInputTextAppend",
+    "RealtimeSpeechInputTextEnd",
     "AudioV2VoicesListRequest",
     "AudioV2VoicesListResponse",
     "VoiceListPage",
@@ -162,6 +181,7 @@ def _create_client(api_key: str, http_client: httpx2.AsyncClient) -> Mistral:
             client.models,
             client.chat,
             client.audio.realtime,
+            client.audio.realtime_speech,
             client.beta.conversations,
             client.files,
         )
@@ -258,21 +278,14 @@ def _realtime_error(err: Exception) -> RealtimeError:
     return RealtimeError("Realtime transcription failed", kind)
 
 
-@asynccontextmanager
-async def _connect_realtime(
-    client: Mistral, model: str
-) -> AsyncGenerator[RealtimeConnection]:
-    """Open a verified HA-safe socket, then use the SDK's protocol objects."""
-    # SDK 3.7.0 connect() cannot accept a prepared SSLContext. Its default
-    # websockets transport loads certificates on HA's loop. Keep this narrow
-    # connection adapter until that public SDK API can receive HA's context;
-    # all audio messages and event parsing remain owned by the official SDK.
+def _realtime_url(client: Mistral, model: str, path: str) -> tuple[str, dict[str, str]]:
+    """Resolve the configured secure endpoint and SDK authentication."""
     config = client.sdk_configuration
     base_url, _ = config.get_server_details()
-    endpoint = utils.generate_url(base_url, "/v1/audio/transcriptions/realtime", None)
+    endpoint = utils.generate_url(base_url, path, None)
     parsed = urlparse(endpoint)
     if parsed.scheme != "https":
-        raise RealtimeError("Realtime transcription requires a secure cloud endpoint")
+        raise RealtimeError("Realtime requires a secure cloud endpoint")
     security = config.security() if callable(config.security) else config.security
     resolved_security = utils.get_security_from_env(security, models.Security)
     headers: dict[str, str] = {}
@@ -283,11 +296,24 @@ async def _connect_realtime(
             {key: values[0] for key, values in security_query.items() if values}
         )
     url = urlunparse(parsed._replace(scheme="wss", query=urlencode(query)))
+    return url, headers
+
+
+@asynccontextmanager
+async def _connect_realtime(
+    client: Mistral, model: str
+) -> AsyncGenerator[RealtimeConnection]:
+    """Open a verified HA-safe socket, then use the SDK's protocol objects."""
+    # SDK 3.7.0 connect() cannot accept a prepared SSLContext. Its default
+    # websockets transport loads certificates on HA's loop. Keep this narrow
+    # connection adapter until that public SDK API can receive HA's context;
+    # all audio messages and event parsing remain owned by the official SDK.
+    url, headers = _realtime_url(client, model, "/v1/audio/transcriptions/realtime")
     setup_deadline = asyncio.get_running_loop().time() + SETUP_TIMEOUT_MS / 1000
     async with websocket_connect(
         url,
         additional_headers=headers,
-        user_agent_header=config.user_agent,
+        user_agent_header=client.sdk_configuration.user_agent,
         ssl=get_default_context(),
         open_timeout=SETUP_TIMEOUT_MS / 1000,
     ) as websocket:
@@ -395,6 +421,247 @@ def _optional_string(value: object) -> str | None:
     return value if isinstance(value, str) and value else None
 
 
+@asynccontextmanager
+async def _connect_realtime_speech(
+    client: Mistral, model: str, voice_id: str, output_format: models.SpeechOutputFormat
+) -> AsyncGenerator[RealtimeSpeechConnection]:
+    """Use HA's verified TLS context with the official SDK speech protocol."""
+    url, headers = _realtime_url(client, model, "/v1/audio/speech/realtime")
+    deadline = asyncio.get_running_loop().time() + SETUP_TIMEOUT_MS / 1000
+    async with websocket_connect(
+        url,
+        additional_headers=headers,
+        user_agent_header=client.sdk_configuration.user_agent,
+        ssl=get_default_context(),
+        open_timeout=SETUP_TIMEOUT_MS / 1000,
+        max_queue=1,
+    ) as websocket:
+        async with asyncio.timeout_at(deadline):
+            created = parse_realtime_speech_event(json.loads(await websocket.recv()))
+            if not isinstance(created, models.RealtimeSpeechSessionCreated):
+                raise SpeechStreamError("tts_response_invalid")
+            connection = RealtimeSpeechConnection(websocket, created.session)
+            await connection.update_session(
+                voice_id=voice_id,
+                response_format=output_format,
+                streaming_mode="responsive",
+            )
+            updated = parse_realtime_speech_event(json.loads(await websocket.recv()))
+            if (
+                not isinstance(updated, models.RealtimeSpeechSessionUpdated)
+                or updated.session.voice != voice_id
+                or updated.session.is_ref_audio
+                or updated.session.response_format != output_format
+                or updated.session.streaming_mode != "responsive"
+            ):
+                raise SpeechStreamError("tts_response_invalid")
+        try:
+            yield connection
+        finally:
+            await connection.close()
+
+
+async def _send_speech_text(
+    connection: RealtimeSpeechConnection, text: AsyncGenerator[str]
+) -> None:
+    """Forward bounded deltas verbatim and end exactly one generation."""
+    size = 0
+    async for delta in text:
+        if not isinstance(delta, str):
+            raise SpeechStreamError("tts_response_invalid")
+        size += len(delta)
+        if size > MAX_TTS_TEXT_LENGTH:
+            raise SpeechStreamError("tts_text_too_long")
+        if delta:
+            await connection.send_text(delta)
+    if not size:
+        raise SpeechStreamError("tts_response_empty")
+    await connection.end()
+
+
+@dataclass(slots=True)
+class _SpeechAudioBuffer:
+    """Coalesce bounded audio without pausing WebSocket control frames.
+
+    The receiver enforces the cumulative 25 MiB output limit before every
+    append. A slow HA converter may retain that much audio, but never an
+    unbounded queue of provider deltas. Fast readers receive bytes immediately.
+    """
+
+    _data: bytearray = field(default_factory=bytearray, repr=False)
+    _ready: asyncio.Event = field(default_factory=asyncio.Event, repr=False)
+
+    def put(self, chunk: bytes) -> None:
+        """Append already validated audio without blocking protocol reads."""
+        self._data.extend(chunk)
+        self._ready.set()
+
+    def empty(self) -> bool:
+        """Return whether all received bytes have been consumed."""
+        return not self._data
+
+    def get_nowait(self) -> bytes:
+        """Transfer buffered bytes atomically on the event loop."""
+        data, self._data = self._data, bytearray()
+        self._ready.clear()
+        return bytes(data)
+
+    async def get(self) -> bytes:
+        """Wait until the network receiver has audio for Home Assistant."""
+        await self._ready.wait()
+        return self.get_nowait()
+
+
+async def _receive_speech_audio(
+    connection: RealtimeSpeechConnection,
+    sender: asyncio.Task[None],
+    queue: _SpeechAudioBuffer,
+) -> None:
+    """Require the provider's final event, then close this one-generation socket."""
+    size = 0
+    # The SDK annotates events() as AsyncIterator, but implements an async
+    # generator. Own its closure explicitly when we stop at the terminal event.
+    events_generator = cast(AsyncGenerator[RealtimeSpeechEvent], connection.events())
+    async with aclosing(events_generator) as events:
+        async for event in events:
+            if isinstance(event, models.RealtimeSpeechError):
+                # Internal provider error codes are not HTTP authentication statuses.
+                raise RealtimeError("Realtime speech was rejected")
+            if isinstance(event, models.SpeechStreamAudioDelta):
+                chunk = base64.b64decode(event.audio_data, validate=True)
+                size += len(chunk)
+                if size > MAX_TTS_AUDIO_BYTES:
+                    raise SpeechStreamError("tts_audio_too_large")
+                if chunk:
+                    queue.put(chunk)
+            elif isinstance(event, models.SpeechStreamDone):
+                if not sender.done():
+                    raise SpeechStreamError("tts_response_invalid")
+                sender.result()
+                if not size:
+                    raise SpeechStreamError("tts_response_empty")
+                # Match the SDK's speak_stream terminal-event contract. The live
+                # endpoint can close TCP after done without a WS close frame.
+                # Close from our side, rather than reading beyond the generation.
+                await connection.close()
+                return
+            else:
+                raise SpeechStreamError("tts_response_invalid")
+    # SDK 3.7's event iterator consumes CancelledError. Restore cancellation so
+    # the owning request deadline cannot be mistaken for an invalid response.
+    current_task = asyncio.current_task()
+    if current_task is not None and current_task.cancelling():
+        raise asyncio.CancelledError
+    raise SpeechStreamError("tts_response_invalid")
+
+
+def _speech_transport_error(err: Exception) -> RealtimeError:
+    """Keep close-frame reasons, provider content and credentials private."""
+    cause: BaseException | None = err
+    while cause is not None:
+        if (
+            isinstance(cause, ConnectionClosed)
+            and cause.rcvd is not None
+            and cause.rcvd.code in (1003, 1007, 1008)
+        ):
+            return RealtimeError("Realtime speech request was rejected")
+        cause = cause.__cause__
+    classified = _realtime_error(err)
+    return RealtimeError("Realtime speech failed", classified.kind)
+
+
+@dataclass(frozen=True, slots=True)
+class _RealtimeSpeechRequest:
+    """Validated provider settings and the owned incremental text input."""
+
+    model: str
+    voice_id: str
+    output_format: models.SpeechOutputFormat
+    text: AsyncGenerator[str]
+
+
+async def _run_realtime_speech(
+    client: Mistral,
+    request: _RealtimeSpeechRequest,
+    queue: _SpeechAudioBuffer,
+) -> None:
+    """Supervise both directions under a deadline independent of the consumer."""
+    try:
+        async with asyncio.timeout(REQUEST_TIMEOUT_MS / 1000):
+            async with _connect_realtime_speech(
+                client, request.model, request.voice_id, request.output_format
+            ) as connection:
+                sender = asyncio.create_task(
+                    _send_speech_text(connection, request.text)
+                )
+                receiver = asyncio.create_task(
+                    _receive_speech_audio(connection, sender, queue)
+                )
+                try:
+                    await asyncio.gather(sender, receiver)
+                finally:
+                    sender.cancel()
+                    receiver.cancel()
+                    await asyncio.gather(sender, receiver, return_exceptions=True)
+    except RealtimeError:
+        raise
+    except binascii.Error, ValueError, TypeError:
+        raise SpeechStreamError("tts_response_invalid") from None
+    except Exception as err:
+        raise _speech_transport_error(err) from None
+    finally:
+        with suppress(Exception):
+            await request.text.aclose()
+
+
+async def async_stream_speech(
+    client: Mistral,
+    model: str,
+    voice_id: str,
+    output_format: models.SpeechOutputFormat,
+    text: AsyncGenerator[str],
+) -> AsyncGenerator[bytes]:
+    """Start bounded speech before the complete text or audio is available."""
+    queue = _SpeechAudioBuffer()
+    producer = asyncio.create_task(
+        _run_realtime_speech(
+            client, _RealtimeSpeechRequest(model, voice_id, output_format, text), queue
+        )
+    )
+    pending: asyncio.Task[bytes] | None = None
+    try:
+        while True:
+            if producer.done():
+                producer.result()
+                while not queue.empty():
+                    yield queue.get_nowait()
+                return
+            pending = asyncio.create_task(queue.get())
+            await asyncio.wait((producer, pending), return_when=asyncio.FIRST_COMPLETED)
+            if producer.done():
+                producer.result()
+            if pending.done():
+                chunk = pending.result()
+                pending = None
+                yield chunk
+            else:
+                pending.cancel()
+                await asyncio.gather(pending, return_exceptions=True)
+                pending = None
+    finally:
+        producer.cancel()
+        if pending is not None:
+            pending.cancel()
+        await asyncio.gather(
+            producer,
+            *((pending,) if pending is not None else ()),
+            return_exceptions=True,
+        )
+        # A task cancelled before its first step never enters its own finally.
+        with suppress(Exception):
+            await text.aclose()
+
+
 def _optional_datetime(value: object) -> datetime | None:
     """Return an SDK datetime value, ignoring its UNSET sentinel."""
     return value if isinstance(value, datetime) else None
@@ -406,6 +673,9 @@ def _parse_model(model: BaseModelCard | FTModelCard) -> MistralModel | None:
         return None
 
     capabilities = model.capabilities
+    speech = (
+        model.audio_speech_capabilities if isinstance(model, BaseModelCard) else None
+    )
 
     return MistralModel(
         id=model.id,
@@ -416,6 +686,18 @@ def _parse_model(model: BaseModelCard | FTModelCard) -> MistralModel | None:
         audio_transcription=bool(capabilities.audio_transcription),
         audio_transcription_realtime=bool(capabilities.audio_transcription_realtime),
         audio_speech=bool(capabilities.audio_speech),
+        audio_speech_modes=(
+            tuple(speech.modes)
+            if isinstance(speech, models.AudioSpeechCapabilities)
+            and speech.modes is not None
+            else None
+        ),
+        audio_speech_formats=(
+            tuple(speech.response_formats)
+            if isinstance(speech, models.AudioSpeechCapabilities)
+            and speech.response_formats is not None
+            else None
+        ),
         function_calling=bool(capabilities.function_calling),
         reasoning=bool(capabilities.reasoning),
         vision=bool(capabilities.vision),

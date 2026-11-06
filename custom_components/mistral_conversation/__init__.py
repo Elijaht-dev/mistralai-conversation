@@ -19,6 +19,7 @@ from .const import (
     CONF_NORMALIZE_AUDIO,
     CONF_REASONING_EFFORT,
     CONF_SAFE_PROMPT,
+    CONF_SYNTHESIS_MODE,
     CONF_TARGET_LOUDNESS,
     CONF_TEMPERATURE,
     CONF_TRANSCRIPTION_MODE,
@@ -271,7 +272,21 @@ async def async_migrate_entry(
         _migrate_model_defaults(hass, entry)
         hass.config_entries.async_update_entry(entry, minor_version=5)
 
+    if entry.minor_version < 6:
+        _migrate_synthesis_mode(hass, entry)
+        hass.config_entries.async_update_entry(entry, minor_version=6)
+
     return True
+
+
+def _migrate_synthesis_mode(hass: HomeAssistant, entry: MistralConfigEntry) -> None:
+    """Preserve the HTTP speech endpoint for every existing TTS entity."""
+    for subentry in entry.subentries.values():
+        if subentry.subentry_type != SUBENTRY_TYPE_TTS:
+            continue
+        data = dict(subentry.data)
+        data.setdefault(CONF_SYNTHESIS_MODE, "standard")
+        hass.config_entries.async_update_subentry(entry, subentry, data=data)
 
 
 __all__ = ["MistralConfigEntry", "MistralCoordinator"]

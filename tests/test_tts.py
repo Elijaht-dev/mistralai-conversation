@@ -104,6 +104,7 @@ async def test_tts_properties_and_saved_voices(
     entity = _entity(hass)
 
     assert entity.default_language == "en-US"
+    assert not entity.async_supports_streaming_input()
     assert "fr-FR" in entity.supported_languages
 
     assert entity.supported_options == [
@@ -175,6 +176,43 @@ async def test_tts_streams_supported_audio_formats(
         response_format=provider_format,
         timeout_ms=REQUEST_TIMEOUT_MS,
     )
+
+
+async def test_standard_streaming_method_keeps_buffered_http(hass, tts_component):
+    """The explicit HA streaming method still supports Standard callers."""
+    _, client = tts_component
+    client.audio.speech.complete_async.return_value = _speech_stream(
+        base64.b64encode(b"standard").decode()
+    )
+
+    async def source():
+        yield "Hello "
+        yield "world"
+
+    response = await _entity(hass).async_stream_tts_audio(
+        tts.TTSAudioRequest("en-US", {}, source())
+    )
+    assert response.extension == "mp3"
+    assert [chunk async for chunk in response.data_gen] == [b"standard"]
+    assert (
+        client.audio.speech.complete_async.await_args.kwargs["input"] == "Hello world"
+    )
+
+
+async def test_standard_streaming_input_is_bounded(hass, tts_component):
+    """Direct streaming calls cannot accumulate input beyond the text bound."""
+    _, client = tts_component
+
+    async def source():
+        yield "x" * MAX_TTS_TEXT_LENGTH
+        yield "x"
+
+    with pytest.raises(HomeAssistantError) as error:
+        await _entity(hass).async_stream_tts_audio(
+            tts.TTSAudioRequest("en-US", {}, source())
+        )
+    assert error.value.translation_key == "tts_text_too_long"
+    client.audio.speech.complete_async.assert_not_awaited()
 
 
 @pytest.mark.parametrize(

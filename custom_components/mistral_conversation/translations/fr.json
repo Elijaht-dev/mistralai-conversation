@@ -163,7 +163,9 @@
       "entry_type": "Synthèse vocale",
       "error": {
         "target_loudness_invalid": "Choisissez une cible entière entre -24 et -12 LUFS.",
-        "model_no_speech": "Le modèle sélectionné ne prend pas en charge la synthèse vocale."
+        "model_no_speech": "Le modèle sélectionné ne prend pas en charge la synthèse vocale.",
+        "tts_realtime_normalization": "Désactivez la normalisation audio pour utiliser le mode Temps réel. La normalisation en deux passes nécessite le message audio complet.",
+        "model_no_synthesis_mode": "Le modèle sélectionné ne prend pas en charge ce mode de synthèse."
       },
       "initiate_flow": {
         "reconfigure": "Reconfigurer la synthèse vocale",
@@ -176,14 +178,16 @@
             "name": "Nom",
             "normalize_audio": "Normaliser le volume de la voix",
             "target_loudness": "Volume cible (LUFS)",
-            "voice_id": "Voix"
+            "voice_id": "Voix",
+            "synthesis_mode": "Mode de synthèse"
           },
           "data_description": {
             "model": "Identifiant du modèle de synthèse vocale Mistral.",
             "name": "Nom affiché pour cette entité de synthèse vocale dans Home Assistant.",
             "normalize_audio": "Utilise FFmpeg localement pour uniformiser le volume de la voix générée. Cette option est activée par défaut pour les nouvelles entités ; les entités existantes conservent leur comportement jusqu'à son activation.",
             "target_loudness": "Cible entière entre -24 et -12 LUFS (-16 par défaut). L'amplification est limitée à 20 dB ; les extraits courts ou non mesurables ne sont pas amplifiés.",
-            "voice_id": "Sélectionnez une voix Mistral prédéfinie ou personnalisée enregistrée, ou saisissez son identifiant. N'utilisez une voix clonée qu'avec le consentement de la personne concernée."
+            "voice_id": "Sélectionnez une voix Mistral prédéfinie ou personnalisée enregistrée, ou saisissez son identifiant. N'utilisez une voix clonée qu'avec le consentement de la personne concernée.",
+            "synthesis_mode": "Standard attend la synthèse complète et permet la normalisation. Temps réel transmet progressivement le texte et l’audio par WebSocket ; désactivez la normalisation. La compatibilité du modèle et de la voix reste nécessaire."
           },
           "description": "Configurez la génération vocale de Mistral. Le texte envoyé à cette entité est traité par Mistral AI avec la voix enregistrée sélectionnée.",
           "title": "Synthèse vocale Mistral"
@@ -334,6 +338,15 @@
     },
     "model_no_speech": {
       "message": "Le modèle {model} ne prend pas en charge cet usage."
+    },
+    "tts_realtime_normalization": {
+      "message": "Désactivez la normalisation audio pour utiliser le mode Temps réel. La normalisation en deux passes nécessite le message audio complet."
+    },
+    "model_no_synthesis_mode": {
+      "message": "Le modèle sélectionné ne prend pas en charge ce mode de synthèse."
+    },
+    "tts_format_unsupported": {
+      "message": "Le modèle {model} ne prend pas en charge le format audio {format}."
     }
   },
   "issues": {
@@ -379,6 +392,12 @@
         "auto": "Automatique",
         "batch": "Batch",
         "realtime": "Realtime"
+      }
+    },
+    "synthesis_mode": {
+      "options": {
+        "standard": "Standard",
+        "realtime": "Temps réel"
       }
     }
   }

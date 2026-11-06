@@ -5,6 +5,39 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-06
+
+### Added
+
+- Explicit Standard/Realtime synthesis mode per TTS entity. Realtime streams
+  text and audio over a verified Mistral WebSocket through HA's native TTS API.
+- Speech-mode and output-format capability validation, bounded streaming,
+  request deadlines and cleanup on cancellation, generator close and unload.
+
+### Changed
+
+- Configuration migration 1.6 preserves Standard mode for existing TTS entities.
+  New entities also default to Standard. Realtime requires normalization to be
+  disabled; the existing two-pass normalization remains available in Standard.
+- Realtime TTS failures stop playback generation without an HTTP retry. A late
+  failure cannot withdraw audio already played. Dynamic normalization and
+  native audio-to-audio conversation are not part of this change.
+
+### Fixed
+
+- Finish a validated realtime speech generation on `speech.audio.done`, matching
+  the SDK contract even when the provider ends TCP without a WebSocket close frame.
+- Prevent false WebSocket heartbeat timeouts when bounded audio reads are paused
+  by Home Assistant or its audio converter. The 300-second request limit remains.
+
+### Validation
+
+- Automated compatibility tests and real Home Assistant validation are recorded
+  in [QUALITY.md](QUALITY.md#version-100).
+- Live image-generation checks hit the Mistral account's HTTP 429 rate limit.
+  Image generation and reference-image retrieval were not revalidated in this
+  run; their last successful live validation is recorded under version 0.6.0.
+
 ## [0.6.0] - 2026-11-05
 
 ### Fixed
@@ -309,7 +342,8 @@ The beta was checked on HA 2026.8.6 and 2026.9.0 before the stable release.
 - Capability checks, model repairs, reauthentication, diagnostics and migrations.
 - English/French translations and automated quality, HACS and Hassfest checks.
 
-[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.6.0...v1.0.0
 [0.6.0]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.5...v0.6.0
 [0.5.5]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.3...v0.5.4

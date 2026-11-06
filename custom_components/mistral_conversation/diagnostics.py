@@ -61,6 +61,8 @@ async def async_get_config_entry_diagnostics(
                     "audio_transcription": model.audio_transcription,
                     "audio_transcription_realtime": model.audio_transcription_realtime,
                     "audio_speech": model.audio_speech,
+                    "audio_speech_modes": model.audio_speech_modes,
+                    "audio_speech_formats": model.audio_speech_formats,
                     "function_calling": model.function_calling,
                     "reasoning": model.reasoning,
                     "vision": model.vision,

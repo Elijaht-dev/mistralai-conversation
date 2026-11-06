@@ -24,6 +24,7 @@ from custom_components.mistral_conversation.const import (
     CONF_NORMALIZE_AUDIO,
     CONF_REASONING_EFFORT,
     CONF_SAFE_PROMPT,
+    CONF_SYNTHESIS_MODE,
     CONF_TARGET_LOUDNESS,
     CONF_TEMPERATURE,
     CONF_TRANSCRIPTION_MODE,
@@ -614,6 +615,7 @@ async def test_create_and_reconfigure_tts_subentry(
         CONF_MODEL: DEFAULT_TTS_MODEL,
         CONF_VOICE_ID: "voice-1",
         CONF_NORMALIZE_AUDIO: True,
+        CONF_SYNTHESIS_MODE: "standard",
         CONF_TARGET_LOUDNESS: DEFAULT_TARGET_LOUDNESS,
     }
 
@@ -660,6 +662,47 @@ async def test_create_and_reconfigure_tts_subentry(
     assert tts_subentry.data[CONF_VOICE_ID] == "custom-voice-id"
     assert tts_subentry.data[CONF_NORMALIZE_AUDIO] is False
     assert tts_subentry.data[CONF_TARGET_LOUDNESS] == -20
+
+
+async def test_realtime_tts_flow_rejects_normalization_and_known_offline_model(
+    hass, mock_config_entry, mock_init_component
+):
+    """Realtime is explicit and never disables normalization silently."""
+    result = await hass.config_entries.subentries.async_init(
+        (mock_config_entry.entry_id, SUBENTRY_TYPE_TTS),
+        context={"source": config_entries.SOURCE_USER},
+    )
+    settings = {
+        CONF_NAME: "Realtime speaker",
+        CONF_MODEL: "ft:custom-tts",
+        CONF_VOICE_ID: "test-voice",
+        CONF_SYNTHESIS_MODE: "realtime",
+        CONF_NORMALIZE_AUDIO: True,
+    }
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"], settings
+    )
+    assert result["errors"] == {CONF_NORMALIZE_AUDIO: "tts_realtime_normalization"}
+    mock_config_entry.runtime_data.async_set_updated_data(
+        [
+            MistralModel(
+                id="ft:custom-tts", audio_speech=True, audio_speech_modes=("offline",)
+            )
+        ]
+    )
+    settings[CONF_NORMALIZE_AUDIO] = False
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"], settings
+    )
+    assert result["errors"] == {CONF_MODEL: "model_no_synthesis_mode"}
+    settings[CONF_MODEL] = "ft:unknown-tts"
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"], settings
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_SYNTHESIS_MODE] == "realtime"
+    assert result["data"][CONF_VOICE_ID] == "test-voice"
+    assert result["data"][CONF_NORMALIZE_AUDIO] is False
 
 
 @pytest.mark.parametrize(

@@ -11,5 +11,5 @@
   "issue_tracker": "https://github.com/Elijaht-dev/mistralai-conversation/issues",
   "loggers": ["mistralai"],
   "requirements": ["mistralai[realtime]==3.7.0"],
-  "version": "0.6.0"
+  "version": "1.0.0"
 }

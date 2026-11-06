@@ -42,6 +42,7 @@ CONF_SAFE_PROMPT: Final = "safe_prompt"
 CONF_TEMPERATURE: Final = "temperature"
 CONF_VOICE_ID: Final = "voice_id"
 CONF_TRANSCRIPTION_MODE: Final = "transcription_mode"
+CONF_SYNTHESIS_MODE: Final = "synthesis_mode"
 CONF_NORMALIZE_AUDIO: Final = "normalize_audio"
 CONF_TARGET_LOUDNESS: Final = "target_loudness"
 
@@ -109,6 +110,7 @@ DEFAULT_NEW_STT_OPTIONS = {
 
 DEFAULT_TTS_OPTIONS = {
     CONF_MODEL: DEFAULT_NEW_TTS_MODEL,
+    CONF_SYNTHESIS_MODE: "standard",
     CONF_NORMALIZE_AUDIO: True,
     CONF_TARGET_LOUDNESS: -16,
 }
@@ -182,6 +184,8 @@ class MistralModel:
     audio_transcription: bool = False
     audio_transcription_realtime: bool = False
     audio_speech: bool = False
+    audio_speech_modes: tuple[str, ...] | None = None
+    audio_speech_formats: tuple[str, ...] | None = None
     function_calling: bool = False
     reasoning: bool = False
     vision: bool = False

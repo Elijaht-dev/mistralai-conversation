@@ -47,6 +47,7 @@ from .const import (
     CONF_NORMALIZE_AUDIO,
     CONF_REASONING_EFFORT,
     CONF_SAFE_PROMPT,
+    CONF_SYNTHESIS_MODE,
     CONF_TARGET_LOUDNESS,
     CONF_TEMPERATURE,
     CONF_TRANSCRIPTION_MODE,
@@ -85,7 +86,12 @@ from .const import (
 )
 from .coordinator import MistralConfigEntry, MistralCoordinator
 from .errors import api_error_message, classify_api_error
-from .model_catalog import MODEL_PRESETS, ModelUsage, resolve_transcription_transport
+from .model_catalog import (
+    MODEL_PRESETS,
+    ModelUsage,
+    resolve_transcription_transport,
+    speech_model_error,
+)
 from .reasoning import fixed_reasoning_setting, reasoning_error, reasoning_options
 
 if TYPE_CHECKING:
@@ -217,7 +223,7 @@ class MistralConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Mistral AI Conversation."""
 
     VERSION = 1
-    MINOR_VERSION = 5
+    MINOR_VERSION = 6
 
     @classmethod
     @callback
@@ -696,8 +702,11 @@ class TTSSubentryFlowHandler(ConfigSubentryFlow):
             selected, known = cast(
                 MistralConfigEntry, entry
             ).runtime_data.get_model_info(user_input[CONF_MODEL])
-            if known and not selected.audio_speech:
-                errors[CONF_MODEL] = "model_no_speech"
+            mode = user_input.get(CONF_SYNTHESIS_MODE, "standard")
+            if error := speech_model_error(selected, known, mode):
+                errors[CONF_MODEL] = error
+            if mode == "realtime" and user_input.get(CONF_NORMALIZE_AUDIO, False):
+                errors[CONF_NORMALIZE_AUDIO] = "tts_realtime_normalization"
             try:
                 user_input[CONF_TARGET_LOUDNESS] = validate_target_loudness(
                     user_input[CONF_TARGET_LOUDNESS]
@@ -771,6 +780,16 @@ class TTSSubentryFlowHandler(ConfigSubentryFlow):
                         custom_value=True,
                         mode=SelectSelectorMode.DROPDOWN,
                         sort=True,
+                    )
+                ),
+                vol.Required(
+                    CONF_SYNTHESIS_MODE,
+                    default=suggested.get(CONF_SYNTHESIS_MODE, "standard"),
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        options=["standard", "realtime"],
+                        translation_key="synthesis_mode",
+                        mode=SelectSelectorMode.DROPDOWN,
                     )
                 ),
                 vol.Required(

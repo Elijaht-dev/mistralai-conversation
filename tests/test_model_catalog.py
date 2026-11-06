@@ -11,7 +11,34 @@ from custom_components.mistral_conversation.const import (
 )
 from custom_components.mistral_conversation.model_catalog import (
     resolve_transcription_transport,
+    speech_model_error,
 )
+
+
+@pytest.mark.parametrize(
+    ("known", "mode", "modes", "formats", "expected"),
+    [
+        (False, "realtime", (), (), None),
+        (True, "standard", ("offline", "realtime"), ("mp3", "wav"), None),
+        (True, "realtime", ("realtime",), None, None),
+        (True, "realtime", None, None, None),
+        (True, "standard", ("realtime",), None, "model_no_synthesis_mode"),
+        (True, "realtime", ("offline",), None, "model_no_synthesis_mode"),
+        (True, "realtime", (), None, "model_no_synthesis_mode"),
+        (True, "realtime", None, (), "tts_format_unsupported"),
+        (True, "realtime", None, ("wav",), "tts_format_unsupported"),
+        (False, "invalid", None, None, "tts_option_invalid"),
+    ],
+)
+def test_speech_mode_and_format_metadata(known, mode, modes, formats, expected):
+    """Only explicit metadata restricts a discovered speech model."""
+    model = MistralModel(
+        id="test-speech",
+        audio_speech=True,
+        audio_speech_modes=modes,
+        audio_speech_formats=formats,
+    )
+    assert speech_model_error(model, known, mode, "mp3") == expected
 
 
 @pytest.mark.parametrize(

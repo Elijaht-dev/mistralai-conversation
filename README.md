@@ -150,6 +150,33 @@ capability restrictions.
 TTS supports MP3, Opus, FLAC, WAV and raw PCM. Select a preset or saved custom
 voice, or enter its ID.
 
+Each TTS entity has an explicit **Synthesis mode**:
+
+| Mode | Behavior |
+| --- | --- |
+| Standard (default) | Send the complete text through HTTP and return the complete audio; supports loudness normalization |
+| Realtime | Send text as it arrives over a WebSocket and return audio progressively through Home Assistant's streaming TTS interface |
+
+To use Realtime, reconfigure or add a TTS entity, select a compatible model and
+an explicit voice, and disable **Normalize speech loudness**. New and existing
+entities keep Standard until changed. The mode is configured per entity;
+`normalize_audio: true` is rejected in Realtime, including per-call overrides.
+Discovered model mode/format restrictions are checked before synthesis. Custom
+model and voice IDs remain configurable; Mistral must accept them on the chosen
+endpoint. A rejected voice is never replaced automatically.
+
+Realtime uses one connection per request and sends the original text deltas,
+including spaces. Failures stop the stream without retrying through Standard.
+Audio already played cannot be withdrawn after a late failure. Playback latency
+also depends on Home Assistant's conversion, the player and the satellite;
+streaming does not guarantee immediate playback on every device. Standalone TTS
+keeps the usual STT → Conversation → TTS pipeline.
+
+Home Assistant handles satellite sample-rate, channel and sample-width
+conversion from container formats such as WAV. Mistral's raw PCM is mono,
+24 kHz, float32 little-endian; it is not Assist's 16-bit PCM input format.
+Prefer a container format when Home Assistant must convert the audio.
+
 New entities enable **Normalize speech loudness** at **-16 LUFS**. The target
 accepts whole numbers from -24 to -12 LUFS. Existing entities retain their
 normalization settings.
@@ -171,6 +198,8 @@ data:
 Use `normalize_audio: false` to request the original provider audio.
 Normalization errors return a translated error. Processing limits are listed
 in [QUALITY.md](QUALITY.md#limits).
+The existing two-pass normalization requires the full clip and is available in
+Standard mode. Dynamic normalization during Realtime playback is not included.
 
 ## Data and control
 

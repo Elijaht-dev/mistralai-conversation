@@ -29,14 +29,17 @@ cancellation and unload release owned resources without closing HA's shared
 transport. SDK construction, synchronous cleanup and blocking media work run
 in the executor. Services and SDK imports are prepared before requests.
 
-Realtime uses a separate verified WebSocket per request. Session configuration
-must be acknowledged before audio upload. Upload and response tasks are
-supervised and cancelled on failure or entity removal.
+Realtime STT and TTS use a separate verified WebSocket per request. Session
+configuration must be acknowledged before input upload. Input and response
+tasks are supervised and cancelled on failure or entity removal. TTS also
+closes requests when its audio generator is closed, including paused consumers.
 
 Configuration migration 1.5 preserves explicit model choices and materializes
 previous implicit defaults before new entities adopt Voxtral 3 and Large 4.
 Saved voices and normalization options are preserved; TTS requires an explicit
 voice selection.
+Configuration migration 1.6 materializes Standard synthesis mode for existing
+TTS entities without changing models, voices, audio options or subentry IDs.
 
 ### Models, conversation and tools
 
@@ -68,6 +71,34 @@ Gain and peaks are bounded; silence and short/unmeasurable clips are not
 amplified. Audio stays in process pipes. Timeout, cancellation and unload reap
 subprocesses. Normalization failure does not return unprocessed audio or mark
 the provider unavailable. Resampling and lossy encoding can shift decoded peaks.
+
+TTS Standard preserves the buffered HTTP path. Explicit Realtime mode bridges
+HA's incremental text/audio interface to the official SDK speech protocol in
+`responsive` mode. It requires normalization to be disabled, including service
+overrides. Known speech modes and output formats are validated against discovery;
+missing metadata does not prohibit custom models. Voice selection is explicit.
+
+Realtime TTS validates its session acknowledgement, decodes each base64 delta
+strictly, and requires a final speech event after input completion. It then closes
+the one-generation connection from the client side, following the SDK contract;
+the provider may end TCP without a WebSocket close frame after its final event.
+Missing or premature final events still fail closed. A coalescing byte buffer
+decouples protocol reads from a slow HA converter or audio consumer. It is
+bounded by the cumulative 25 MiB output limit; fast readers receive audio
+immediately. The WebSocket frame queue is also bounded. Text/audio limits are
+cumulative and the request deadline runs independently of consumer speed. Provider failures
+never cause an HTTP retry. A late failure invalidates the result but cannot
+withdraw already played audio. Protocol errors contain only integration-owned
+messages; provider event payloads and close-frame reasons are not logged.
+WebSocket control frames and keepalive continue to be processed while HA's audio
+consumer is paused. The overall 300-second deadline still closes stalled
+provider requests independently of the consumer.
+
+Container audio allows HA to convert for satellite playback. Raw Mistral PCM
+remains float32 little-endian mono at 24 kHz and must not be labelled as Assist
+16-bit PCM. Local TLS and mocked incremental-stream tests cover transport and
+HA conversion; a physical satellite and measured playback latency are separate
+release validation requirements.
 
 Image generation uses Mistral's Conversations API with only the image-generation
 tool and `store=False`. It creates no saved agent. Known models must advertise
@@ -138,6 +169,56 @@ checksum-verified libjpeg-turbo 3.2.1. Setup and commands are in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Recorded validation
+
+### Version 1.0.0
+
+Automated validation completed on 2026-11-06 under Python 3.14.7 with Mistral
+SDK 3.7.0. Ruff formatting/lint, strict mypy on the primary baseline, dependency
+checks, translation parity and offline HACS validation passed.
+
+| Home Assistant | HTTPX2 | Tests passed | Total coverage | Branch coverage |
+| --- | --- | --- | --- | --- |
+| 2026.11.0 | 2.14.0 | 580 | 94.69% | 90.00% |
+| 2026.10.4 | 2.14.0 | 580 | 94.69% | 90.00% |
+| 2026.7.4 | 2.14.0 | 580 | 94.82% | 90.13% |
+| 2026.10.4 | 2.16.0 | 580 | 94.69% | 90.00% |
+| 2026.7.4 | 2.16.0 | 580 | 94.82% | 90.13% |
+
+Automated checks use synthetic audio, mocked provider events and a local TLS
+server. They cover incremental delivery, WAV conversion for satellite formats,
+TCP termination after the final speech event, and heartbeat handling with a slow
+audio consumer. Truncated streams without a final event still fail closed.
+
+A real HA 2026.11.0 instance was backed up, configuration-checked and fully
+restarted with the candidate. Migration 1.6 preserved saved models, voices,
+normalization settings, subentry IDs and pipelines. All 25 installed runtime
+files matched the validated candidate.
+
+| Live check | Result |
+| --- | --- |
+| Conversation and follow-ups after one/two local intents | Passed |
+| Read-only Assist tool round trip and structured AI Task | Passed |
+| Synthetic batch STT and Realtime STT cancellation/recovery | Passed |
+| Standard TTS generation and retrieval without playback | Passed |
+| Realtime TTS through a native Assist pipeline and standalone retrieval | Passed |
+| Complete realtime audio decoded with FFmpeg | Passed |
+| Provider TTS incremental input, cancellation and recovery | Passed |
+| Image generation and reference-image retrieval | Not revalidated: account HTTP 429 rate limit |
+
+In the final synthetic Assist check, the first audio bytes arrived 4.95 seconds
+after the request, before intent processing finished at 8.45 seconds. Complete
+audio retrieval took 38.20 seconds. These are API-stream measurements from one
+request, not physical playback latency or a general performance guarantee.
+
+Temporary entities and pipelines were removed. The final candidate's observed
+integration logs contained no warning/error or blocking-call lines. Physical
+microphone, satellite and speaker behavior was not tested.
+
+Live image requests, including direct SDK checks, hit the Mistral account's
+HTTP 429 rate limit. No successful image/reference round trip is claimed for
+1.0.0; the last successful live image validation remains recorded under 0.6.0.
+
+### Version 0.6.0
 
 Validation for 0.6.0, including SDK 3 and image URL support, was performed on
 2026-11-05 under Python 3.14:

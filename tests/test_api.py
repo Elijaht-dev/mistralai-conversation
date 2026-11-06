@@ -11,7 +11,12 @@ from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 import httpx2
 import pytest
 from homeassistant.core import HomeAssistant
-from mistralai.client.models import BaseModelCard, FTModelCard, ModelCapabilities
+from mistralai.client.models import (
+    AudioSpeechCapabilities,
+    BaseModelCard,
+    FTModelCard,
+    ModelCapabilities,
+)
 
 from custom_components.mistral_conversation.api import (
     MistralClientResources,
@@ -367,6 +372,9 @@ async def test_audio_model_discovery_retains_capabilities():
                 BaseModelCard(
                     id="voice",
                     aliases=["voice-latest"],
+                    audio_speech_capabilities=AudioSpeechCapabilities(
+                        modes=["offline", "realtime"], response_formats=["mp3", "wav"]
+                    ),
                     capabilities=ModelCapabilities(
                         completion_chat=False,
                         audio_transcription=True,
@@ -385,6 +393,8 @@ async def test_audio_model_discovery_retains_capabilities():
         and model.audio_speech
     )
     assert model.matches("voice-latest")
+    assert model.audio_speech_modes == ("offline", "realtime")
+    assert model.audio_speech_formats == ("mp3", "wav")
 
 
 async def test_validate_api_key_closes_client(

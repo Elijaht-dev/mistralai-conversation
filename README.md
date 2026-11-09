@@ -106,6 +106,50 @@ and spoken replies remain available for later conversation turns.
 AI Task supports plain text and structured data using native JSON-schema
 output. Compatible models also accept image and PDF attachments.
 
+#### Evaluate questions
+
+On Home Assistant 2026.11 or newer, the existing AI Task entity also supports
+`ai_task.evaluate`. It uses the configured data model and its settings. Supply
+`state` as text or structured data, add media through the action's
+`attachments` field, or provide both. Compatible models can evaluate camera
+snapshots, other supported images, and PDFs.
+
+```yaml
+action: ai_task.evaluate
+data:
+  entity_id: ai_task.mistral_ai_task
+  task_name: Check room comfort
+  state:
+    temperature_c: 27
+  questions:
+    warm:
+      type: noul
+      instructions: Is the room warmer than 25 degrees Celsius?
+    comfort:
+      type: choice
+      instructions: Which temperature range fits?
+      criteria:
+        comfortable: At most 25 degrees Celsius
+        warm: Above 25 degrees Celsius
+    warmth:
+      type: score
+      instructions: Rate the room temperature using these levels.
+      criteria:
+        - Below 20 degrees Celsius
+        - 20 to 25 degrees Celsius
+        - Above 25 degrees Celsius
+response_variable: evaluation
+```
+
+Read `evaluation.answers.warm.noul` for the probability of yes,
+`evaluation.answers.comfort.choice` for the most likely criterion, and
+`evaluation.answers.warmth.score` for the expected level index starting at
+zero. Choice and score answers also include `probabilities`. These values are
+model estimates. Omit `entity_id` to use Home Assistant's preferred evaluation
+entity.
+
+#### Generate an image
+
 The same entity provides `ai_task.generate_image`. Its independent image-tool
 model interprets instructions and reference images; Mistral manages the
 underlying image generator.
@@ -209,8 +253,9 @@ Standard mode. Dynamic normalization during Realtime playback is not included.
 
 ## Data and control
 
-Prompts, relevant history, exposed tool schemas/results, attachments, recordings
-and text for speech generation are sent to Mistral AI. API use may incur charges.
+Prompts, relevant history, exposed tool schemas/results, evaluation state and
+questions, attachments, recordings, and text for speech generation are sent to
+Mistral AI. API use may incur charges.
 Home Assistant stores API keys and redacts them from integration diagnostics.
 Request traces exclude prompts, attachments, recordings, transcripts and audio.
 

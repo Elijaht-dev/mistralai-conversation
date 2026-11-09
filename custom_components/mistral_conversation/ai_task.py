@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Coroutine
 from json import JSONDecodeError
 from pathlib import Path
-from typing import override
+from typing import Any, override
 
 import httpx2
 from homeassistant.components import ai_task, conversation
@@ -14,6 +15,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util.json import json_loads
+from homeassistant.util.ulid import ulid_now
 from mistralai.client.errors import MistralError, NoResponseError
 
 from .const import (
@@ -26,6 +28,12 @@ from .const import (
 from .coordinator import MistralConfigEntry
 from .entity import MistralBaseEntity, async_prepare_image_attachments
 from .errors import ImageDownloadError
+from .evaluation import (
+    EVALUATION_PROMPT,
+    evaluation_schema,
+    evaluation_user_content,
+    parse_evaluation_response,
+)
 from .image import ImageGenerationError, async_generate_image
 
 PARALLEL_UPDATES = 0
@@ -47,12 +55,15 @@ async def async_setup_entry(
 
 
 class MistralAITaskEntity(ai_task.AITaskEntity, MistralBaseEntity):
-    """Generate Home Assistant AI Task data and images with Mistral."""
+    """Generate data and images and evaluate questions with Mistral."""
 
     _attr_supported_features = (
         ai_task.AITaskEntityFeature.GENERATE_DATA
         | ai_task.AITaskEntityFeature.SUPPORT_ATTACHMENTS
         | ai_task.AITaskEntityFeature.GENERATE_IMAGE
+        | getattr(
+            ai_task.AITaskEntityFeature, "EVALUATE", ai_task.AITaskEntityFeature(0)
+        )
     )
     _attr_translation_key = "ai_task_data"
 
@@ -65,18 +76,60 @@ class MistralAITaskEntity(ai_task.AITaskEntity, MistralBaseEntity):
             if isinstance(configured_model, str) and configured_model
             else DEFAULT_IMAGE_MODEL
         )
-        self._image_tasks: set[asyncio.Task[ai_task.GenImageTaskResult]] = set()
-        self._image_unloading = False
+        self._active_tasks: set[asyncio.Task[object]] = set()
+        self._unloading = False
 
     @override
     async def async_will_remove_from_hass(self) -> None:
         """Finish cancelling requests before the shared SDK client closes."""
-        self._image_unloading = True
-        tasks = tuple(self._image_tasks)
+        self._unloading = True
+        tasks = tuple(self._active_tasks)
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
         await super().async_will_remove_from_hass()
+
+    async def _async_track_request[T](self, operation: Coroutine[Any, Any, T]) -> T:
+        """Await a request and keep it visible to entity unload."""
+        request = asyncio.create_task(operation)
+        self._active_tasks.add(request)
+        try:
+            return await request
+        finally:
+            self._active_tasks.discard(request)
+
+    @override
+    async def _async_evaluate(
+        self, task: ai_task.EvaluationTask
+    ) -> ai_task.EvaluationTaskResult:
+        """Answer native Home Assistant evaluation questions."""
+        if self._unloading:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="evaluation_error"
+            )
+        return await self._async_track_request(self._async_run_evaluation(task))
+
+    async def _async_run_evaluation(
+        self, task: ai_task.EvaluationTask
+    ) -> ai_task.EvaluationTaskResult:
+        """Use the data model with a fresh, private chat log and no tool API."""
+        chat_log = conversation.ChatLog(
+            self.hass,
+            ulid_now(),
+            content=[
+                conversation.SystemContent(content=EVALUATION_PROMPT),
+                evaluation_user_content(task),
+            ],
+        )
+        try:
+            text = await self._async_handle_evaluation_chat_log(
+                chat_log, evaluation_schema(task.questions)
+            )
+        except OSError:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="evaluation_error"
+            ) from None
+        return parse_evaluation_response(text, task.questions)
 
     @override
     async def _async_generate_image(
@@ -85,17 +138,14 @@ class MistralAITaskEntity(ai_task.AITaskEntity, MistralBaseEntity):
         chat_log: conversation.ChatLog,
     ) -> ai_task.GenImageTaskResult:
         """Supervise an image request throughout the entity lifecycle."""
-        if self._image_unloading:
+        if self._unloading:
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="image_generation_error",
             )
-        request = asyncio.create_task(self._async_run_image_task(task, chat_log))
-        self._image_tasks.add(request)
-        try:
-            return await request
-        finally:
-            self._image_tasks.discard(request)
+        return await self._async_track_request(
+            self._async_run_image_task(task, chat_log)
+        )
 
     async def _async_run_image_task(
         self,

@@ -58,7 +58,7 @@
           "data": {
             "image_model": "Modèle pilotant l’outil de génération d’images",
             "max_tokens": "Nombre maximal de jetons de réponse",
-            "model": "Modèle pour la génération de données",
+            "model": "Modèle pour les tâches de données",
             "name": "Nom",
             "reasoning_effort": "Raisonnement",
             "safe_prompt": "Activer le message de sécurité Mistral",
@@ -66,14 +66,14 @@
           },
           "data_description": {
             "image_model": "Choisissez le modèle Mistral qui interprète vos instructions et références, puis appelle l’outil de génération d’images. Ce réglage ne sélectionne pas le moteur qui produit l’image. Il est indépendant du modèle de génération de données et accepte les identifiants personnalisés.",
-            "max_tokens": "Nombre maximal de jetons que Mistral peut générer pour les tâches de données. L'entrée et la sortie doivent tenir ensemble dans la fenêtre de contexte du modèle.",
-            "model": "Choisissez un modèle pour générer des données ou saisissez l'identifiant d'un modèle personnalisé ou affiné.",
+            "max_tokens": "Nombre maximal de jetons que Mistral peut générer pour les tâches de données et d’évaluation. L’entrée et la sortie doivent tenir ensemble dans la fenêtre de contexte du modèle.",
+            "model": "Choisissez le modèle pour la génération de données et l’évaluation. Vous pouvez saisir l’identifiant d’un modèle personnalisé ou affiné.",
             "name": "Nom affiché pour cette entité de tâche IA dans Home Assistant.",
-            "reasoning_effort": "Pour les tâches de données uniquement. Automatique utilise le réglage du fournisseur. Les modèles au raisonnement fixe appliquent leur seul comportement possible à l’enregistrement.",
-            "safe_prompt": "Pour les tâches de données uniquement. Demander à Mistral d'ajouter son message de sécurité avant la tâche.",
-            "temperature": "Pour les tâches de données uniquement. Une valeur faible donne des réponses plus prévisibles ; une valeur élevée les rend plus variées."
+            "reasoning_effort": "Pour les tâches de données et d’évaluation. Automatique utilise le réglage du fournisseur. Les modèles au raisonnement fixe appliquent leur seul comportement possible à l’enregistrement.",
+            "safe_prompt": "Pour les tâches de données et d’évaluation. Demander à Mistral d’ajouter son message de sécurité avant la tâche.",
+            "temperature": "Pour les tâches de données et d’évaluation. Une valeur faible rend les réponses plus prévisibles. Une valeur élevée les rend plus variées."
           },
-          "description": "Configurez Mistral pour générer des données et des images avec les tâches IA de Home Assistant. Les tâches de données acceptent les images et PDF sur les modèles compatibles. Les tâches d’images acceptent des images de référence.",
+          "description": "Configurez Mistral pour les tâches IA de Home Assistant. Les tâches de données et d’évaluation acceptent les images et les PDF sur les modèles compatibles. L’évaluation nécessite Home Assistant 2026.11 ou une version ultérieure. Les tâches d’images acceptent des images de référence.",
           "title": "Tâche IA Mistral"
         }
       }
@@ -239,6 +239,15 @@
     },
     "empty_response": {
       "message": "Mistral AI a renvoyé une réponse vide."
+    },
+    "evaluation_error": {
+      "message": "L’évaluation n’a pas pu aboutir."
+    },
+    "evaluation_response_invalid": {
+      "message": "Mistral AI a renvoyé une évaluation non valide ou incomplète."
+    },
+    "evaluation_state_invalid": {
+      "message": "L’état à évaluer doit être une valeur JSON valide."
     },
     "image_attachment_unsupported": {
       "message": "Les images de référence pour la génération doivent être au format PNG, JPEG, GIF ou WebP."

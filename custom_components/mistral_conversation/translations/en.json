@@ -58,7 +58,7 @@
           "data": {
             "image_model": "Model for the image-generation tool",
             "max_tokens": "Maximum response tokens",
-            "model": "Model for data generation",
+            "model": "Model for data tasks",
             "name": "Name",
             "reasoning_effort": "Reasoning",
             "safe_prompt": "Enable Mistral safety prompt",
@@ -66,14 +66,14 @@
           },
           "data_description": {
             "image_model": "Choose the Mistral model that interprets your instructions and references, then calls the image-generation tool. This does not select the underlying image generator. The setting is independent of the data-generation model and accepts custom model IDs.",
-            "max_tokens": "Maximum tokens Mistral may generate for data tasks. Input and output together must fit within the model's context window.",
-            "model": "Choose a model for data generation or enter a custom or fine-tuned model ID.",
+            "max_tokens": "Maximum tokens Mistral may generate for data and evaluation tasks. Input and output together must fit within the model's context window.",
+            "model": "Choose the model for data generation and evaluation. You can enter a custom or fine-tuned model ID.",
             "name": "Name shown for this AI Task entity in Home Assistant.",
-            "reasoning_effort": "For data tasks only. Automatic uses the provider's default. Models with fixed reasoning apply their only supported behavior when saved.",
-            "safe_prompt": "For data tasks only. Ask Mistral to inject its safety prompt before the task.",
-            "temperature": "For data tasks only. Lower values are more predictable; higher values are more varied."
+            "reasoning_effort": "For data and evaluation tasks. Automatic uses the provider's default. Models with fixed reasoning apply their only supported behavior when saved.",
+            "safe_prompt": "For data and evaluation tasks. Ask Mistral to inject its safety prompt before the task.",
+            "temperature": "For data and evaluation tasks. Lower values make replies more predictable. Higher values increase variation."
           },
-          "description": "Configure Mistral for Home Assistant AI Task data and image generation. Data tasks can receive image and PDF attachments on compatible models. Image tasks can receive image references.",
+          "description": "Configure Mistral for Home Assistant AI Task. Data and evaluation tasks can use image and PDF attachments on compatible models. Evaluation requires Home Assistant 2026.11 or newer. Image tasks can use image references.",
           "title": "Mistral AI Task"
         }
       }
@@ -239,6 +239,15 @@
     },
     "empty_response": {
       "message": "Mistral AI returned an empty response."
+    },
+    "evaluation_error": {
+      "message": "The evaluation could not be completed."
+    },
+    "evaluation_response_invalid": {
+      "message": "Mistral AI returned an invalid or incomplete evaluation."
+    },
+    "evaluation_state_invalid": {
+      "message": "The evaluation state must be a valid JSON value."
     },
     "image_attachment_unsupported": {
       "message": "Image generation references must be PNG, JPEG, GIF, or WebP images."

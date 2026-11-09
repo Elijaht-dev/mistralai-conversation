@@ -11,6 +11,7 @@ from collections.abc import (
     Iterator,
     Sequence,
 )
+from contextlib import aclosing
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Never, cast
@@ -91,6 +92,8 @@ from .tool_calls import ToolCallAccumulator, ToolCallDecodeError
 
 if TYPE_CHECKING:
     import probatio as vol
+    from homeassistant.util.json import JsonObjectType
+    from mistralai.client.utils.eventstreaming import EventStreamAsync
 else:
     # Keep schema annotations compatible with Home Assistant's runtime alias.
     import voluptuous as vol
@@ -308,6 +311,8 @@ async def _transform_stream(  # noqa: PLR0912
     chat_log: conversation.ChatLog,
     stream: AsyncIterable[CompletionEvent],
     state: MistralStreamState,
+    *,
+    text_only: bool = False,
 ) -> AsyncGenerator[conversation.AssistantContentDeltaDict]:
     """Transform Mistral streaming events into Home Assistant deltas."""
     tool_calls = ToolCallAccumulator()
@@ -335,6 +340,14 @@ async def _transform_stream(  # noqa: PLR0912
                 translation_domain=DOMAIN,
                 translation_key="stream_error",
             )
+        if text_only and (
+            choice.delta.tool_calls
+            or choice.finish_reason in ("length", "model_length", "tool_calls")
+        ):
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="evaluation_response_invalid",
+            )
 
         delta_content = choice.delta.content
         if isinstance(delta_content, str):
@@ -346,7 +359,7 @@ async def _transform_stream(  # noqa: PLR0912
                 if isinstance(chunk, TextChunk) and chunk.text:
                     state.has_output = True
                     yield {"content": chunk.text}
-                elif isinstance(chunk, ThinkChunk):
+                elif isinstance(chunk, ThinkChunk) and not text_only:
                     native_content.add_chunk(chunk)
                     for thinking_text in _thinking_text(chunk):
                         state.has_output = True
@@ -623,7 +636,7 @@ class MistralBaseEntity(CoordinatorEntity[MistralCoordinator]):
         self,
         chat_log: conversation.ChatLog,
         structure_name: str | None = None,
-        structure: vol.Schema | None = None,
+        structure: vol.Schema | JsonObjectType | None = None,
     ) -> MistralRequest:
         """Build and validate the first provider request."""
         if not chat_log.content or not isinstance(
@@ -703,15 +716,18 @@ class MistralBaseEntity(CoordinatorEntity[MistralCoordinator]):
 
         response_format: ResponseFormat | None = None
         if structure is not None:
-            schema = _to_openapi(
-                structure,
-                custom_serializer=(
-                    chat_log.llm_api.custom_serializer
-                    if chat_log.llm_api
-                    else llm.selector_serializer
-                ),
-            )
-            _adjust_structured_output_schema(schema)
+            if isinstance(structure, dict):
+                schema: dict[str, Any] = structure
+            else:
+                schema = _to_openapi(
+                    structure,
+                    custom_serializer=(
+                        chat_log.llm_api.custom_serializer
+                        if chat_log.llm_api
+                        else llm.selector_serializer
+                    ),
+                )
+                _adjust_structured_output_schema(schema)
             response_format = ResponseFormat(
                 type="json_schema",
                 json_schema=JSONSchema(
@@ -794,6 +810,67 @@ class MistralBaseEntity(CoordinatorEntity[MistralCoordinator]):
             translation_placeholders={"message": message},
         ) from err
 
+    async def _async_open_chat_stream(
+        self, request: MistralRequest
+    ) -> EventStreamAsync[CompletionEvent]:
+        """Send a validated request through the shared SDK client."""
+        return await self.coordinator.client.chat.stream_async(
+            model=request.model,
+            messages=request.messages,
+            max_tokens=request.max_tokens,
+            temperature=request.temperature,
+            safe_prompt=request.safe_prompt,
+            prompt_cache_key=request.prompt_cache_key,
+            reasoning_effort=request.reasoning_effort,
+            response_format=request.response_format,
+            tools=request.tools or None,
+            tool_choice="auto" if request.tools else None,
+            parallel_tool_calls=bool(request.tools),
+            timeout_ms=REQUEST_TIMEOUT_MS,
+        )
+
+    async def _async_handle_evaluation_chat_log(
+        self, chat_log: conversation.ChatLog, schema: JsonObjectType
+    ) -> str:
+        """Collect evaluation text without publishing conversation deltas or tools."""
+        request = await self._async_build_request(
+            chat_log,
+            structure_name="home_assistant_evaluation",
+            structure=schema,
+        )
+        try:
+            async with (
+                await self._async_open_chat_stream(request) as stream,
+                aclosing(
+                    _transform_stream(
+                        chat_log, stream, MistralStreamState(), text_only=True
+                    )
+                ) as deltas,
+            ):
+                text = "".join(
+                    [part async for delta in deltas if (part := delta.get("content"))]
+                )
+        except (MistralError, NoResponseError, httpx2.HTTPError, TimeoutError) as err:
+            translation_key, _ = await self._async_process_api_error(err)
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key=translation_key,
+                translation_placeholders={"message": "Evaluation request failed"},
+            ) from None
+        except UnicodeError:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="stream_error",
+            ) from None
+
+        if not text.strip():
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="empty_response",
+            )
+        self.coordinator.async_set_updated_data(self.coordinator.data or [])
+        return text
+
     async def _async_handle_chat_log(
         self,
         chat_log: conversation.ChatLog,
@@ -811,20 +888,7 @@ class MistralBaseEntity(CoordinatorEntity[MistralCoordinator]):
         for _iteration in range(max_iterations):
             stream_state = MistralStreamState()
             try:
-                stream = await self.coordinator.client.chat.stream_async(
-                    model=request.model,
-                    messages=request.messages,
-                    max_tokens=request.max_tokens,
-                    temperature=request.temperature,
-                    safe_prompt=request.safe_prompt,
-                    prompt_cache_key=request.prompt_cache_key,
-                    reasoning_effort=request.reasoning_effort,
-                    response_format=request.response_format,
-                    tools=request.tools or None,
-                    tool_choice="auto" if request.tools else None,
-                    parallel_tool_calls=bool(request.tools),
-                    timeout_ms=REQUEST_TIMEOUT_MS,
-                )
+                stream = await self._async_open_chat_stream(request)
                 new_contents = [
                     content
                     async for content in chat_log.async_add_delta_content_stream(

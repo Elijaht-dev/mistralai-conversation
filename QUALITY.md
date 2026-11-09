@@ -57,6 +57,14 @@ TTS entities without changing models, voices, audio options or subentry IDs.
   while preserving user messages, replies and ordinary tool exchanges.
   Home Assistant's original chat log is not modified.
 - Structured AI Task data uses native JSON-schema output.
+- AI Task evaluation is available on HA 2026.11 or newer and uses the entity's
+  configured data model. Each request runs without tools or shared chat history.
+  Evaluation uses native JSON-schema output and validates the complete set of
+  answers and probabilities locally. Choice and score are derived from the
+  returned distributions. Probabilities are model estimates.
+- The integration keeps evaluation inputs and replies out of its logs and
+  conversation history. Provider failures use translated errors without provider
+  text. Cancellation and unload close active evaluation streams.
 
 ### Voice and image handling
 
@@ -304,7 +312,8 @@ Before a feature or SDK release:
 2. Back up a real instance, verify installed files, validate configuration and
    perform a full restart.
 3. Verify Conversation, local-intent follow-ups, a read-only tool round trip,
-   structured AI Task, batch STT, Realtime cancellation/recovery and TTS retrieval.
+   structured AI Task, evaluation on HA 2026.11+, batch STT, Realtime
+   cancellation/recovery and TTS retrieval.
 4. For image generation, verify a text request, a reference image and HA media
    retrieval. For Files API results, confirm provider deletion and failed
    retrieval after deletion. For URL-only results, verify the approved storage

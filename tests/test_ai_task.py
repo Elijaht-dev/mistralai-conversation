@@ -49,12 +49,16 @@ async def test_generate_unstructured_data(
         if subentry.subentry_type == SUBENTRY_TYPE_AI_TASK
     )
     assert entity_entry.config_subentry_id == ai_task_subentry.subentry_id
-    assert (
-        entity_entry.supported_features
-        == ai_task.AITaskEntityFeature.GENERATE_DATA
+    features = (
+        ai_task.AITaskEntityFeature.GENERATE_DATA
         | ai_task.AITaskEntityFeature.SUPPORT_ATTACHMENTS
         | ai_task.AITaskEntityFeature.GENERATE_IMAGE
     )
+    has_evaluate = hasattr(ai_task.AITaskEntityFeature, "EVALUATE")
+    if has_evaluate:
+        features |= ai_task.AITaskEntityFeature.EVALUATE
+    assert entity_entry.supported_features == features
+    assert hass.services.has_service(ai_task.DOMAIN, "evaluate") is has_evaluate
 
 
 async def test_generate_structured_data_uses_native_json_schema(

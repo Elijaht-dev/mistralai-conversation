@@ -5,6 +5,14 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-09
+
+### Added
+
+- Support `ai_task.evaluate` on existing Mistral AI Task entities on Home Assistant
+  2026.11 or newer. Evaluate state and attachments with yes/no probability,
+  choice, and score questions using the configured data model.
+
 ## [1.0.2] - 2026-11-07
 
 ### Changed
@@ -360,7 +368,9 @@ The beta was checked on HA 2026.8.6 and 2026.9.0 before the stable release.
 - Capability checks, model repairs, reauthentication, diagnostics and migrations.
 - English/French translations and automated quality, HACS and Hassfest checks.
 
-[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v1.0.2...v1.1.0
+[1.0.2]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.6.0...v1.0.0
 [0.6.0]: https://github.com/Elijaht-dev/mistralai-conversation/compare/v0.5.5...v0.6.0

@@ -22,6 +22,7 @@ from .const import (
     CONF_SYNTHESIS_MODE,
     CONF_TARGET_LOUDNESS,
     CONF_TEMPERATURE,
+    CONF_TRANSCRIPTION_LANGUAGE,
     CONF_TRANSCRIPTION_MODE,
     DEFAULT_AI_TASK_NAME,
     DEFAULT_AI_TASK_OPTIONS,
@@ -268,15 +269,28 @@ async def async_migrate_entry(
             hass.config_entries.async_update_subentry(entry, subentry, data=data)
         hass.config_entries.async_update_entry(entry, minor_version=4)
 
-    if entry.minor_version < 5:
-        _migrate_model_defaults(hass, entry)
-        hass.config_entries.async_update_entry(entry, minor_version=5)
-
-    if entry.minor_version < 6:
-        _migrate_synthesis_mode(hass, entry)
-        hass.config_entries.async_update_entry(entry, minor_version=6)
+    for minor_version, migrate in (
+        (5, _migrate_model_defaults),
+        (6, _migrate_synthesis_mode),
+        (7, _migrate_transcription_language),
+    ):
+        if entry.minor_version < minor_version:
+            migrate(hass, entry)
+            hass.config_entries.async_update_entry(entry, minor_version=minor_version)
 
     return True
+
+
+def _migrate_transcription_language(
+    hass: HomeAssistant, entry: MistralConfigEntry
+) -> None:
+    """Preserve the mode-dependent language behavior of existing STT entities."""
+    for subentry in entry.subentries.values():
+        if subentry.subentry_type != SUBENTRY_TYPE_STT:
+            continue
+        data = dict(subentry.data)
+        data.setdefault(CONF_TRANSCRIPTION_LANGUAGE, "legacy")
+        hass.config_entries.async_update_subentry(entry, subentry, data=data)
 
 
 def _migrate_synthesis_mode(hass: HomeAssistant, entry: MistralConfigEntry) -> None:

@@ -179,14 +179,24 @@ STT accepts mono, 16-bit, 16 kHz PCM from Assist.
 | Transcription mode | Behavior |
 | --- | --- |
 | Automatic | Use discovered capabilities, then documented model IDs; unknown IDs use Batch |
-| Batch | Buffer one recording, add a WAV header and send the pipeline language |
+| Batch | Buffer one recording, add a WAV header and send it to the file endpoint |
 | Realtime | Send audio during capture through the WebSocket endpoint |
 
 Mini Transcribe 3 and Small Transcribe 3 use the file transcription endpoint.
 This Batch mode processes one Assist recording per request.
 
-Realtime uses automatic language detection. Assist determines when speech ends,
-and the integration waits for the final transcript before starting the
+Each STT entity has a **Transcription language** setting for both modes. New
+entities **Follow Assist pipeline** by default. Choose **Automatic detection**
+to let Voxtral detect the spoken language, or select a fixed language to override
+the pipeline language. Regional pipeline locales such as `fr-FR` are sent as
+two-letter codes such as `fr`.
+
+Existing entities keep **Default for transcription mode**: pipeline language in
+Batch and automatic detection in Realtime. This choice remains available until
+you select another language setting.
+
+Assist determines when speech ends, and the integration waits for the final
+transcript before starting the
 conversation agent. Turn-detection events do not discard trailing words.
 A failed Realtime request is not retried through Batch.
 

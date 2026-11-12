@@ -139,19 +139,22 @@
           "data": {
             "model": "Transcription model",
             "name": "Name",
-            "transcription_mode": "Transcription mode"
+            "transcription_mode": "Transcription mode",
+            "transcription_language": "Transcription language"
           },
           "data_description": {
             "model": "Choose a Voxtral model or enter a custom ID. New entities use Realtime 3.",
             "name": "Name shown for this speech-to-text entity in Home Assistant.",
-            "transcription_mode": "Automatic uses known model capabilities; unknown models use Batch. Choose Batch or Realtime for a custom model."
+            "transcription_mode": "Automatic uses known model capabilities; unknown models use Batch. Choose Batch or Realtime for a custom model.",
+            "transcription_language": "Follow the Assist pipeline language, detect it automatically, or select a fixed language. Default for transcription mode preserves existing behavior: pipeline language in Batch, automatic detection in Realtime."
           },
           "description": "Configure Mistral transcription for Assist. Voice audio is sent to Mistral AI, during speech when using Realtime. Assist receives the final transcript when speech ends.",
           "title": "Mistral speech-to-text"
         }
       },
       "error": {
-        "model_no_transcription": "The selected model does not support this transcription mode."
+        "model_no_transcription": "The selected model does not support this transcription mode.",
+        "invalid_transcription_language": "Select a supported transcription language."
       }
     },
     "tts": {
@@ -407,6 +410,26 @@
       "options": {
         "standard": "Standard",
         "realtime": "Realtime"
+      }
+    },
+    "transcription_language": {
+      "options": {
+        "ar": "Arabic",
+        "de": "German",
+        "en": "English",
+        "es": "Spanish",
+        "fr": "French",
+        "hi": "Hindi",
+        "it": "Italian",
+        "ja": "Japanese",
+        "ko": "Korean",
+        "nl": "Dutch",
+        "pt": "Portuguese",
+        "ru": "Russian",
+        "zh": "Chinese",
+        "pipeline": "Follow Assist pipeline",
+        "auto": "Automatic detection",
+        "legacy": "Default for transcription mode"
       }
     }
   }

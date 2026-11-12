@@ -5,6 +5,12 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Select a transcription language per STT entity for Batch and Realtime:
+  follow the Assist pipeline, detect automatically, or choose a fixed language.
+  New entities follow Assist; existing entities retain their previous behavior.
+
 ## [1.1.0] - 2026-11-09
 
 ### Added

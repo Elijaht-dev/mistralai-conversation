@@ -14,7 +14,7 @@ from homeassistant.const import (
     CONF_PROMPT,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.data_entry_flow import FlowResultType, InvalidData
 from homeassistant.helpers import config_validation as cv
 from mistralai.client.errors import NoResponseError
 
@@ -27,6 +27,7 @@ from custom_components.mistral_conversation.const import (
     CONF_SYNTHESIS_MODE,
     CONF_TARGET_LOUDNESS,
     CONF_TEMPERATURE,
+    CONF_TRANSCRIPTION_LANGUAGE,
     CONF_TRANSCRIPTION_MODE,
     CONF_VOICE_ID,
     DEFAULT_AI_TASK_NAME,
@@ -517,6 +518,15 @@ async def test_create_stt_subentry(
         if getattr(marker, "schema", None) == CONF_MODEL
     )
     assert model_field.default() == REALTIME_STT_MODEL
+    language_selector = result["data_schema"].schema[CONF_TRANSCRIPTION_LANGUAGE]
+    assert "fr" in language_selector.config["options"]
+    assert "legacy" not in language_selector.config["options"]
+    language_field = next(
+        marker
+        for marker in result["data_schema"].schema
+        if getattr(marker, "schema", None) == CONF_TRANSCRIPTION_LANGUAGE
+    )
+    assert language_field.default() == "pipeline"
     result = await hass.config_entries.subentries.async_configure(
         result["flow_id"],
         {
@@ -530,6 +540,7 @@ async def test_create_stt_subentry(
     assert result["data"] == {
         CONF_MODEL: selected_model,
         CONF_TRANSCRIPTION_MODE: "auto",
+        CONF_TRANSCRIPTION_LANGUAGE: "pipeline",
     }
 
     subentry = next(
@@ -573,7 +584,95 @@ async def test_create_stt_subentry_with_default_model(
     assert result["data"] == {
         CONF_MODEL: REALTIME_STT_MODEL,
         CONF_TRANSCRIPTION_MODE: "auto",
+        CONF_TRANSCRIPTION_LANGUAGE: "pipeline",
     }
+
+
+@pytest.mark.parametrize("language", ["pipeline", "auto", "fr", "en"])
+async def test_stt_language_round_trip(
+    hass, mock_config_entry, mock_init_component, language
+):
+    """Language choices persist through creation, changes and omitted updates."""
+    result = await hass.config_entries.subentries.async_init(
+        (mock_config_entry.entry_id, SUBENTRY_TYPE_STT),
+        context={"source": config_entries.SOURCE_USER},
+    )
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        {CONF_NAME: "Language test", CONF_TRANSCRIPTION_LANGUAGE: language},
+    )
+    assert result["data"][CONF_TRANSCRIPTION_LANGUAGE] == language
+    subentry = next(
+        item
+        for item in mock_config_entry.subentries.values()
+        if item.title == "Language test"
+    )
+    for submitted, expected in [
+        ({}, language),
+        ({CONF_TRANSCRIPTION_LANGUAGE: "de"}, "de"),
+    ]:
+        result = await mock_config_entry.start_subentry_reconfigure_flow(
+            hass, subentry.subentry_id
+        )
+        assert (
+            "legacy"
+            not in result["data_schema"]
+            .schema[CONF_TRANSCRIPTION_LANGUAGE]
+            .config["options"]
+        )
+        result = await hass.config_entries.subentries.async_configure(
+            result["flow_id"], {CONF_NAME: "Language test", **submitted}
+        )
+        assert result["reason"] == "reconfigure_successful"
+        assert subentry.data[CONF_TRANSCRIPTION_LANGUAGE] == expected
+
+
+async def test_stt_legacy_language_only_offered_while_saved(
+    hass, mock_config_entry, mock_init_component
+):
+    """Existing entities retain mode defaults until explicitly changed."""
+    subentry = next(
+        item
+        for item in mock_config_entry.subentries.values()
+        if item.subentry_type == SUBENTRY_TYPE_STT
+    )
+    for language in ("legacy", "auto"):
+        result = await mock_config_entry.start_subentry_reconfigure_flow(
+            hass, subentry.subentry_id
+        )
+        selector = result["data_schema"].schema[CONF_TRANSCRIPTION_LANGUAGE]
+        assert "legacy" in selector.config["options"]
+        result = await hass.config_entries.subentries.async_configure(
+            result["flow_id"],
+            {CONF_NAME: subentry.title, CONF_TRANSCRIPTION_LANGUAGE: language},
+        )
+        assert result["reason"] == "reconfigure_successful"
+        assert subentry.data[CONF_TRANSCRIPTION_LANGUAGE] == language
+    result = await mock_config_entry.start_subentry_reconfigure_flow(
+        hass, subentry.subentry_id
+    )
+    assert (
+        "legacy"
+        not in result["data_schema"]
+        .schema[CONF_TRANSCRIPTION_LANGUAGE]
+        .config["options"]
+    )
+
+
+@pytest.mark.parametrize("language", ["legacy", "xx", "fr-FR", ""])
+async def test_stt_invalid_language_selection(
+    hass, mock_config_entry, mock_init_component, language
+):
+    """The public form rejects unsupported language codes and new legacy choices."""
+    result = await hass.config_entries.subentries.async_init(
+        (mock_config_entry.entry_id, SUBENTRY_TYPE_STT),
+        context={"source": config_entries.SOURCE_USER},
+    )
+    with pytest.raises(InvalidData):
+        await hass.config_entries.subentries.async_configure(
+            result["flow_id"],
+            {CONF_NAME: "Language test", CONF_TRANSCRIPTION_LANGUAGE: language},
+        )
 
 
 async def test_create_and_reconfigure_tts_subentry(
@@ -781,6 +880,7 @@ async def test_stt_custom_realtime_mode_round_trip(
     assert result["data"] == {
         CONF_MODEL: "ft:custom",
         CONF_TRANSCRIPTION_MODE: "realtime",
+        CONF_TRANSCRIPTION_LANGUAGE: "pipeline",
     }
     subentry = next(
         entry

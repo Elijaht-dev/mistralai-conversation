@@ -42,6 +42,7 @@ CONF_SAFE_PROMPT: Final = "safe_prompt"
 CONF_TEMPERATURE: Final = "temperature"
 CONF_VOICE_ID: Final = "voice_id"
 CONF_TRANSCRIPTION_MODE: Final = "transcription_mode"
+CONF_TRANSCRIPTION_LANGUAGE: Final = "transcription_language"
 CONF_SYNTHESIS_MODE: Final = "synthesis_mode"
 CONF_NORMALIZE_AUDIO: Final = "normalize_audio"
 CONF_TARGET_LOUDNESS: Final = "target_loudness"
@@ -102,10 +103,12 @@ DEFAULT_NEW_AI_TASK_OPTIONS = {
 DEFAULT_STT_OPTIONS = {
     CONF_MODEL: DEFAULT_STT_MODEL,
     CONF_TRANSCRIPTION_MODE: "auto",
+    CONF_TRANSCRIPTION_LANGUAGE: "legacy",
 }
 DEFAULT_NEW_STT_OPTIONS = {
     CONF_MODEL: REALTIME_STT_MODEL,
     CONF_TRANSCRIPTION_MODE: "auto",
+    CONF_TRANSCRIPTION_LANGUAGE: "pipeline",
 }
 
 DEFAULT_TTS_OPTIONS = {

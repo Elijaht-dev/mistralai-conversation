@@ -139,19 +139,22 @@
           "data": {
             "model": "Modèle de transcription",
             "name": "Nom",
-            "transcription_mode": "Mode de transcription"
+            "transcription_mode": "Mode de transcription",
+            "transcription_language": "Langue de transcription"
           },
           "data_description": {
             "model": "Choisissez un modèle Voxtral ou saisissez un identifiant personnalisé. Les nouvelles entités utilisent Realtime 3.",
             "name": "Nom affiché pour cette entité de reconnaissance vocale dans Home Assistant.",
-            "transcription_mode": "Automatique utilise les capacités connues du modèle ; les modèles inconnus utilisent Batch. Choisissez Batch ou Realtime pour un modèle personnalisé."
+            "transcription_mode": "Automatique utilise les capacités connues du modèle ; les modèles inconnus utilisent Batch. Choisissez Batch ou Realtime pour un modèle personnalisé.",
+            "transcription_language": "Suivez la langue du pipeline Assist, détectez-la automatiquement ou choisissez une langue fixe. Par défaut pour le mode de transcription conserve le comportement existant : langue du pipeline en Batch, détection automatique en Realtime."
           },
           "description": "Configurez la transcription Mistral pour Assist. L'audio vocal est envoyé à Mistral AI, pendant la parole avec Realtime. Assist reçoit la transcription finale à la fin de la phrase.",
           "title": "Reconnaissance vocale Mistral"
         }
       },
       "error": {
-        "model_no_transcription": "Le modèle sélectionné ne prend pas en charge ce mode de transcription."
+        "model_no_transcription": "Le modèle sélectionné ne prend pas en charge ce mode de transcription.",
+        "invalid_transcription_language": "Choisissez une langue de transcription prise en charge."
       }
     },
     "tts": {
@@ -407,6 +410,26 @@
       "options": {
         "standard": "Standard",
         "realtime": "Temps réel"
+      }
+    },
+    "transcription_language": {
+      "options": {
+        "ar": "Arabe",
+        "de": "Allemand",
+        "en": "Anglais",
+        "es": "Espagnol",
+        "fr": "Français",
+        "hi": "Hindi",
+        "it": "Italien",
+        "ja": "Japonais",
+        "ko": "Coréen",
+        "nl": "Néerlandais",
+        "pt": "Portugais",
+        "ru": "Russe",
+        "zh": "Chinois",
+        "pipeline": "Suivre la langue du pipeline Assist",
+        "auto": "Détection automatique",
+        "legacy": "Par défaut pour le mode de transcription"
       }
     }
   }

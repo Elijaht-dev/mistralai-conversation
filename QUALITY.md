@@ -40,6 +40,9 @@ Saved voices and normalization options are preserved; TTS requires an explicit
 voice selection.
 Configuration migration 1.6 materializes Standard synthesis mode for existing
 TTS entities without changing models, voices, audio options or subentry IDs.
+Configuration migration 1.7 materializes the legacy STT language setting:
+pipeline language in Batch and automatic detection in Realtime. Explicit saved
+language choices, model selections, modes and subentry IDs are preserved.
 
 ### Models, conversation and tools
 
@@ -73,6 +76,12 @@ modes cannot bypass known incompatibilities. Unknown IDs use Batch unless
 Realtime is selected. Assist owns end-of-speech; Realtime turn events are
 advisory and the final transcript is required. Failures do not trigger a retry
 through another endpoint.
+
+New STT entities follow the Assist pipeline language in both modes. Each entity
+can instead use automatic language detection or a fixed supported language.
+Invalid saved language settings fail before reading audio. Realtime sends the
+language through the SDK session update and requires acknowledgement of a pinned
+language before uploading audio; missing or mismatched values close the request.
 
 TTS normalization measures provider WAV audio and applies a second FFmpeg pass.
 Gain and peaks are bounded; silence and short/unmeasurable clips are not
@@ -182,6 +191,37 @@ checksum-verified libjpeg-turbo 3.2.1. Setup and commands are in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Recorded validation
+
+### Unreleased transcription language option
+
+Validated on 2026-11-12 under Python 3.14.7 with Mistral SDK 3.7.0 in an isolated
+checkout containing only the language feature. Formatting, lint, strict typing,
+dependency checks, translation parity and offline HACS validation passed.
+
+| Home Assistant | HTTPX2 | Tests passed / skipped | Total coverage | Branch coverage |
+| --- | --- | --- | --- | --- |
+| 2026.11.0 | 2.14.0 | 699 / 0 | 95.35% | 91.27% |
+| 2026.10.4 | 2.14.0 | 656 / 43 | 91.97% | 87.32% |
+| 2026.7.4 | 2.14.0 | 656 / 43 | 92.08% | 87.44% |
+| 2026.10.4 | 2.16.0 | 656 / 43 | 91.97% | 87.32% |
+| 2026.7.4 | 2.16.0 | 656 / 43 | 92.08% | 87.44% |
+
+The older HA baselines skip evaluation tests because that API requires HA
+2026.11. Tests cover language selection on both transports, locale normalization,
+automatic detection, legacy behavior, invalid settings, migration preservation
+and Realtime acknowledgement failures before audio upload.
+
+After verified backups and configuration checks, the candidate was installed
+and fully restarted on a real HA 2026.11.1 instance. All 27 runtime files matched
+the candidate. Migration 1.7 preserved existing settings, subentry IDs and Assist
+pipelines, with existing STT entities retaining the legacy language setting.
+Live synthetic Batch and Realtime STT requests returned provider HTTP 429 rate
+limits; successful live language selection is not claimed. Temporary STT
+entities were removed and the original configuration was verified. No unexpected
+integration warning/error or blocking-call lines were observed beyond these
+rate-limit warnings. Physical microphone and satellite behavior was not tested.
+The integration version remains 1.1.0; this candidate is not a new release.
+Public HACS/Hassfest CI remains required before publication.
 
 ### Version 1.0.2
 

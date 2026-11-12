@@ -50,6 +50,7 @@ from .const import (
     CONF_SYNTHESIS_MODE,
     CONF_TARGET_LOUDNESS,
     CONF_TEMPERATURE,
+    CONF_TRANSCRIPTION_LANGUAGE,
     CONF_TRANSCRIPTION_MODE,
     CONF_VOICE_ID,
     DEFAULT_AI_TASK_NAME,
@@ -93,6 +94,7 @@ from .model_catalog import (
     speech_model_error,
 )
 from .reasoning import fixed_reasoning_setting, reasoning_error, reasoning_options
+from .transcription import TRANSCRIPTION_LANGUAGES
 
 if TYPE_CHECKING:
     import probatio as vol
@@ -223,7 +225,7 @@ class MistralConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Mistral AI Conversation."""
 
     VERSION = 1
-    MINOR_VERSION = 6
+    MINOR_VERSION = 7
 
     @classmethod
     @callback
@@ -571,6 +573,13 @@ class STTSubentryFlowHandler(ConfigSubentryFlow):
 
         suggested = self.options
         errors: dict[str, str] = {}
+        language_options = list(TRANSCRIPTION_LANGUAGES)
+        default_language = "pipeline" if self._is_new else "legacy"
+        if (
+            not self._is_new
+            and self.options.get(CONF_TRANSCRIPTION_LANGUAGE, "legacy") == "legacy"
+        ):
+            language_options.append("legacy")
         if user_input is not None:
             data = user_input.copy()
             name = data.pop(CONF_NAME)
@@ -578,6 +587,10 @@ class STTSubentryFlowHandler(ConfigSubentryFlow):
                 CONF_MODEL, REALTIME_STT_MODEL if self._is_new else DEFAULT_STT_MODEL
             )
             data.setdefault(CONF_TRANSCRIPTION_MODE, "auto")
+            data.setdefault(
+                CONF_TRANSCRIPTION_LANGUAGE,
+                self.options.get(CONF_TRANSCRIPTION_LANGUAGE, default_language),
+            )
             model, known = cast(MistralConfigEntry, entry).runtime_data.get_model_info(
                 data[CONF_MODEL]
             )
@@ -587,6 +600,9 @@ class STTSubentryFlowHandler(ConfigSubentryFlow):
                 )
             except ValueError:
                 errors[CONF_MODEL] = "model_no_transcription"
+            if data[CONF_TRANSCRIPTION_LANGUAGE] not in language_options:
+                errors[CONF_TRANSCRIPTION_LANGUAGE] = "invalid_transcription_language"
+            if errors:
                 suggested = self.options | user_input
             else:
                 if self._is_new:
@@ -626,6 +642,18 @@ class STTSubentryFlowHandler(ConfigSubentryFlow):
                     SelectSelectorConfig(
                         options=["auto", "batch", "realtime"],
                         translation_key=CONF_TRANSCRIPTION_MODE,
+                        mode=SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Required(
+                    CONF_TRANSCRIPTION_LANGUAGE,
+                    default=suggested.get(
+                        CONF_TRANSCRIPTION_LANGUAGE, default_language
+                    ),
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        options=language_options,
+                        translation_key=CONF_TRANSCRIPTION_LANGUAGE,
                         mode=SelectSelectorMode.DROPDOWN,
                     )
                 ),

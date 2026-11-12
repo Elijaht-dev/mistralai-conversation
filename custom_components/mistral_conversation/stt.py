@@ -14,9 +14,11 @@ from homeassistant.config_entries import ConfigSubentry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from mistralai.client.errors import MistralError, NoResponseError
+from mistralai.client.types import UNSET
 
 from .api import async_transcribe_realtime
 from .const import (
+    CONF_TRANSCRIPTION_LANGUAGE,
     CONF_TRANSCRIPTION_MODE,
     LOGGER,
     MAX_STT_AUDIO_BYTES,
@@ -27,24 +29,9 @@ from .coordinator import MistralConfigEntry
 from .entity import MistralBaseEntity
 from .errors import RealtimeError
 from .model_catalog import resolve_transcription_transport
+from .transcription import SUPPORTED_STT_LANGUAGES, resolve_transcription_language
 
 PARALLEL_UPDATES = 0
-
-SUPPORTED_LANGUAGES = [
-    "ar-SA",
-    "de-DE",
-    "en-US",
-    "es-ES",
-    "fr-FR",
-    "hi-IN",
-    "it-IT",
-    "ja-JP",
-    "ko-KR",
-    "nl-NL",
-    "pt-PT",
-    "ru-RU",
-    "zh-CN",
-]
 
 
 async def async_setup_entry(
@@ -84,13 +71,15 @@ class MistralSTTEntity(stt.SpeechToTextEntity, MistralBaseEntity):
         await super().async_will_remove_from_hass()
 
     async def _async_process_realtime(
-        self, stream: AsyncIterable[bytes]
+        self, stream: AsyncIterable[bytes], language: str | None
     ) -> stt.SpeechResult:
         """Convert the typed provider boundary into an Assist result."""
         if self._removing:
             return stt.SpeechResult(None, stt.SpeechResultState.ERROR)
         task = asyncio.create_task(
-            async_transcribe_realtime(self.coordinator.client, self.model, stream)
+            async_transcribe_realtime(
+                self.coordinator.client, self.model, stream, language=language
+            )
         )
         self._realtime_tasks.add(task)
         try:
@@ -108,7 +97,7 @@ class MistralSTTEntity(stt.SpeechToTextEntity, MistralBaseEntity):
     @override
     def supported_languages(self) -> list[str]:
         """Return languages supported by Voxtral transcription."""
-        return SUPPORTED_LANGUAGES
+        return list(SUPPORTED_STT_LANGUAGES)
 
     @property
     @override
@@ -157,12 +146,24 @@ class MistralSTTEntity(stt.SpeechToTextEntity, MistralBaseEntity):
                 "Mistral STT model does not support the selected transcription mode"
             )
             return stt.SpeechResult(None, stt.SpeechResultState.ERROR)
+        try:
+            language = resolve_transcription_language(
+                self.subentry.data.get(CONF_TRANSCRIPTION_LANGUAGE, "legacy"),
+                metadata.language,
+                transport,
+            )
+        except ValueError:
+            LOGGER.warning("Mistral STT transcription language is invalid")
+            return stt.SpeechResult(None, stt.SpeechResultState.ERROR)
         if transport == "realtime":
-            return await self._async_process_realtime(stream)
-        return await self._async_process_batch(metadata, stream)
+            return await self._async_process_realtime(stream, language)
+        return await self._async_process_batch(metadata, stream, language)
 
     async def _async_process_batch(
-        self, metadata: stt.SpeechMetadata, stream: AsyncIterable[bytes]
+        self,
+        metadata: stt.SpeechMetadata,
+        stream: AsyncIterable[bytes],
+        language: str | None,
     ) -> stt.SpeechResult:
         """Wrap bounded raw Assist audio in the WAV container used by the file API."""
         audio_bytes = bytearray()
@@ -191,7 +192,7 @@ class MistralSTTEntity(stt.SpeechToTextEntity, MistralBaseEntity):
                         "content": wav_buffer.getvalue(),
                         "content_type": "audio/wav",
                     },
-                    language=metadata.language.partition("-")[0],
+                    language=language if language is not None else UNSET,
                     timeout_ms=REQUEST_TIMEOUT_MS,
                 )
             )

@@ -101,6 +101,32 @@ custom SDK efforts remain editable where supported.
 With **Prefer handling commands locally** enabled, locally handled commands
 and spoken replies remain available for later conversation turns.
 
+#### Prompt caching
+
+Conversation entities automatically send a stable Mistral prompt-cache key for
+each account, entity and configured model. This helps Mistral reuse matching
+system instructions and tool definitions across separate conversations as well
+as follow-up turns. No setting is needed.
+
+Every request still includes Home Assistant's complete prompt, tools and relevant
+history. The integration does not cache entity data or answers locally. Changes
+to instructions, exposed tools or other content near the start of the prompt
+can reduce reuse; templates that change on every request can do the same.
+Mistral decides whether a compatible cached prefix is available, so cache hits
+and faster responses are not guaranteed.
+
+To check reuse, inspect the `stats` entries in Home Assistant conversation
+traces. `cached_input_tokens` reports the provider's cached input count;
+`input_tokens` still includes all input tokens and `output_tokens` reports the
+generated tokens. A zero means Mistral reported no cached tokens. A missing
+field means no valid cache count was reported, rather than a confirmed miss.
+Only numeric counts are added to these traces.
+The same counts appear in integration debug logs as `Mistral token usage`;
+use the logging configuration under [Troubleshooting](#troubleshooting) to
+enable them.
+See [Mistral's prompt-caching documentation](https://docs.mistral.ai/inference/conversations/advanced/prompt-caching)
+for provider behavior and billing.
+
 ### AI Task
 
 AI Task supports plain text and structured data using native JSON-schema

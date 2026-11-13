@@ -24,7 +24,7 @@ Use separate virtual environments for the compatibility suites:
 
 | Home Assistant | HTTPX2 | Requirements |
 | --- | --- | --- |
-| 2026.11.0 | 2.14.0 | `requirements_test.txt` |
+| 2026.11.1 | 2.14.0 | `requirements_test.txt` |
 | 2026.10.4 | 2.14.0 | `requirements_test_2026_10.txt` |
 | 2026.7.4 | 2.14.0 | `requirements_test_2026_7.txt` |
 | 2026.10.4 | 2.16.0 | `requirements_test_2026_10_httpx2_2_16.txt` |

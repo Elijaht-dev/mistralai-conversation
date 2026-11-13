@@ -11,6 +11,16 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   follow the Assist pipeline, detect automatically, or choose a fixed language.
   New entities follow Assist; existing entities retain their previous behavior.
 
+- Automatically request prompt-cache reuse across conversations for each
+  Conversation entity and configured model. Valid provider-reported cached input
+  token counts appear in conversation traces; cache hits are not guaranteed.
+
+### Changed
+
+- Update the primary test baseline to Home Assistant 2026.11.1 and its matching
+  fixtures; update mypy to 2.4.1, Ruff to 0.17.5 and Mutagen to 1.48.1.
+  Keep Home Assistant's HTTPX2 2.14.0 pin and validate 2.16.0 on older baselines.
+
 ## [1.1.0] - 2026-11-09
 
 ### Added

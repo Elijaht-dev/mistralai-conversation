@@ -41,6 +41,7 @@ async def test_generate_unstructured_data(
     assert result.data == "The garage is closed."
     call = mock_init_component.chat.stream_async.await_args
     assert call.kwargs["response_format"] is None
+    assert call.kwargs["prompt_cache_key"] == result.conversation_id
     entity_entry = entity_registry.async_get(ENTITY_ID)
     assert entity_entry is not None
     ai_task_subentry = next(

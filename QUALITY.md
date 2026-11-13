@@ -56,6 +56,20 @@ language choices, model selections, modes and subentry IDs are preserved.
   Signatures are never altered, exposed or logged.
 - Home Assistant owns tool schemas, validation and execution. Malformed,
   incomplete or ambiguous streamed calls are rejected before execution.
+- Conversation requests use a deterministic SHA-256 prompt-cache key derived
+  from the domain, account entry ID, subentry ID and configured model. It is
+  stable across conversations, tool rounds and reloads and contains no prompt,
+  credential or user data. AI Task retains its per-conversation key.
+- Prompt caching is a provider routing hint, not a local cache or a guarantee
+  of cache hits. Every request sends the complete HA-provided prompt and tools;
+  HA remains responsible for prompt preparation, exposure and permissions.
+- Stream usage traces retain total input/output counts and add
+  `cached_input_tokens` only for a provider-reported integer between zero and
+  the total input count. SDK additional properties are checked at the typed
+  provider boundary; missing or malformed cache details are omitted. Usage-only
+  events are supported, and no key or prompt content is added to token traces.
+  Integration debug logging reports the same numeric counts without request or
+  response content.
 - Conversation replay omits external tool calls and their matched results
   while preserving user messages, replies and ordinary tool exchanges.
   Home Assistant's original chat log is not modified.
@@ -186,11 +200,47 @@ their matching fixture packages. Fresh-process tests enable HA's blocking-call
 detector and exercise the real SDK with mocked HTTP and local TLS transports.
 Normal tests and CI never call the live Mistral API.
 
+The primary test baseline is HA 2026.11.1 with its matching official fixtures.
+Test environments pin mypy 2.4.1, Ruff 0.17.5 and Mutagen 1.48.1.
 The test environment pins PyTurboJPEG 2.6.1. A real JPEG encode/decode test uses
 checksum-verified libjpeg-turbo 3.2.1. Setup and commands are in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Recorded validation
+
+### Unreleased 1.2.0 combined validation
+
+On 2026-11-13, prompt caching and STT language selection were tested together
+with Python 3.14.7 and SDK 3.7.0. The primary HA baseline and its official
+fixtures were updated to 2026.11.1; mypy, Ruff and Mutagen were updated to
+2.4.1, 0.17.5 and 1.48.1 respectively. Formatting, linting, strict typing,
+dependency checks and offline HACS validation passed.
+
+| Home Assistant | HTTPX2 | Tests passed / skipped | Total coverage | Branch coverage |
+| --- | --- | --- | --- | --- |
+| 2026.11.1 | 2.14.0 | 720 / 0 | 95.43% | 91.45% |
+| 2026.10.4 | 2.14.0 | 677 / 43 | 92.07% | 87.53% |
+| 2026.7.4 | 2.14.0 | 677 / 43 | 92.19% | 87.65% |
+| 2026.10.4 | 2.16.0 | 677 / 43 | 92.07% | 87.53% |
+| 2026.7.4 | 2.16.0 | 677 / 43 | 92.19% | 87.65% |
+
+The older baselines skip evaluation tests because they require HA 2026.11.
+HTTPX2 2.14.0 remains the HA 2026.11 core constraint; 2.16.0 is validated on the
+older baselines. The supported HA minimum and SDK runtime pin are unchanged.
+
+After fresh verified backups, the language candidate already installed on a
+real HA 2026.11.1 instance was retested with synthetic Batch and Realtime
+audio. Both requests failed with provider rate limits. A minimal Conversation
+request on the existing engine also returned HTTP 429, so the combined caching
+engine was not installed. Fixed-language and automatic-detection checks could
+not proceed past the initial transcription failures. Live cache hits, successful
+language selection and latency/cost savings remain unverified.
+
+All temporary test entities were removed. The installed runtime, original
+configuration and Assist pipelines matched their pre-test snapshots, and the
+integration remained loaded. The candidate retains version 1.1.0 pending the
+owner's 1.2.0 release. Public HACS/Hassfest CI and successful real-instance smoke
+validation remain required before publication.
 
 ### Unreleased transcription language option
 
@@ -223,6 +273,25 @@ rate-limit warnings. Physical microphone and satellite behavior was not tested.
 The integration version remains 1.1.0; this candidate is not a new release.
 Public HACS/Hassfest CI remains required before publication.
 
+### Unreleased prompt caching
+
+On 2026-11-12, the isolated caching change passed the complete local gate on
+Python 3.14.7 with SDK 3.7.0: formatting, linting, strict typing, dependency
+checks, tests, coverage and offline HACS validation. All 666 tests passed on
+HA 2026.11.0; 623 passed in each of the four older HA/HTTPX2 environments, with
+43 evaluation tests skipped because they require HA 2026.11. Branch coverage
+was 87.23-91.24%. Mocked HTTP requests exercised the real SDK's cache-key
+serialization and cached-token parsing, including usage-only events.
+
+A backed-up HA 2026.11.1 instance loaded the candidate engine after a full
+restart, preserving configuration, pipelines and every other runtime file.
+Live Mistral requests returned HTTP 429 despite bounded retries and a smaller
+probe without tools; the restored original engine also received HTTP 429.
+Cache hits, live tool execution, structured AI Task and
+latency/cost savings could not be verified. The previous production engine was
+restored and the temporary entity and debug logging were removed. This is not
+a complete feature-release smoke test; public HACS/Hassfest CI remains required.
+
 ### Version 1.0.2
 
 Packaging only: Python files and dependency pins are unchanged from 1.0.1.
@@ -235,7 +304,7 @@ tests, strict rejection of unrelated voices, lookup failures, cancellation and
 the real SDK over local TLS with HA's blocking detector enabled.
 
 All 602 tests passed in each of the five pinned HA/HTTPX2 environments, with
-94.72–94.84% total coverage and 90.08–90.20% branch coverage. Formatting, linting,
+94.72â€“94.84% total coverage and 90.08â€“90.20% branch coverage. Formatting, linting,
 strict typing, dependency checks and offline HACS validation passed.
 
 After backup, configuration validation and a full restart on HA 2026.11.0,

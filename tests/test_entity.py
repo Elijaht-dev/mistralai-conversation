@@ -356,10 +356,13 @@ async def test_transform_text_reasoning_usage_and_native(
                     completion_event(content="continued"),
                     completion_event(
                         finish_reason="stop",
-                        usage=UsageInfo(
-                            prompt_tokens=12,
-                            completion_tokens=7,
-                            total_tokens=19,
+                        usage=UsageInfo.model_validate(
+                            {
+                                "prompt_tokens": 128,
+                                "completion_tokens": 7,
+                                "total_tokens": 135,
+                                "prompt_tokens_details": {"cached_tokens": 64},
+                            }
                         ),
                     ),
                 ]
@@ -377,7 +380,13 @@ async def test_transform_text_reasoning_usage_and_native(
     assert native.signature == "sig"
     assert state.has_output
     chat_log.async_trace.assert_called_with(
-        {"stats": {"input_tokens": 12, "output_tokens": 7}}
+        {
+            "stats": {
+                "input_tokens": 128,
+                "output_tokens": 7,
+                "cached_input_tokens": 64,
+            }
+        }
     )
 
 
@@ -598,7 +607,8 @@ async def test_conversation_success_and_request_parameters(
     assert call.kwargs["temperature"] == 0.2
     assert call.kwargs["reasoning_effort"] == "none"
     assert call.kwargs["safe_prompt"] is False
-    assert call.kwargs["prompt_cache_key"] == result.conversation_id
+    assert isinstance(call.kwargs["prompt_cache_key"], str)
+    assert call.kwargs["prompt_cache_key"] != result.conversation_id
     assert isinstance(call.kwargs["messages"][0], SystemMessage)
     assert isinstance(call.kwargs["messages"][1], UserMessage)
 
@@ -720,6 +730,11 @@ async def test_conversation_function_call_round_trip(
 
     assert result.response.speech["plain"]["speech"] == "The kitchen is on."
     assert mock_init_component.chat.stream_async.await_count == 2
+    first_request, second_request = (
+        call.kwargs for call in mock_init_component.chat.stream_async.await_args_list
+    )
+    assert first_request["prompt_cache_key"] == second_request["prompt_cache_key"]
+    assert first_request["tools"] == second_request["tools"]
     second_messages = mock_init_component.chat.stream_async.await_args_list[1].kwargs[
         "messages"
     ]

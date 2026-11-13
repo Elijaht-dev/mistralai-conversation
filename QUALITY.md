@@ -228,19 +228,35 @@ The older baselines skip evaluation tests because they require HA 2026.11.
 HTTPX2 2.14.0 remains the HA 2026.11 core constraint; 2.16.0 is validated on the
 older baselines. The supported HA minimum and SDK runtime pin are unchanged.
 
-After fresh verified backups, the language candidate already installed on a
-real HA 2026.11.1 instance was retested with synthetic Batch and Realtime
-audio. Both requests failed with provider rate limits. A minimal Conversation
-request on the existing engine also returned HTTP 429, so the combined caching
-engine was not installed. Fixed-language and automatic-detection checks could
-not proceed past the initial transcription failures. Live cache hits, successful
-language selection and latency/cost savings remain unverified.
+Initial Conversation probes used a model unavailable to the test credentials.
+Its HTTP 429 response reported an effective request limit of zero; those
+failures did not establish exhausted credit or an account-wide rate limit.
 
-All temporary test entities were removed. The installed runtime, original
-configuration and Assist pipelines matched their pre-test snapshots, and the
-integration remained loaded. The candidate retains version 1.1.0 pending the
-owner's 1.2.0 release. Public HACS/Hassfest CI and successful real-instance smoke
-validation remain required before publication.
+After verified backups, the combined candidate was installed and fully
+restarted on HA 2026.11.1. Corrected tests used the permitted
+`ministral-14b-2512` model and respected its verified two-request-per-minute
+allowance. Fresh conversations, a read-only Assist date/time tool round trip
+and structured AI Task output passed. Three spaced conversations and a second
+pair two seconds apart all succeeded. The fresh conversation requesting the
+read-only tool reported 4,608 cached input tokens out of 4,751 total input
+tokens, confirming prefix reuse across conversations with exposed tools. The
+other six observed stream-usage records reported zero cached tokens. Cache
+hits remain provider-controlled; no general latency gain is claimed.
+
+Batch and Realtime STT still failed. Direct authenticated Realtime handshakes
+outside HA also returned HTTP 429 for both the `-3` and `-3-0` model IDs. Direct
+TTS requests with an existing configured voice returned HTTP 429 with an
+effective request limit of zero for both aliases. The audio refusal remains
+unexplained; successful language selection and the remaining audio release
+checks are unverified.
+
+All temporary entities and debug logging were removed. The candidate engine
+matched the validated source, every other runtime file was preserved, and
+configuration and Assist pipelines matched their pre-test snapshots. The
+integration remained loaded with no warning/error or blocking-call lines in
+the final observed integration logs. The candidate remains installed with
+version 1.1.0 pending the owner's 1.2.0 release. Public HACS/Hassfest CI and the
+remaining successful real-instance smoke checks are required before publication.
 
 ### Unreleased transcription language option
 
@@ -416,6 +432,10 @@ integration files, when a release is published. CI checks archive integrity.
 Existing assets are not overwritten, preserving their download counts.
 
 Before a feature or SDK release:
+
+Use models and endpoints available to the test credentials and respect their
+actual per-model request limits. An HTTP 429 alone does not identify which
+limit was reached or establish that the account has no credit.
 
 1. Pass the complete local checks and public HACS/Hassfest CI.
 2. Back up a real instance, verify installed files, validate configuration and

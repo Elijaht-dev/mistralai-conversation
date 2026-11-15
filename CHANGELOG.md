@@ -5,6 +5,10 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.2.0b1] - 2026-11-15
+
+Experimental prerelease for testing before 1.2.0.
+
 ### Added
 
 - Select a transcription language per STT entity for Batch and Realtime:
@@ -20,6 +24,16 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Update the primary test baseline to Home Assistant 2026.11.1 and its matching
   fixtures; update mypy to 2.4.1, Ruff to 0.17.5 and Mutagen to 1.48.1.
   Keep Home Assistant's HTTPX2 2.14.0 pin and validate 2.16.0 on older baselines.
+
+### Validation
+
+- The combined features passed all five pinned HA/HTTPX2 suites. Real Home
+  Assistant checks confirmed Conversation, Assist tools, structured AI Task and
+  prompt-cache reuse with an available model.
+- Live audio checks remain incomplete: the maintainer's Realtime transcription
+  and TTS endpoints still returned HTTP 429 on 2026-11-15. Successful live
+  transcription language selection is unverified. See [QUALITY.md](QUALITY.md)
+  for the validation record and test this prerelease only with a backup.
 
 ## [1.1.0] - 2026-11-09
 

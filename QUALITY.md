@@ -208,7 +208,7 @@ checksum-verified libjpeg-turbo 3.2.1. Setup and commands are in
 
 ## Recorded validation
 
-### Unreleased 1.2.0 combined validation
+### Version 1.2.0b1 combined validation
 
 On 2026-11-13, prompt caching and STT language selection were tested together
 with Python 3.14.7 and SDK 3.7.0. The primary HA baseline and its official
@@ -250,13 +250,20 @@ effective request limit of zero for both aliases. The audio refusal remains
 unexplained; successful language selection and the remaining audio release
 checks are unverified.
 
+On 2026-11-15, fresh direct checks from the same HA host still returned HTTP
+429 for Realtime transcription and TTS. The TTS response again reported an
+effective request limit of zero. The account's displayed limits do not explain
+these refusals; exhausted credit is not established.
+
 All temporary entities and debug logging were removed. The candidate engine
 matched the validated source, every other runtime file was preserved, and
 configuration and Assist pipelines matched their pre-test snapshots. The
 integration remained loaded with no warning/error or blocking-call lines in
 the final observed integration logs. The candidate remains installed with
-version 1.1.0 pending the owner's 1.2.0 release. Public HACS/Hassfest CI and the
-remaining successful real-instance smoke checks are required before publication.
+version 1.1.0 in that live validation record. The owner authorized an experimental
+1.2.0b1 prerelease for independent testing while audio access remains blocked.
+Public HACS/Hassfest CI is required before publishing the prerelease. The
+remaining real-instance smoke checks are required before stable 1.2.0.
 
 ### Unreleased transcription language option
 

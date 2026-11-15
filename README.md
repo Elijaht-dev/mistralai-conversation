@@ -37,6 +37,11 @@ HACS/Marketplace releases configured with `zip_release` install the attached
 `mistral_conversation.zip`. GitHub counts downloads of this file, including
 updates and redownloads; this is not a count of unique users.
 
+Prereleases are experimental and require an explicit version selection in HACS.
+Back up Home Assistant first, select the prerelease when downloading or
+redownloading this integration, then restart Home Assistant. Review the release
+notes for checks that still need independent testing.
+
 ### Manual installation
 
 1. Copy `custom_components/mistral_conversation` into your Home Assistant

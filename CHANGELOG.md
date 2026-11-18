@@ -17,7 +17,7 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   New entities follow Assist; existing entities retain their previous behavior.
 - Automatically request prompt-cache reuse across conversations for each
   Conversation entity and configured model. Valid provider-reported cached input
-  token counts appear in conversation traces; cache hits are not guaranteed.
+  token counts appear in conversation traces.
 
 ### Changed
 

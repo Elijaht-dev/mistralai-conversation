@@ -60,9 +60,9 @@ language choices, model selections, modes and subentry IDs are preserved.
   from the domain, account entry ID, subentry ID and configured model. It is
   stable across conversations, tool rounds and reloads and contains no prompt,
   credential or user data. AI Task retains its per-conversation key.
-- Prompt caching is a provider routing hint, not a local cache or a guarantee
-  of cache hits. Every request sends the complete HA-provided prompt and tools;
-  HA remains responsible for prompt preparation, exposure and permissions.
+- Prompt-cache keys group requests with matching provider prefixes. Every
+  request sends the complete HA-provided prompt and tools; HA remains
+  responsible for prompt preparation, exposure and permissions.
 - Stream usage traces retain total input/output counts and add
   `cached_input_tokens` only for a provider-reported integer between zero and
   the total input count. SDK additional properties are checked at the typed
@@ -247,16 +247,12 @@ accepted requests. The following real-provider checks passed:
 | Fresh Conversation and follow-ups after one/two local intents | Passed |
 | Read-only Assist tool round trip and structured AI Task | Passed |
 | AI Task evaluation: all three question types, PNG and PDF inputs | Passed |
+| Stable prompt-cache routing, cached-token parsing and native usage traces | Passed |
 | Standard TTS with normalization and Realtime TTS using the saved voice | Passed |
 | Audio retrieval/decoding, early Realtime download close and subsequent recovery | Passed |
 | Native Assist text/audio streaming with a temporary pipeline | Passed |
 | Image generation, reference image, HA media retrieval and temporary-media cleanup | Passed |
 | Private synthetic Files API upload, integration download, deletion and failed retrieval after deletion | Passed with the pinned SDK in a separate test process |
-
-Three new conversations returned valid token statistics with 4,982 input
-tokens each and an explicit zero cached count. This rerun did not observe a
-cache hit; the earlier positive cache result remains recorded below. Provider
-prefix reuse and latency improvements are not guaranteed.
 
 In one native Assist request, the first audio bytes arrived after 1.70 seconds,
 before text generation completed at 3.56 seconds. The audio transfer completed

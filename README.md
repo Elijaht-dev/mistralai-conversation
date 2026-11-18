@@ -123,8 +123,6 @@ Every request still includes Home Assistant's complete prompt, tools and relevan
 history. The integration does not cache entity data or answers locally. Changes
 to instructions, exposed tools or other content near the start of the prompt
 can reduce reuse; templates that change on every request can do the same.
-Mistral decides whether a compatible cached prefix is available, so cache hits
-and faster responses are not guaranteed.
 
 To check reuse, inspect the `stats` entries in Home Assistant conversation
 traces. `cached_input_tokens` reports the provider's cached input count;

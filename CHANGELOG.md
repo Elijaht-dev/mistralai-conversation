@@ -5,6 +5,64 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-18
+
+### Added
+
+- Change an account's API key from its **Reconfigure** menu. The new key is
+  validated before the existing entities switch to it. Failed validation keeps
+  the current key, and successful changes preserve entities and their settings.
+- Select a transcription language per STT entity for Batch and Realtime:
+  follow the Assist pipeline, detect automatically, or choose a fixed language.
+  New entities follow Assist; existing entities retain their previous behavior.
+- Automatically request prompt-cache reuse across conversations for each
+  Conversation entity and configured model. Valid provider-reported cached input
+  token counts appear in conversation traces.
+
+### Changed
+
+- Update the primary test baseline to Home Assistant 2026.11.1 and its matching
+  fixtures; update mypy to 2.4.1, Ruff to 0.17.5 and Mutagen to 1.48.1.
+  Keep Home Assistant's HTTPX2 2.14.0 pin and validate 2.16.0 on older baselines.
+
+### Validation
+
+- Rerun all five complete compatibility suites and successful real Home
+  Assistant checks, including both STT language modes, audio streaming and
+  recovery, account reconfiguration, Conversation, tools, AI Task and images.
+  The subscribed account now accepts the previously blocked audio requests.
+  See [QUALITY.md](QUALITY.md#version-120-validation) for results and limitations.
+
+## [1.2.0b1] - 2026-11-15
+
+Experimental prerelease for testing before 1.2.0.
+
+### Added
+
+- Select a transcription language per STT entity for Batch and Realtime:
+  follow the Assist pipeline, detect automatically, or choose a fixed language.
+  New entities follow Assist; existing entities retain their previous behavior.
+
+- Automatically request prompt-cache reuse across conversations for each
+  Conversation entity and configured model. Valid provider-reported cached input
+  token counts appear in conversation traces; cache hits are not guaranteed.
+
+### Changed
+
+- Update the primary test baseline to Home Assistant 2026.11.1 and its matching
+  fixtures; update mypy to 2.4.1, Ruff to 0.17.5 and Mutagen to 1.48.1.
+  Keep Home Assistant's HTTPX2 2.14.0 pin and validate 2.16.0 on older baselines.
+
+### Validation
+
+- The combined features passed all five pinned HA/HTTPX2 suites. Real Home
+  Assistant checks confirmed Conversation, Assist tools, structured AI Task and
+  prompt-cache reuse with an available model.
+- Live audio checks remain incomplete: the maintainer's Realtime transcription
+  and TTS endpoints still returned HTTP 429 on 2026-11-15. Successful live
+  transcription language selection is unverified. See [QUALITY.md](QUALITY.md)
+  for the validation record and test this prerelease only with a backup.
+
 ## [1.1.0] - 2026-11-09
 
 ### Added

@@ -40,6 +40,7 @@ from custom_components.mistral_conversation.const import (
     CONF_SYNTHESIS_MODE,
     CONF_TARGET_LOUDNESS,
     CONF_TEMPERATURE,
+    CONF_TRANSCRIPTION_LANGUAGE,
     CONF_TRANSCRIPTION_MODE,
     CONF_VOICE_ID,
     DEFAULT_AI_TASK_OPTIONS,
@@ -297,7 +298,7 @@ async def test_migration_normalizes_preview_data(
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.minor_version == 6
+    assert entry.minor_version == 7
     chat_only, legacy = [
         subentry
         for subentry in entry.subentries.values()
@@ -363,7 +364,7 @@ async def test_migration_does_not_duplicate_voice_platform_subentries(
 
     assert await async_migrate_entry(hass, entry)
 
-    assert entry.minor_version == 6
+    assert entry.minor_version == 7
     assert [subentry.subentry_type for subentry in entry.subentries.values()].count(
         SUBENTRY_TYPE_AI_TASK
     ) == 1
@@ -390,6 +391,48 @@ async def test_migration_rejects_unknown_major_version(
     assert entry.minor_version == 1
 
 
+@pytest.mark.parametrize("minor_version", [1, 3, 4, 5, 6])
+@pytest.mark.parametrize("selection", [None, "pipeline", "auto", "fr", "legacy"])
+async def test_migration_preserves_transcription_language(
+    hass, minor_version, selection
+):
+    """Migration 1.7 materializes legacy behavior without replacing saved choices."""
+    original = {
+        CONF_MODEL: "ft:transcription",
+        CONF_TRANSCRIPTION_MODE: "realtime",
+        **({CONF_TRANSCRIPTION_LANGUAGE: selection} if selection is not None else {}),
+    }
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        version=1,
+        minor_version=minor_version,
+        data={CONF_API_KEY: "test-api-key"},
+        subentries_data=[
+            {
+                "subentry_type": SUBENTRY_TYPE_STT,
+                "data": original,
+                "title": "Existing microphone",
+                "unique_id": "test-microphone",
+            }
+        ],
+    )
+    entry.add_to_hass(hass)
+    subentry = next(iter(entry.subentries.values()))
+    subentry_id = subentry.subentry_id
+    assert await async_migrate_entry(hass, entry)
+    assert entry.minor_version == 7
+    assert entry.subentries[subentry_id] is subentry
+    assert subentry.title == "Existing microphone"
+    assert subentry.unique_id == "test-microphone"
+    assert subentry.data == {
+        **original,
+        CONF_TRANSCRIPTION_LANGUAGE: selection or "legacy",
+    }
+    before = entry.as_dict()
+    assert await async_migrate_entry(hass, entry)
+    assert entry.as_dict() == before
+
+
 async def test_migration_keeps_existing_tts_audio_unchanged(
     hass: HomeAssistant,
 ) -> None:
@@ -413,7 +456,7 @@ async def test_migration_keeps_existing_tts_audio_unchanged(
     subentry = next(iter(entry.subentries.values()))
 
     assert await async_migrate_entry(hass, entry)
-    assert entry.minor_version == 6
+    assert entry.minor_version == 7
     assert subentry.data == {
         CONF_MODEL: DEFAULT_TTS_MODEL,
         CONF_VOICE_ID: "voice-1",
@@ -422,7 +465,7 @@ async def test_migration_keeps_existing_tts_audio_unchanged(
         CONF_TARGET_LOUDNESS: DEFAULT_TARGET_LOUDNESS,
     }
     assert await async_migrate_entry(hass, entry)
-    assert entry.minor_version == 6
+    assert entry.minor_version == 7
     assert len(entry.subentries) == 1
 
 
@@ -456,7 +499,7 @@ async def test_migration_preserves_speech_settings_and_subentry_ids(hass, saved_
     assert tuple(entry.subentries) == before
     subentry = next(iter(entry.subentries.values()))
     assert subentry.data == {**original, CONF_SYNTHESIS_MODE: saved_mode or "standard"}
-    assert entry.minor_version == 6
+    assert entry.minor_version == 7
     assert await async_migrate_entry(hass, entry)
     assert subentry.data == {**original, CONF_SYNTHESIS_MODE: saved_mode or "standard"}
 
@@ -493,7 +536,7 @@ async def test_migration_materializes_old_defaults_and_preserves_settings(
     )
     entry.add_to_hass(hass)
     assert await async_migrate_entry(hass, entry)
-    assert entry.minor_version == 6
+    assert entry.minor_version == 7
     by_type = {
         subentry.subentry_type: dict(subentry.data)
         for subentry in entry.subentries.values()
@@ -505,6 +548,7 @@ async def test_migration_materializes_old_defaults_and_preserves_settings(
         assert by_type[SUBENTRY_TYPE_STT] == {
             CONF_MODEL: DEFAULT_STT_MODEL,
             CONF_TRANSCRIPTION_MODE: "auto",
+            CONF_TRANSCRIPTION_LANGUAGE: "legacy",
         }
         assert by_type[SUBENTRY_TYPE_TTS][CONF_MODEL] == DEFAULT_TTS_MODEL
     assert await async_migrate_entry(hass, entry)

@@ -171,9 +171,11 @@ def mock_realtime_connect():
     """Mock socket establishment while keeping SDK audio/event handling real."""
 
     @asynccontextmanager
-    async def connect(client, model):
+    async def connect(client, model, *, language=None):
         connection = await client.audio.realtime.connect(model=model)
         try:
+            if language is not None:
+                await connection.update_session(language=language)
             yield connection
         finally:
             await connection.close()

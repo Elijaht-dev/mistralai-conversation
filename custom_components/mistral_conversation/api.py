@@ -308,7 +308,7 @@ def _realtime_url(client: Mistral, model: str, path: str) -> tuple[str, dict[str
 
 @asynccontextmanager
 async def _connect_realtime(
-    client: Mistral, model: str
+    client: Mistral, model: str, *, language: str | None = None
 ) -> AsyncGenerator[RealtimeConnection]:
     """Open a verified HA-safe socket, then use the SDK's protocol objects."""
     # SDK 3.7.0 connect() cannot accept a prepared SSLContext. Its default
@@ -330,13 +330,15 @@ async def _connect_realtime(
                 raise RealtimeError("Invalid Realtime session handshake")
             connection = RealtimeConnection(websocket, event.session)
             await connection.update_session(
-                models.AudioFormat(encoding="pcm_s16le", sample_rate=16000)
+                models.AudioFormat(encoding="pcm_s16le", sample_rate=16000),
+                language=language,
             )
             updated = parse_realtime_event(json.loads(await websocket.recv()))
             if (
                 not isinstance(updated, models.RealtimeTranscriptionSessionUpdated)
                 or updated.session.audio_format.encoding != "pcm_s16le"
                 or updated.session.audio_format.sample_rate != 16000
+                or (language is not None and updated.session.language != language)
             ):
                 raise RealtimeError("Invalid Realtime session configuration")
         try:
@@ -383,10 +385,10 @@ async def _receive_realtime_text(
 
 
 async def _transcribe_realtime(
-    client: Mistral, model: str, stream: AsyncIterable[bytes]
+    client: Mistral, model: str, stream: AsyncIterable[bytes], *, language: str | None
 ) -> str:
     """Supervise upload and download so neither can mask the other's failure."""
-    async with _connect_realtime(client, model) as connection:
+    async with _connect_realtime(client, model, language=language) as connection:
         sender = asyncio.create_task(_send_realtime_audio(connection, stream))
         receiver = asyncio.create_task(_receive_realtime_text(connection, sender))
         try:
@@ -407,12 +409,16 @@ async def _transcribe_realtime(
 
 
 async def async_transcribe_realtime(
-    client: Mistral, model: str, stream: AsyncIterable[bytes]
+    client: Mistral,
+    model: str,
+    stream: AsyncIterable[bytes],
+    *,
+    language: str | None = None,
 ) -> str:
     """Transcribe a bounded Assist PCM stream using the official Realtime SDK."""
     try:
         async with asyncio.timeout(REQUEST_TIMEOUT_MS / 1000):
-            return await _transcribe_realtime(client, model, stream)
+            return await _transcribe_realtime(client, model, stream, language=language)
     except (
         RealtimeTranscriptionException,
         WebSocketException,

@@ -79,6 +79,36 @@ async def test_transport_uses_verified_tls_and_sdk_messages(transport):
         "encoding": "pcm_s16le",
         "sample_rate": 16000,
     }
+    assert "language" not in socket.sent[0]["session"]
+    assert socket.closed
+
+
+@pytest.mark.parametrize("acknowledged", ["fr", "en", None, "missing"])
+async def test_realtime_language_acknowledged_before_audio(transport, acknowledged):
+    """SDK serialization pins the language; missing or changed settings fail closed."""
+    client, socket, _ = transport
+    created = socket.recv.return_value
+    updated = json.loads(created)
+    updated["type"] = "session.updated"
+    if acknowledged != "missing":
+        updated["session"]["language"] = acknowledged
+    socket.recv.side_effect = [created, json.dumps(updated)]
+    if acknowledged == "fr":
+        assert (
+            await async_transcribe_realtime(
+                client, REALTIME_STT_MODEL, audio(b"ab"), language="fr"
+            )
+            == "Hello"
+        )
+        assert socket.audio_sent.is_set()
+    else:
+        with pytest.raises(RealtimeError, match="configuration"):
+            await async_transcribe_realtime(
+                client, REALTIME_STT_MODEL, audio(b"ab"), language="fr"
+            )
+        assert [message["type"] for message in socket.sent] == ["session.update"]
+        assert not socket.audio_sent.is_set()
+    assert socket.sent[0]["session"]["language"] == "fr"
     assert socket.closed
 
 

@@ -13,6 +13,7 @@ from collections.abc import (
 )
 from contextlib import aclosing
 from dataclasses import dataclass, field
+from hashlib import sha256
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Never, cast
 
@@ -47,6 +48,7 @@ from mistralai.client.models import (
     ToolCall,
     ToolMessage,
     ToolReferenceChunk,
+    UsageInfo,
     UserMessage,
 )
 from mistralai.client.models.contentchunk import ContentChunk
@@ -76,6 +78,7 @@ from .const import (
     REASONING_SETTINGS,
     REQUEST_TIMEOUT_MS,
     SUBENTRY_TYPE_AI_TASK,
+    SUBENTRY_TYPE_CONVERSATION,
     SUBENTRY_TYPE_STT,
     SUBENTRY_TYPE_TTS,
     SUPPORTED_DOCUMENT_MIME_TYPES,
@@ -307,6 +310,23 @@ def _thinking_text(chunk: ThinkChunk) -> Iterator[str]:
             yield item.text
 
 
+def _cached_input_tokens(usage: UsageInfo) -> int | None:
+    """Read optional cache usage without trusting untyped SDK extensions."""
+    details: object = usage.additional_properties.get("prompt_tokens_details")
+    if not isinstance(details, dict):
+        return None
+    cached_tokens: object = details.get("cached_tokens")
+    if (
+        isinstance(cached_tokens, bool)
+        or not isinstance(cached_tokens, int)
+        or cached_tokens < 0
+        or usage.prompt_tokens is None
+        or cached_tokens > usage.prompt_tokens
+    ):
+        return None
+    return cached_tokens
+
+
 async def _transform_stream(  # noqa: PLR0912
     chat_log: conversation.ChatLog,
     stream: AsyncIterable[CompletionEvent],
@@ -322,14 +342,14 @@ async def _transform_stream(  # noqa: PLR0912
     async for event in stream:
         data = event.data
         if data.usage is not None:
-            chat_log.async_trace(
-                {
-                    "stats": {
-                        "input_tokens": data.usage.prompt_tokens or 0,
-                        "output_tokens": data.usage.completion_tokens or 0,
-                    }
-                }
-            )
+            stats = {
+                "input_tokens": data.usage.prompt_tokens or 0,
+                "output_tokens": data.usage.completion_tokens or 0,
+            }
+            if (cached_tokens := _cached_input_tokens(data.usage)) is not None:
+                stats["cached_input_tokens"] = cached_tokens
+            chat_log.async_trace({"stats": stats})
+            LOGGER.debug("Mistral token usage: %s", stats)
 
         if not data.choices:
             continue
@@ -775,7 +795,22 @@ class MistralBaseEntity(CoordinatorEntity[MistralCoordinator]):
                 else reasoning_effort
             ),
             safe_prompt=bool(options[CONF_SAFE_PROMPT]),
-            prompt_cache_key=chat_log.conversation_id,
+            # Route repeated system/tool prefixes together across conversations.
+            # Use only opaque configuration IDs and the model, never prompt data.
+            prompt_cache_key=(
+                sha256(
+                    json_dumps(
+                        [
+                            DOMAIN,
+                            self.entry.entry_id,
+                            self.subentry.subentry_id,
+                            self.model,
+                        ]
+                    ).encode("utf-8")
+                ).hexdigest()
+                if self.subentry.subentry_type == SUBENTRY_TYPE_CONVERSATION
+                else chat_log.conversation_id
+            ),
             response_format=response_format,
         )
 

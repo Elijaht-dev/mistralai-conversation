@@ -40,6 +40,9 @@ Saved voices and normalization options are preserved; TTS requires an explicit
 voice selection.
 Configuration migration 1.6 materializes Standard synthesis mode for existing
 TTS entities without changing models, voices, audio options or subentry IDs.
+Configuration migration 1.7 materializes the legacy STT language setting:
+pipeline language in Batch and automatic detection in Realtime. Explicit saved
+language choices, model selections, modes and subentry IDs are preserved.
 
 ### Models, conversation and tools
 
@@ -53,6 +56,20 @@ TTS entities without changing models, voices, audio options or subentry IDs.
   Signatures are never altered, exposed or logged.
 - Home Assistant owns tool schemas, validation and execution. Malformed,
   incomplete or ambiguous streamed calls are rejected before execution.
+- Conversation requests use a deterministic SHA-256 prompt-cache key derived
+  from the domain, account entry ID, subentry ID and configured model. It is
+  stable across conversations, tool rounds and reloads and contains no prompt,
+  credential or user data. AI Task retains its per-conversation key.
+- Prompt-cache keys group requests with matching provider prefixes. Every
+  request sends the complete HA-provided prompt and tools; HA remains
+  responsible for prompt preparation, exposure and permissions.
+- Stream usage traces retain total input/output counts and add
+  `cached_input_tokens` only for a provider-reported integer between zero and
+  the total input count. SDK additional properties are checked at the typed
+  provider boundary; missing or malformed cache details are omitted. Usage-only
+  events are supported, and no key or prompt content is added to token traces.
+  Integration debug logging reports the same numeric counts without request or
+  response content.
 - Conversation replay omits external tool calls and their matched results
   while preserving user messages, replies and ordinary tool exchanges.
   Home Assistant's original chat log is not modified.
@@ -73,6 +90,12 @@ modes cannot bypass known incompatibilities. Unknown IDs use Batch unless
 Realtime is selected. Assist owns end-of-speech; Realtime turn events are
 advisory and the final transcript is required. Failures do not trigger a retry
 through another endpoint.
+
+New STT entities follow the Assist pipeline language in both modes. Each entity
+can instead use automatic language detection or a fixed supported language.
+Invalid saved language settings fail before reading audio. Realtime sends the
+language through the SDK session update and requires acknowledgement of a pinned
+language before uploading audio; missing or mismatched values close the request.
 
 TTS normalization measures provider WAV audio and applies a second FFmpeg pass.
 Gain and peaks are bounded; silence and short/unmeasurable clips are not
@@ -133,6 +156,11 @@ Home Assistant owns its local media copy.
 
 ### Failures and privacy
 
+Account reconfiguration and reauthentication validate a replacement API key
+through model discovery before saving it. Failed validation preserves the
+active configuration. A successful change reloads the same entry with its
+existing subentries and entity IDs. The credential forms use empty password fields.
+
 Authentication starts reauthentication. Timeout, connection, rate-limit and
 provider failures remain distinct. Connection failures update availability and
 schedule discovery recovery; validation and rate-limit errors do not mark the
@@ -177,11 +205,174 @@ their matching fixture packages. Fresh-process tests enable HA's blocking-call
 detector and exercise the real SDK with mocked HTTP and local TLS transports.
 Normal tests and CI never call the live Mistral API.
 
+The primary test baseline is HA 2026.11.1 with its matching official fixtures.
+Test environments pin mypy 2.4.1, Ruff 0.17.5 and Mutagen 1.48.1.
 The test environment pins PyTurboJPEG 2.6.1. A real JPEG encode/decode test uses
 checksum-verified libjpeg-turbo 3.2.1. Setup and commands are in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Recorded validation
+
+### Version 1.2.0 validation
+
+On 2026-11-18, the combined candidate included prompt caching, STT language
+selection and account API-key reconfiguration. Python 3.14.7 and SDK 3.7.0
+passed formatting, lint, strict typing, dependency checks and offline HACS
+validation. All five complete pinned suites were rerun:
+
+| Home Assistant | HTTPX2 | Tests passed / skipped | Total coverage | Branch coverage |
+| --- | --- | --- | --- | --- |
+| 2026.11.1 | 2.14.0 | 732 / 0 | 95.55% | 91.55% |
+| 2026.10.4 | 2.14.0 | 689 / 43 | 92.21% | 87.68% |
+| 2026.7.4 | 2.14.0 | 689 / 43 | 92.33% | 87.79% |
+| 2026.10.4 | 2.16.0 | 689 / 43 | 92.21% | 87.68% |
+| 2026.7.4 | 2.16.0 | 689 / 43 | 92.33% | 87.79% |
+
+The older baselines skip evaluation tests because that API requires HA
+2026.11. Reconfiguration tests cover failed validation, blank keys, duplicate
+keys including concurrent configuration, preservation of entity/subentry IDs,
+replacement-client cleanup and exactly one reload after a changed key.
+
+A fresh native backup and verified rollback files preceded installation on
+HA 2026.11.2. All 27 installed runtime files matched the candidate after a full
+restart. With the subscribed account, the formerly blocked audio endpoints
+accepted requests. The following real-provider checks passed:
+
+| Live check | Result |
+| --- | --- |
+| Account Reconfigure form, empty password, blank-key rejection and saved-key revalidation | Passed |
+| Batch STT: pipeline language, fixed French overriding an English pipeline and automatic detection | Passed |
+| Realtime STT: the same three language choices | Passed |
+| Realtime STT cancellation and subsequent successful transcription | Passed |
+| Fresh Conversation and follow-ups after one/two local intents | Passed |
+| Read-only Assist tool round trip and structured AI Task | Passed |
+| AI Task evaluation: all three question types, PNG and PDF inputs | Passed |
+| Stable prompt-cache routing, cached-token parsing and native usage traces | Passed |
+| Standard TTS with normalization and Realtime TTS using the saved voice | Passed |
+| Audio retrieval/decoding, early Realtime download close and subsequent recovery | Passed |
+| Native Assist text/audio streaming with a temporary pipeline | Passed |
+| Image generation, reference image, HA media retrieval and temporary-media cleanup | Passed |
+| Private synthetic Files API upload, integration download, deletion and failed retrieval after deletion | Passed with the pinned SDK in a separate test process |
+
+In one native Assist request, the first audio bytes arrived after 1.70 seconds,
+before text generation completed at 3.56 seconds. The audio transfer completed
+after 16.64 seconds and decoded successfully. These are measurements from one
+synthetic request, not a general latency claim or physical playback validation.
+
+Temporary entities, pipelines and synthetic image files were removed. A final
+configuration check and full restart cleared temporary debug logging. Saved
+account settings and pipelines matched their original snapshots, installed
+files still matched the candidate, and final observed integration logs had no
+warning/error or blocking-call lines. Physical microphones, satellites and
+speakers were not tested. Public HACS/Hassfest CI remains required on the final
+commit before publication.
+
+### Version 1.2.0b1 combined validation
+
+On 2026-11-13, prompt caching and STT language selection were tested together
+with Python 3.14.7 and SDK 3.7.0. The primary HA baseline and its official
+fixtures were updated to 2026.11.1; mypy, Ruff and Mutagen were updated to
+2.4.1, 0.17.5 and 1.48.1 respectively. Formatting, linting, strict typing,
+dependency checks and offline HACS validation passed.
+
+| Home Assistant | HTTPX2 | Tests passed / skipped | Total coverage | Branch coverage |
+| --- | --- | --- | --- | --- |
+| 2026.11.1 | 2.14.0 | 720 / 0 | 95.43% | 91.45% |
+| 2026.10.4 | 2.14.0 | 677 / 43 | 92.07% | 87.53% |
+| 2026.7.4 | 2.14.0 | 677 / 43 | 92.19% | 87.65% |
+| 2026.10.4 | 2.16.0 | 677 / 43 | 92.07% | 87.53% |
+| 2026.7.4 | 2.16.0 | 677 / 43 | 92.19% | 87.65% |
+
+The older baselines skip evaluation tests because they require HA 2026.11.
+HTTPX2 2.14.0 remains the HA 2026.11 core constraint; 2.16.0 is validated on the
+older baselines. The supported HA minimum and SDK runtime pin are unchanged.
+
+Initial Conversation probes used a model unavailable to the test credentials.
+Its HTTP 429 response reported an effective request limit of zero; those
+failures did not establish exhausted credit or an account-wide rate limit.
+
+After verified backups, the combined candidate was installed and fully
+restarted on HA 2026.11.1. Corrected tests used the permitted
+`ministral-14b-2512` model and respected its verified two-request-per-minute
+allowance. Fresh conversations, a read-only Assist date/time tool round trip
+and structured AI Task output passed. Three spaced conversations and a second
+pair two seconds apart all succeeded. The fresh conversation requesting the
+read-only tool reported 4,608 cached input tokens out of 4,751 total input
+tokens, confirming prefix reuse across conversations with exposed tools. The
+other six observed stream-usage records reported zero cached tokens. Cache
+hits remain provider-controlled; no general latency gain is claimed.
+
+Batch and Realtime STT still failed. Direct authenticated Realtime handshakes
+outside HA also returned HTTP 429 for both the `-3` and `-3-0` model IDs. Direct
+TTS requests with an existing configured voice returned HTTP 429 with an
+effective request limit of zero for both aliases. The audio refusal remains
+unexplained; successful language selection and the remaining audio release
+checks are unverified.
+
+On 2026-11-15, fresh direct checks from the same HA host still returned HTTP
+429 for Realtime transcription and TTS. The TTS response again reported an
+effective request limit of zero. The account's displayed limits do not explain
+these refusals; exhausted credit is not established.
+
+All temporary entities and debug logging were removed. The candidate engine
+matched the validated source, every other runtime file was preserved, and
+configuration and Assist pipelines matched their pre-test snapshots. The
+integration remained loaded with no warning/error or blocking-call lines in
+the final observed integration logs. The candidate remains installed with
+version 1.1.0 in that live validation record. The owner authorized an experimental
+1.2.0b1 prerelease for independent testing while audio access remains blocked.
+Public HACS/Hassfest CI is required before publishing the prerelease. The
+remaining real-instance smoke checks are required before stable 1.2.0.
+
+### Unreleased transcription language option
+
+Validated on 2026-11-12 under Python 3.14.7 with Mistral SDK 3.7.0 in an isolated
+checkout containing only the language feature. Formatting, lint, strict typing,
+dependency checks, translation parity and offline HACS validation passed.
+
+| Home Assistant | HTTPX2 | Tests passed / skipped | Total coverage | Branch coverage |
+| --- | --- | --- | --- | --- |
+| 2026.11.0 | 2.14.0 | 699 / 0 | 95.35% | 91.27% |
+| 2026.10.4 | 2.14.0 | 656 / 43 | 91.97% | 87.32% |
+| 2026.7.4 | 2.14.0 | 656 / 43 | 92.08% | 87.44% |
+| 2026.10.4 | 2.16.0 | 656 / 43 | 91.97% | 87.32% |
+| 2026.7.4 | 2.16.0 | 656 / 43 | 92.08% | 87.44% |
+
+The older HA baselines skip evaluation tests because that API requires HA
+2026.11. Tests cover language selection on both transports, locale normalization,
+automatic detection, legacy behavior, invalid settings, migration preservation
+and Realtime acknowledgement failures before audio upload.
+
+After verified backups and configuration checks, the candidate was installed
+and fully restarted on a real HA 2026.11.1 instance. All 27 runtime files matched
+the candidate. Migration 1.7 preserved existing settings, subentry IDs and Assist
+pipelines, with existing STT entities retaining the legacy language setting.
+Live synthetic Batch and Realtime STT requests returned provider HTTP 429 rate
+limits; successful live language selection is not claimed. Temporary STT
+entities were removed and the original configuration was verified. No unexpected
+integration warning/error or blocking-call lines were observed beyond these
+rate-limit warnings. Physical microphone and satellite behavior was not tested.
+The integration version remains 1.1.0; this candidate is not a new release.
+Public HACS/Hassfest CI remains required before publication.
+
+### Unreleased prompt caching
+
+On 2026-11-12, the isolated caching change passed the complete local gate on
+Python 3.14.7 with SDK 3.7.0: formatting, linting, strict typing, dependency
+checks, tests, coverage and offline HACS validation. All 666 tests passed on
+HA 2026.11.0; 623 passed in each of the four older HA/HTTPX2 environments, with
+43 evaluation tests skipped because they require HA 2026.11. Branch coverage
+was 87.23-91.24%. Mocked HTTP requests exercised the real SDK's cache-key
+serialization and cached-token parsing, including usage-only events.
+
+A backed-up HA 2026.11.1 instance loaded the candidate engine after a full
+restart, preserving configuration, pipelines and every other runtime file.
+Live Mistral requests returned HTTP 429 despite bounded retries and a smaller
+probe without tools; the restored original engine also received HTTP 429.
+Cache hits, live tool execution, structured AI Task and
+latency/cost savings could not be verified. The previous production engine was
+restored and the temporary entity and debug logging were removed. This is not
+a complete feature-release smoke test; public HACS/Hassfest CI remains required.
 
 ### Version 1.0.2
 
@@ -195,7 +386,7 @@ tests, strict rejection of unrelated voices, lookup failures, cancellation and
 the real SDK over local TLS with HA's blocking detector enabled.
 
 All 602 tests passed in each of the five pinned HA/HTTPX2 environments, with
-94.72–94.84% total coverage and 90.08–90.20% branch coverage. Formatting, linting,
+94.72â€“94.84% total coverage and 90.08â€“90.20% branch coverage. Formatting, linting,
 strict typing, dependency checks and offline HACS validation passed.
 
 After backup, configuration validation and a full restart on HA 2026.11.0,
@@ -307,6 +498,10 @@ integration files, when a release is published. CI checks archive integrity.
 Existing assets are not overwritten, preserving their download counts.
 
 Before a feature or SDK release:
+
+Use models and endpoints available to the test credentials and respect their
+actual per-model request limits. An HTTP 429 alone does not identify which
+limit was reached or establish that the account has no credit.
 
 1. Pass the complete local checks and public HACS/Hassfest CI.
 2. Back up a real instance, verify installed files, validate configuration and

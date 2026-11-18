@@ -37,6 +37,11 @@ HACS/Marketplace releases configured with `zip_release` install the attached
 `mistral_conversation.zip`. GitHub counts downloads of this file, including
 updates and redownloads; this is not a count of unique users.
 
+Prereleases are experimental and require an explicit version selection in HACS.
+Back up Home Assistant first, select the prerelease when downloading or
+redownloading this integration, then restart Home Assistant. Review the release
+notes for checks that still need independent testing.
+
 ### Manual installation
 
 1. Copy `custom_components/mistral_conversation` into your Home Assistant
@@ -57,6 +62,12 @@ updates and redownloads; this is not a count of unique users.
 
 Each entity has its own settings. Upgrades preserve existing model selections,
 voices, audio options and pipelines.
+
+To change the API key, open **Settings → Devices & services → Mistral AI
+Conversation**. Open the account entry's **⋮** menu, select **Reconfigure** and
+enter the new key. Home Assistant validates it with Mistral before switching
+the existing entities to it. If you switch accounts, check access to your
+configured models and saved voices on the new account.
 
 ### Models
 
@@ -100,6 +111,30 @@ custom SDK efforts remain editable where supported.
 
 With **Prefer handling commands locally** enabled, locally handled commands
 and spoken replies remain available for later conversation turns.
+
+#### Prompt caching
+
+Conversation entities automatically send a stable Mistral prompt-cache key for
+each account, entity and configured model. This helps Mistral reuse matching
+system instructions and tool definitions across separate conversations as well
+as follow-up turns. No setting is needed.
+
+Every request still includes Home Assistant's complete prompt, tools and relevant
+history. The integration does not cache entity data or answers locally. Changes
+to instructions, exposed tools or other content near the start of the prompt
+can reduce reuse; templates that change on every request can do the same.
+
+To check reuse, inspect the `stats` entries in Home Assistant conversation
+traces. `cached_input_tokens` reports the provider's cached input count;
+`input_tokens` still includes all input tokens and `output_tokens` reports the
+generated tokens. A zero means Mistral reported no cached tokens. A missing
+field means no valid cache count was reported, rather than a confirmed miss.
+Only numeric counts are added to these traces.
+The same counts appear in integration debug logs as `Mistral token usage`;
+use the logging configuration under [Troubleshooting](#troubleshooting) to
+enable them.
+See [Mistral's prompt-caching documentation](https://docs.mistral.ai/inference/conversations/advanced/prompt-caching)
+for provider behavior and billing.
 
 ### AI Task
 
@@ -179,14 +214,24 @@ STT accepts mono, 16-bit, 16 kHz PCM from Assist.
 | Transcription mode | Behavior |
 | --- | --- |
 | Automatic | Use discovered capabilities, then documented model IDs; unknown IDs use Batch |
-| Batch | Buffer one recording, add a WAV header and send the pipeline language |
+| Batch | Buffer one recording, add a WAV header and send it to the file endpoint |
 | Realtime | Send audio during capture through the WebSocket endpoint |
 
 Mini Transcribe 3 and Small Transcribe 3 use the file transcription endpoint.
 This Batch mode processes one Assist recording per request.
 
-Realtime uses automatic language detection. Assist determines when speech ends,
-and the integration waits for the final transcript before starting the
+Each STT entity has a **Transcription language** setting for both modes. New
+entities **Follow Assist pipeline** by default. Choose **Automatic detection**
+to let Voxtral detect the spoken language, or select a fixed language to override
+the pipeline language. Regional pipeline locales such as `fr-FR` are sent as
+two-letter codes such as `fr`.
+
+Existing entities keep **Default for transcription mode**: pipeline language in
+Batch and automatic detection in Realtime. This choice remains available until
+you select another language setting.
+
+Assist determines when speech ends, and the integration waits for the final
+transcript before starting the
 conversation agent. Turn-detection events do not discard trailing words.
 A failed Realtime request is not retried through Batch.
 

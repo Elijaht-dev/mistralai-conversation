@@ -2,12 +2,14 @@
   "title": "Mistral AI Conversation",
   "config": {
     "abort": {
-      "already_configured": "This Mistral AI account is already configured.",
-      "reauth_successful": "Reauthentication was successful."
+      "already_configured": "This API key is already in use by a Mistral AI entry.",
+      "reauth_successful": "Reauthentication was successful.",
+      "reconfigure_successful": "The Mistral AI API key has been updated."
     },
     "error": {
       "cannot_connect": "Failed to connect to Mistral AI.",
       "invalid_auth": "The API key is invalid or does not have access.",
+      "rate_limited": "Mistral AI rate-limited the key check. Try again later.",
       "timeout_connect": "Mistral AI did not respond before the connection timed out.",
       "unknown": "Unexpected error."
     },
@@ -21,6 +23,13 @@
         },
         "description": "Mistral AI rejected the saved credentials. Enter a valid API key to reconnect.",
         "title": "Reconnect Mistral AI"
+      },
+      "reconfigure": {
+        "data": {
+          "api_key": "New API key"
+        },
+        "description": "All entities in this entry will use the new key. If you switch Mistral accounts, check that your models and voices are available on the new account.",
+        "title": "Change the Mistral AI API key"
       },
       "user": {
         "data": {
@@ -139,19 +148,22 @@
           "data": {
             "model": "Transcription model",
             "name": "Name",
-            "transcription_mode": "Transcription mode"
+            "transcription_mode": "Transcription mode",
+            "transcription_language": "Transcription language"
           },
           "data_description": {
             "model": "Choose a Voxtral model or enter a custom ID. New entities use Realtime 3.",
             "name": "Name shown for this speech-to-text entity in Home Assistant.",
-            "transcription_mode": "Automatic uses known model capabilities; unknown models use Batch. Choose Batch or Realtime for a custom model."
+            "transcription_mode": "Automatic uses known model capabilities; unknown models use Batch. Choose Batch or Realtime for a custom model.",
+            "transcription_language": "Follow the Assist pipeline language, detect it automatically, or select a fixed language. Default for transcription mode preserves existing behavior: pipeline language in Batch, automatic detection in Realtime."
           },
           "description": "Configure Mistral transcription for Assist. Voice audio is sent to Mistral AI, during speech when using Realtime. Assist receives the final transcript when speech ends.",
           "title": "Mistral speech-to-text"
         }
       },
       "error": {
-        "model_no_transcription": "The selected model does not support this transcription mode."
+        "model_no_transcription": "The selected model does not support this transcription mode.",
+        "invalid_transcription_language": "Select a supported transcription language."
       }
     },
     "tts": {
@@ -407,6 +419,26 @@
       "options": {
         "standard": "Standard",
         "realtime": "Realtime"
+      }
+    },
+    "transcription_language": {
+      "options": {
+        "ar": "Arabic",
+        "de": "German",
+        "en": "English",
+        "es": "Spanish",
+        "fr": "French",
+        "hi": "Hindi",
+        "it": "Italian",
+        "ja": "Japanese",
+        "ko": "Korean",
+        "nl": "Dutch",
+        "pt": "Portuguese",
+        "ru": "Russian",
+        "zh": "Chinese",
+        "pipeline": "Follow Assist pipeline",
+        "auto": "Automatic detection",
+        "legacy": "Default for transcription mode"
       }
     }
   }

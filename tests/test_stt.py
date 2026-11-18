@@ -14,8 +14,10 @@ from homeassistant.components import stt
 from homeassistant.config_entries import ConfigSubentry
 from homeassistant.const import CONF_MODEL
 from homeassistant.core import HomeAssistant
+from mistralai.client.types import UNSET
 
 from custom_components.mistral_conversation.const import (
+    CONF_TRANSCRIPTION_LANGUAGE,
     CONF_TRANSCRIPTION_MODE,
     DEFAULT_STT_MODEL,
     REALTIME_STT_MODEL,
@@ -113,6 +115,90 @@ async def test_stt_transcribes_wav_with_metadata_language(
         assert wav_file.getsampwidth() == 2
         assert wav_file.getframerate() == 16000
         assert wav_file.readframes(wav_file.getnframes()) == b"\x01\x02\x03\x04"
+
+
+@pytest.mark.parametrize("transport", ["batch", "realtime"])
+@pytest.mark.parametrize(
+    ("selection", "expected"),
+    [("pipeline", "fr"), ("en", "en"), ("auto", None), ("legacy", "legacy")],
+)
+async def test_stt_language_selection(
+    mock_config_entry, mock_init_component, transport, selection, expected
+):
+    """The same entity setting controls both provider endpoints."""
+    subentry = ConfigSubentry(
+        data=MappingProxyType(
+            {
+                CONF_MODEL: "custom-transcription",
+                CONF_TRANSCRIPTION_MODE: transport,
+                CONF_TRANSCRIPTION_LANGUAGE: selection,
+            }
+        ),
+        subentry_type=SUBENTRY_TYPE_STT,
+        title="Test language",
+        unique_id=None,
+    )
+    entity = MistralSTTEntity(mock_config_entry, subentry)
+    socket = Socket()
+    mock_init_component.audio.realtime.connect = AsyncMock(
+        return_value=connection(socket)
+    )
+    mock_init_component.audio.transcriptions.complete_async.return_value = (
+        SimpleNamespace(text="Hello")
+    )
+    result = await entity.async_process_audio_stream(
+        _metadata("fr-FR"), _audio_stream(b"ab")
+    )
+    assert result.result is stt.SpeechResultState.SUCCESS
+    if expected == "legacy":
+        expected = "fr" if transport == "batch" else None
+    if transport == "batch":
+        arguments = (
+            mock_init_component.audio.transcriptions.complete_async.await_args.kwargs
+        )
+    else:
+        updates = [item for item in socket.sent if item["type"] == "session.update"]
+        arguments = updates[0]["session"] if updates else {}
+        assert socket.closed
+    if expected is None:
+        assert arguments.get("language", UNSET) is UNSET
+    else:
+        assert arguments["language"] == expected
+
+
+@pytest.mark.parametrize("transport", ["batch", "realtime"])
+@pytest.mark.parametrize(
+    ("selection", "pipeline_language"),
+    [("invalid", "fr-FR"), (None, "fr-FR"), ([], "fr-FR"), ("pipeline", "zz-ZZ")],
+)
+async def test_stt_invalid_language_never_consumes_audio(
+    mock_config_entry, mock_init_component, transport, selection, pipeline_language
+):
+    """Corrupt saved settings fail locally without sending or reading audio."""
+    subentry = ConfigSubentry(
+        data=MappingProxyType(
+            {
+                CONF_MODEL: "custom-transcription",
+                CONF_TRANSCRIPTION_MODE: transport,
+                CONF_TRANSCRIPTION_LANGUAGE: selection,
+            }
+        ),
+        subentry_type=SUBENTRY_TYPE_STT,
+        title="Invalid language",
+        unique_id=None,
+    )
+    entity = MistralSTTEntity(mock_config_entry, subentry)
+
+    async def unexpected_audio():
+        pytest.fail("Invalid language must be rejected before reading audio")
+        yield b"ab"
+
+    result = await entity.async_process_audio_stream(
+        _metadata(pipeline_language), unexpected_audio()
+    )
+    assert result.result is stt.SpeechResultState.ERROR
+    mock_init_component.audio.transcriptions.complete_async.assert_not_awaited()
+    mock_init_component.audio.realtime.connect.assert_not_called()
 
 
 async def test_stt_provider_error_updates_availability(

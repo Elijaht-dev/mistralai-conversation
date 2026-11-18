@@ -25,7 +25,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - ha: "2026.11.0"
+          - ha: "2026.11.1"
             httpx2: "2.14.0"
             requirements: requirements_test.txt
           - ha: "2026.10.4"
@@ -80,7 +80,7 @@ jobs:
         run: ruff check .
 
       - name: Type check
-        if: matrix.ha == '2026.11.0'
+        if: matrix.ha == '2026.11.1'
         run: mypy
 
       - name: Run Home Assistant-native tests

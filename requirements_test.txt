@@ -1,4 +1,4 @@
 -r requirements_test_base.txt
 homeassistant==2026.11.1
-httpx2==2.14.0
+httpx2==2.16.0
 pytest-homeassistant @ https://github.com/home-assistant/core/archive/d8a0dc698c8946b44e455d904000db563cfbf1ba.tar.gz#subdirectory=packages/pytest-homeassistant

@@ -63,6 +63,12 @@ notes for checks that still need independent testing.
 Each entity has its own settings. Upgrades preserve existing model selections,
 voices, audio options and pipelines.
 
+To change the API key, open **Settings → Devices & services → Mistral AI
+Conversation**. Open the account entry's **⋮** menu, select **Reconfigure** and
+enter the new key. Home Assistant validates it with Mistral before switching
+the existing entities to it. If you switch accounts, check access to your
+configured models and saved voices on the new account.
+
 ### Models
 
 Model menus offer a curated list and accept custom or fine-tuned IDs. Saved

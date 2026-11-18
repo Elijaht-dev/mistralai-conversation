@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, cast, override
 
 import httpx2
 from homeassistant.config_entries import (
+    SOURCE_REAUTH,
     SOURCE_USER,
     ConfigEntry,
     ConfigEntryState,
@@ -36,6 +37,9 @@ from homeassistant.helpers.selector import (
     SelectSelectorConfig,
     SelectSelectorMode,
     TemplateSelector,
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
 )
 from homeassistant.helpers.typing import VolDictType
 from mistralai.client.errors import MistralError, NoResponseError
@@ -103,6 +107,13 @@ else:
     import voluptuous as vol
 
 _LOGGER = logging.getLogger(__name__)
+_API_KEY_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_API_KEY): TextSelector(
+            TextSelectorConfig(type=TextSelectorType.PASSWORD)
+        )
+    }
+)
 
 
 def _connection_error_key(err: BaseException) -> str:
@@ -112,6 +123,8 @@ def _connection_error_key(err: BaseException) -> str:
         return "invalid_auth"
     if error_kind is ApiErrorKind.TIMEOUT:
         return "timeout_connect"
+    if error_kind is ApiErrorKind.RATE_LIMIT:
+        return "rate_limited"
     return "cannot_connect"
 
 
@@ -241,6 +254,25 @@ class MistralConfigFlow(ConfigFlow, domain=DOMAIN):
             SUBENTRY_TYPE_TTS: TTSSubentryFlowHandler,
         }
 
+    async def _async_validate_key(self, api_key: str) -> dict[str, str]:
+        """Validate a key before saving it to an account entry."""
+        if not api_key.strip():
+            return {"base": "invalid_auth"}
+        match = {CONF_API_KEY: api_key}
+        self._async_abort_entries_match(match)
+        try:
+            await async_validate_api_key(self.hass, api_key)
+        except (MistralError, NoResponseError, httpx2.HTTPError, TimeoutError) as err:
+            return {"base": _connection_error_key(err)}
+        except Exception as err:
+            _LOGGER.error(
+                "Unexpected error validating Mistral API key (%s)", type(err).__name__
+            )
+            return {"base": "unknown"}
+        # Another entry may have saved this key during the provider request.
+        self._async_abort_entries_match(match)
+        return {}
+
     @override
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -250,20 +282,8 @@ class MistralConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             api_key = user_input[CONF_API_KEY]
-            self._async_abort_entries_match({CONF_API_KEY: api_key})
-            try:
-                await async_validate_api_key(self.hass, api_key)
-            except (
-                MistralError,
-                NoResponseError,
-                httpx2.HTTPError,
-                TimeoutError,
-            ) as err:
-                errors["base"] = _connection_error_key(err)
-            except Exception:
-                _LOGGER.exception("Unexpected exception validating Mistral API key")
-                errors["base"] = "unknown"
-            else:
+            errors = await self._async_validate_key(api_key)
+            if not errors:
                 return self.async_create_entry(
                     title=DEFAULT_TITLE,
                     data={CONF_API_KEY: api_key},
@@ -291,7 +311,7 @@ class MistralConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema({vol.Required(CONF_API_KEY): str}),
+            data_schema=_API_KEY_SCHEMA,
             errors=errors or None,
             description_placeholders={
                 "api_key_url": "https://console.mistral.ai/api-keys/"
@@ -305,33 +325,45 @@ class MistralConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_reauth_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Validate and save a replacement API key."""
+        """Replace a key after an authentication failure."""
+        return await self._async_replace_key(
+            self._get_reauth_entry(), "reauth_confirm", user_input
+        )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Let the user change the key for all entities in this entry."""
+        return await self._async_replace_key(
+            self._get_reconfigure_entry(), "reconfigure", user_input
+        )
+
+    async def _async_replace_key(
+        self, entry: ConfigEntry, step_id: str, user_input: dict[str, Any] | None
+    ) -> ConfigFlowResult:
+        """Apply a validated key and reload the existing account once."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
             api_key = user_input[CONF_API_KEY]
-            try:
-                await async_validate_api_key(self.hass, api_key)
-            except (
-                MistralError,
-                NoResponseError,
-                httpx2.HTTPError,
-                TimeoutError,
-            ) as err:
-                errors["base"] = _connection_error_key(err)
-            except Exception:
-                _LOGGER.exception("Unexpected exception reauthenticating Mistral")
-                errors["base"] = "unknown"
-            else:
-                return self.async_update_reload_and_abort(
-                    self._get_reauth_entry(),
-                    data_updates={CONF_API_KEY: api_key},
+            errors = await self._async_validate_key(api_key)
+            if not errors:
+                # The loaded entry's update listener reloads it when the key changes.
+                needs_reload = not entry.update_listeners or (
+                    self.source == SOURCE_REAUTH and api_key == entry.data[CONF_API_KEY]
                 )
+                result = self.async_update_and_abort(
+                    entry, data_updates={CONF_API_KEY: api_key}
+                )
+                if needs_reload:
+                    self.hass.config_entries.async_schedule_reload(entry.entry_id)
+                return result
 
         return self.async_show_form(
-            step_id="reauth_confirm",
-            data_schema=vol.Schema({vol.Required(CONF_API_KEY): str}),
+            step_id=step_id,
+            data_schema=_API_KEY_SCHEMA,
             errors=errors or None,
+            last_step=True,
         )
 
 

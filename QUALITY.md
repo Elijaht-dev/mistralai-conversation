@@ -156,6 +156,11 @@ Home Assistant owns its local media copy.
 
 ### Failures and privacy
 
+Account reconfiguration and reauthentication validate a replacement API key
+through model discovery before saving it. Failed validation preserves the
+active configuration. A successful change reloads the same entry with its
+existing subentries and entity IDs. The credential forms use empty password fields.
+
 Authentication starts reauthentication. Timeout, connection, rate-limit and
 provider failures remain distinct. Connection failures update availability and
 schedule discovery recovery; validation and rate-limit errors do not mark the
@@ -207,6 +212,64 @@ checksum-verified libjpeg-turbo 3.2.1. Setup and commands are in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Recorded validation
+
+### Version 1.2.0 validation
+
+On 2026-11-18, the combined candidate included prompt caching, STT language
+selection and account API-key reconfiguration. Python 3.14.7 and SDK 3.7.0
+passed formatting, lint, strict typing, dependency checks and offline HACS
+validation. All five complete pinned suites were rerun:
+
+| Home Assistant | HTTPX2 | Tests passed / skipped | Total coverage | Branch coverage |
+| --- | --- | --- | --- | --- |
+| 2026.11.1 | 2.14.0 | 732 / 0 | 95.55% | 91.55% |
+| 2026.10.4 | 2.14.0 | 689 / 43 | 92.21% | 87.68% |
+| 2026.7.4 | 2.14.0 | 689 / 43 | 92.33% | 87.79% |
+| 2026.10.4 | 2.16.0 | 689 / 43 | 92.21% | 87.68% |
+| 2026.7.4 | 2.16.0 | 689 / 43 | 92.33% | 87.79% |
+
+The older baselines skip evaluation tests because that API requires HA
+2026.11. Reconfiguration tests cover failed validation, blank keys, duplicate
+keys including concurrent configuration, preservation of entity/subentry IDs,
+replacement-client cleanup and exactly one reload after a changed key.
+
+A fresh native backup and verified rollback files preceded installation on
+HA 2026.11.2. All 27 installed runtime files matched the candidate after a full
+restart. With the subscribed account, the formerly blocked audio endpoints
+accepted requests. The following real-provider checks passed:
+
+| Live check | Result |
+| --- | --- |
+| Account Reconfigure form, empty password, blank-key rejection and saved-key revalidation | Passed |
+| Batch STT: pipeline language, fixed French overriding an English pipeline and automatic detection | Passed |
+| Realtime STT: the same three language choices | Passed |
+| Realtime STT cancellation and subsequent successful transcription | Passed |
+| Fresh Conversation and follow-ups after one/two local intents | Passed |
+| Read-only Assist tool round trip and structured AI Task | Passed |
+| AI Task evaluation: all three question types, PNG and PDF inputs | Passed |
+| Standard TTS with normalization and Realtime TTS using the saved voice | Passed |
+| Audio retrieval/decoding, early Realtime download close and subsequent recovery | Passed |
+| Native Assist text/audio streaming with a temporary pipeline | Passed |
+| Image generation, reference image, HA media retrieval and temporary-media cleanup | Passed |
+| Private synthetic Files API upload, integration download, deletion and failed retrieval after deletion | Passed with the pinned SDK in a separate test process |
+
+Three new conversations returned valid token statistics with 4,982 input
+tokens each and an explicit zero cached count. This rerun did not observe a
+cache hit; the earlier positive cache result remains recorded below. Provider
+prefix reuse and latency improvements are not guaranteed.
+
+In one native Assist request, the first audio bytes arrived after 1.70 seconds,
+before text generation completed at 3.56 seconds. The audio transfer completed
+after 16.64 seconds and decoded successfully. These are measurements from one
+synthetic request, not a general latency claim or physical playback validation.
+
+Temporary entities, pipelines and synthetic image files were removed. A final
+configuration check and full restart cleared temporary debug logging. Saved
+account settings and pipelines matched their original snapshots, installed
+files still matched the candidate, and final observed integration logs had no
+warning/error or blocking-call lines. Physical microphones, satellites and
+speakers were not tested. Public HACS/Hassfest CI remains required on the final
+commit before publication.
 
 ### Version 1.2.0b1 combined validation
 

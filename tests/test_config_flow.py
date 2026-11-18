@@ -16,8 +16,10 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType, InvalidData
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import entity_registry as er
 from mistralai.client.errors import NoResponseError
 
+from custom_components.mistral_conversation.api import MistralClientResources
 from custom_components.mistral_conversation.const import (
     CONF_IMAGE_MODEL,
     CONF_MAX_TOKENS,
@@ -125,25 +127,34 @@ async def test_duplicate_entry_aborts(
 
 
 @pytest.mark.parametrize(
+    "source", [config_entries.SOURCE_USER, config_entries.SOURCE_RECONFIGURE]
+)
+@pytest.mark.parametrize(
     ("error", "error_key"),
     [
         (mistral_error(401), "invalid_auth"),
         (mistral_error(408), "timeout_connect"),
+        (mistral_error(429), "rate_limited"),
         (mistral_error(500), "cannot_connect"),
         (NoResponseError("no response"), "cannot_connect"),
-        (RuntimeError("unexpected"), "unknown"),
+        (RuntimeError("Failed to use test-private-key"), "unknown"),
     ],
 )
-async def test_user_form_errors(
+async def test_api_key_form_errors(
     hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
     mock_setup_entry: AsyncMock,
+    caplog: pytest.LogCaptureFixture,
+    source: str,
     error: BaseException,
     error_key: str,
 ) -> None:
-    """Provider and unexpected errors are presented with stable flow keys."""
+    """A failed validation keeps the form open without exposing or saving the key."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
-        context={"source": config_entries.SOURCE_USER},
+        context={"source": source, "entry_id": mock_config_entry.entry_id}
+        if source == config_entries.SOURCE_RECONFIGURE
+        else {"source": source},
     )
     with patch(
         "custom_components.mistral_conversation.config_flow.async_validate_api_key",
@@ -152,11 +163,18 @@ async def test_user_form_errors(
     ):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"],
-            {CONF_API_KEY: "bad-key"},
+            {CONF_API_KEY: "test-private-key"},
         )
 
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {"base": error_key}
+    (field,) = to_field_list(
+        result["data_schema"], custom_serializer=cv.custom_serializer
+    )
+    assert field["selector"]["text"]["type"] == "password"
+    assert "default" not in field and "suggested_value" not in field
+    assert mock_config_entry.data[CONF_API_KEY] == "test-api-key"
+    assert "test-private-key" not in caplog.text
     mock_setup_entry.assert_not_awaited()
 
 
@@ -183,6 +201,7 @@ async def test_reauthentication_success(
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reauth_successful"
     assert mock_config_entry.data[CONF_API_KEY] == "replacement-key"
+    mock_setup_entry.assert_awaited_once()
 
 
 async def test_reauthentication_error(
@@ -205,6 +224,121 @@ async def test_reauthentication_error(
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {"base": "invalid_auth"}
     assert mock_config_entry.data[CONF_API_KEY] == "test-api-key"
+
+
+async def test_reconfigure_loaded_account(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_init_component: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """The same registered entities use the new client after exactly one reload."""
+    entry_id = mock_config_entry.entry_id
+    subentries = dict(mock_config_entry.subentries)
+    entities = {
+        e.entity_id
+        for e in er.async_entries_for_config_entry(entity_registry, entry_id)
+    }
+    assert entities
+    result = await mock_config_entry.start_reconfigure_flow(hass)
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "reconfigure"
+    (field,) = to_field_list(
+        result["data_schema"], custom_serializer=cv.custom_serializer
+    )
+    assert field["name"] == CONF_API_KEY and field["required"]
+    assert field["selector"]["text"]["type"] == "password"
+    assert "default" not in field and "suggested_value" not in field
+
+    with (
+        patch(
+            "custom_components.mistral_conversation.config_flow.async_validate_api_key",
+            return_value=[],
+        ) as validate,
+        patch(
+            "custom_components.mistral_conversation.coordinator.async_create_client",
+            return_value=MistralClientResources(mock_init_component),
+        ) as create_client,
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_API_KEY: "test-other-account-key"}
+        )
+        await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    validate.assert_awaited_once_with(hass, "test-other-account-key")
+    create_client.assert_awaited_once_with(hass, "test-other-account-key")
+    mock_init_component.__aexit__.assert_awaited_once()
+    assert hass.config_entries.async_get_entry(entry_id) is mock_config_entry
+    assert mock_config_entry.state is config_entries.ConfigEntryState.LOADED
+    assert mock_config_entry.data[CONF_API_KEY] == "test-other-account-key"
+    assert mock_config_entry.subentries == subentries
+    assert {
+        e.entity_id
+        for e in er.async_entries_for_config_entry(entity_registry, entry_id)
+    } == entities
+
+
+@pytest.mark.parametrize("during_validation", [False, True])
+async def test_reconfigure_duplicate_key(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    during_validation: bool,
+) -> None:
+    """A second entry cannot claim the same key, including during validation."""
+    other = MockConfigEntry(domain=DOMAIN, data={CONF_API_KEY: "test-other-key"})
+    if not during_validation:
+        other.add_to_hass(hass)
+    result = await mock_config_entry.start_reconfigure_flow(hass)
+    with patch(
+        "custom_components.mistral_conversation.config_flow.async_validate_api_key",
+        side_effect=lambda *_: other.add_to_hass(hass),
+    ) as validate:
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_API_KEY: "test-other-key"}
+        )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+    assert validate.await_count == int(during_validation)
+    assert mock_config_entry.data[CONF_API_KEY] == "test-api-key"
+    assert other.data[CONF_API_KEY] == "test-other-key"
+
+
+@pytest.mark.parametrize("reauth", [False, True])
+async def test_resubmit_current_key(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_init_component: MagicMock,
+    reauth: bool,
+) -> None:
+    """The current key is allowed, and reauthentication retries with it."""
+    start = (
+        mock_config_entry.start_reauth_flow
+        if reauth
+        else mock_config_entry.start_reconfigure_flow
+    )
+    result = await start(hass)
+    with patch(
+        "custom_components.mistral_conversation.config_flow.async_validate_api_key",
+        return_value=[],
+    ) as validate:
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_API_KEY: " "}
+        )
+        assert result["errors"] == {"base": "invalid_auth"}
+        validate.assert_not_awaited()
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_API_KEY: "test-api-key"}
+        )
+        await hass.async_block_till_done()
+
+    validate.assert_awaited_once_with(hass, "test-api-key")
+    assert result["reason"] == (
+        "reauth_successful" if reauth else "reconfigure_successful"
+    )
+    assert mock_init_component.__aexit__.await_count == int(reauth)
 
 
 def _conversation_input(**updates: object) -> dict[str, object]:

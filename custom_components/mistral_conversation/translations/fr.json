@@ -2,12 +2,14 @@
   "title": "Conversation Mistral AI",
   "config": {
     "abort": {
-      "already_configured": "Ce compte Mistral AI est déjà configuré.",
-      "reauth_successful": "La réauthentification a réussi."
+      "already_configured": "Une entrée Mistral AI utilise déjà cette clé API.",
+      "reauth_successful": "La réauthentification a réussi.",
+      "reconfigure_successful": "La clé API Mistral AI a été mise à jour."
     },
     "error": {
       "cannot_connect": "Impossible de se connecter à Mistral AI.",
       "invalid_auth": "La clé API est incorrecte ou ne dispose pas des accès nécessaires.",
+      "rate_limited": "Mistral AI limite temporairement les demandes de vérification de clé. Réessayez plus tard.",
       "timeout_connect": "Mistral AI n'a pas répondu avant l'expiration du délai de connexion.",
       "unknown": "Erreur inattendue."
     },
@@ -21,6 +23,13 @@
         },
         "description": "Mistral AI a refusé les identifiants enregistrés. Saisissez une clé API valide pour vous reconnecter.",
         "title": "Reconnecter Mistral AI"
+      },
+      "reconfigure": {
+        "data": {
+          "api_key": "Nouvelle clé API"
+        },
+        "description": "Toutes les entités de cette entrée utiliseront la nouvelle clé. Si vous changez de compte Mistral, vérifiez que vos modèles et vos voix sont disponibles sur le nouveau compte.",
+        "title": "Changer la clé API Mistral AI"
       },
       "user": {
         "data": {
